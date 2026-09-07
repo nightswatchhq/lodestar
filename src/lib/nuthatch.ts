@@ -3,9 +3,10 @@
 // queryable over a guarded `GET /sql?q=<SQL>` surface (row-capped + timed out server-side). This is
 // the sibling of `subgraph.ts`: same "fetch → shape → return" contract, SQL instead of GraphQL.
 //
-// First consumer: the delegation-events feed (`/api/delegation-events`), backed by the
-// `graph-staking-nest` on the Helsinki box (HorizonStaking delegation events). Everything is opt-in
-// and falls back to the subgraph, so an unconfigured or unreachable nest changes nothing.
+// Since nuthatch#1160 every protocol route reads a nest and nothing else: there is no gateway
+// client, no API key and no fallback. An unconfigured or unreachable nest is an error the caller can
+// render, never a quiet change of source. The README's "Where the data comes from" section is the
+// map of which route reads which nest.
 
 // Type-only, so it is erased at compile time and does not turn the deliberate dynamic
 // `import('./nest-health')` below into a static cycle.
@@ -22,8 +23,10 @@ export function hasNuthatch(): boolean {
 
 /**
  * Run one SQL query against a nest's `/sql` surface and return its rows. `basePath` selects which nest
- * behind the shared host (empty = the default `graph-staking-nest` on `/sql`; `"/gns"` = the
- * `graph-gns-nest` reverse-proxied under `/gns/sql`). One URL + credential fronts both.
+ * behind the shared host: `"/alloc"` is `graph-allocations-nest`, `"/gns"` is `graph-gns-nest`,
+ * `"/dips"` and `"/dips-sepolia"` the two DIPS nests, `"/legacy-flows"` the frozen pre-Horizon
+ * staking archive. Empty means the host's catch-all, which points at `/alloc`. One URL + credential
+ * fronts all of them.
  */
 export async function nuthatchSql<T = Record<string, unknown>>(
   sql: string,
