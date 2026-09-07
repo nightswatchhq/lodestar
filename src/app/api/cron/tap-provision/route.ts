@@ -20,6 +20,7 @@ import { nuthatchSql } from '@/lib/nuthatch';
 import { indexerUrlSql, deploymentServingIndexersSql, type NestIndexerUrlRow } from '@/lib/nest-queries';
 import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
 import { log } from '@/lib/logger';
+import { noteCronRun } from '@/lib/cron-runs';
 
 const BOUNTY_BOARD = (process.env.NEXT_PUBLIC_BOUNTY_BOARD_ADDRESS ?? '').trim() as `0x${string}`;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -88,6 +89,7 @@ async function resolveIndexers(chainBountyId: string, deploymentId: string): Pro
 }
 
 export async function GET(req: NextRequest) {
+  const startedAt = new Date();
   if (!isAuthorized(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -112,6 +114,9 @@ export async function GET(req: NextRequest) {
   `;
 
   if (bounties.length === 0) {
+    // Recorded: "ran, nothing to do" is a healthy outcome and has to be distinguishable from
+    // "did not run", which is what it used to look like.
+    await noteCronRun(db!, 'tap-provision', startedAt, 0);
     return NextResponse.json({ provisioned: {}, note: 'no claimed bounties' });
   }
 
@@ -144,5 +149,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  await noteCronRun(db!, 'tap-provision', startedAt, Object.keys(results).length);
   return NextResponse.json({ provisioned: results });
 }
