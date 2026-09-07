@@ -29,6 +29,12 @@ const EDGE_SECRET = process.env.LODESTAR_EDGE_SECRET;
 /**
  * The routes kittiwake serves, as its own router lists them.
  *
+ * `/api/indexing-status/`, `/api/subgraph-curation/` and `/api/subgraph-history/` were in this list
+ * and have been taken out. They answered 200 but with a different payload entirely: the history
+ * route returned `{allocations, signals}` where the frontend reads `{history}`. They were never in
+ * the parity harness, so nothing caught it; they are in it now, and they come back here when the
+ * ports are finished. See nightswatchhq/kittiwake#23.
+ *
  * An explicit list rather than a prefix, because the two services split `/api` between them and
  * `/api/studio/*`, `/api/scuttlebutt/*` and the long tail are still here. Anything absent from this
  * list is served by Next as it always was.
@@ -55,7 +61,6 @@ const MIGRATED: readonly string[] = [
   '/api/indexer/',
   '/api/indexers',
   '/api/indexers-enriched',
-  '/api/indexing-status/',
   '/api/network-stats',
   '/api/payments',
   '/api/poi',
@@ -66,10 +71,8 @@ const MIGRATED: readonly string[] = [
   '/api/rewards-history',
   '/api/sql/catalog',
   '/api/sql/query',
-  '/api/subgraph-curation/',
   '/api/subgraph-deployments',
   '/api/subgraph-fees-30d',
-  '/api/subgraph-history/',
   '/api/subgraph-names',
   '/api/subgraph-search',
   '/api/token-metrics',

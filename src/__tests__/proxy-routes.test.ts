@@ -33,8 +33,24 @@ describe('the migrated route list', () => {
 
   it('takes parameterised routes and everything under them', () => {
     expect(isMigrated('/api/indexer/0xabc')).toBe(true);
-    expect(isMigrated('/api/subgraph-history/QmAbc')).toBe(true);
     expect(isMigrated('/api/indexer-status/0xabc')).toBe(true);
+    expect(isMigrated('/api/apr-provenance/0xabc')).toBe(true);
+  });
+
+  /**
+   * These three shipped in the list and answered 200 with a payload the frontend could not read -
+   * `/api/subgraph-history` returned `{allocations, signals}` where the page reads `{history}`.
+   * They were never in the parity harness. Until the ports are finished they stay on Next, and this
+   * test is what stops them drifting back in unnoticed. See nightswatchhq/kittiwake#23.
+   */
+  it('keeps the three deployment routes on Next until their ports are finished', () => {
+    for (const path of [
+      '/api/indexing-status/QmAbc',
+      '/api/subgraph-curation/QmAbc',
+      '/api/subgraph-history/QmAbc',
+    ]) {
+      expect(isMigrated(path), `${path} is not a finished port`).toBe(false);
+    }
   });
 
   /**
