@@ -1,17 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'fs';
+import { MIGRATED as list, isMigrated } from '@/lib/migration';
 
 /**
- * The list in `proxy.ts` decides which routes leave Next for the Rust backend. Getting it wrong is
- * quiet in both directions: a route wrongly included 404s, and one wrongly excluded stays on the
- * slow path while everything still works. Neither shows up as an error, so both are tested.
+ * The list decides which routes leave Next for the Rust backend. Getting it wrong is quiet in both
+ * directions: a route wrongly included 404s, and one wrongly excluded stays on the slow path while
+ * everything still works. Neither shows up as an error, so both are tested.
+ *
+ * This used to read `src/proxy.ts` and re-implement the matcher against a regex over its source,
+ * which meant the thing under test was a copy of the thing that ships. It now imports both, so a
+ * change to the real matcher is a change to what these assertions run.
  */
-const source = readFileSync('src/proxy.ts', 'utf8');
-const list: string[] = Array.from(source.matchAll(/^\s*'(\/api\/[^']*)',$/gm)).map((m) => m[1]);
-
-function isMigrated(path: string): boolean {
-  return list.some((p) => (p.endsWith('/') ? path.startsWith(p) : path === p));
-}
 
 describe('the migrated route list', () => {
   it('is not empty, which would silently disable the whole cutover', () => {
@@ -31,10 +29,25 @@ describe('the migrated route list', () => {
     expect(isMigrated('/api/epochs-of-doom')).toBe(false);
   });
 
-  it('takes parameterised routes and everything under them', () => {
+  it('takes parameterised routes, one segment deep and no further', () => {
     expect(isMigrated('/api/indexer/0xabc')).toBe(true);
     expect(isMigrated('/api/indexer-status/0xabc')).toBe(true);
     expect(isMigrated('/api/apr-provenance/0xabc')).toBe(true);
+  });
+
+  /**
+   * Three live faults, found by the migration inventory's cross-check on 7 September.
+   *
+   * `/api/indexer/` used to mean "everything under it", so the edge forwarded `.../pnl` and
+   * `.../revenue` to a backend with no handler for either and both answered 404 in production,
+   * while the Next handlers that would have served them sat one rewrite away. `present-poi` is
+   * worse: it occupies the address slot, so kittiwake's `/api/indexer/{address}` handler took it
+   * and answered `400 not a valid address` on a POST that submits a PoI.
+   */
+  it('does not forward the sub-routes kittiwake has no handler for', () => {
+    expect(isMigrated('/api/indexer/0xabc/pnl')).toBe(false);
+    expect(isMigrated('/api/indexer/0xabc/revenue')).toBe(false);
+    expect(isMigrated('/api/indexer/present-poi')).toBe(false);
   });
 
   /**

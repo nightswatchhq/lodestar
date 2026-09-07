@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { rateLimit } from '@/lib/rate-limit';
+// One list, shared with the migration inventory and its filesystem check. Keeping a second copy
+// here is the defect behind nightswatchhq/kittiwake#23.
+import { isMigrated } from '@/lib/migration';
 
 export const config = {
   matcher: '/api/:path*',
@@ -25,80 +28,6 @@ const API_ORIGIN = process.env.LODESTAR_API_ORIGIN?.replace(/\/+$/, '');
  * directly cannot name themselves whoever they like.
  */
 const EDGE_SECRET = process.env.LODESTAR_EDGE_SECRET;
-
-/**
- * The routes kittiwake serves, as its own router lists them.
- *
- * Eight routes were taken out on 7 September, having shipped with the wrong shape. **Seven are
- * back**, each agreeing with the old handler in the parity harness. One remains out:
- * `indexing-status`, whose port needs the live serving probe and is a subsystem rather than a
- * shape.
- *
- * Every one of the eight answered 200 with a payload the frontend could not read -
- * `subgraph-history` returned `{allocations, signals}` where the page reads `{history}`,
- * `indexer-stake-history` returned no `history` at all.
- *
- * None of the eight was in the parity harness, which is the whole reason they shipped. That gap is
- * now a test on the kittiwake side: nothing the service serves may go uncompared. They come back
- * here as their ports are finished and the harness agrees. See nightswatchhq/kittiwake#23.
- *
- * An explicit list rather than a prefix, because the two services split `/api` between them and
- * `/api/studio/*`, `/api/scuttlebutt/*` and the long tail are still here. Anything absent from this
- * list is served by Next as it always was.
- *
- * Kept in step by hand, which is the honest weakness of it: a route added to kittiwake and not to
- * this list stays on Next and nobody notices, because both answer. The parity harness is what
- * catches that, and `docs/status.md` in the kittiwake repo is what it writes.
- */
-const MIGRATED: readonly string[] = [
-  '/api/chain-lag',
-  '/api/curators',
-  '/api/delegation-events',
-  '/api/delegation-flows',
-  '/api/developer-activity',
-  '/api/dips',
-  '/api/dropped-chains',
-  '/api/epochs',
-  '/api/horizon/activity',
-  '/api/indexer-node-health',
-  '/api/indexer-status/',
-  '/api/indexer/',
-  '/api/indexers',
-  '/api/indexers-enriched',
-  '/api/network-stats',
-  '/api/payments',
-  '/api/poi',
-  '/api/portfolio',
-  '/api/price',
-  '/api/provisions',
-  '/api/reo',
-  '/api/sql/query',
-  '/api/subgraph-deployments',
-  '/api/subgraph-fees-30d',
-  '/api/subgraph-names',
-  '/api/subgraph-search',
-  '/api/sql/catalog',
-  '/api/grt-flow',
-  '/api/rewards-history',
-  '/api/apr-provenance/',
-  '/api/subgraph-curation/',
-  '/api/subgraph-history/',
-  '/api/indexer-stake-history/',
-  '/api/token-metrics',
-  '/api/tvl',
-  '/api/whoami',
-];
-
-/**
- * Is this exact route one of the migrated ones?
- *
- * A trailing slash in the list means "this and everything under it", which is how the parameterised
- * routes are expressed. Everything else must match exactly: `/api/indexers` must not swallow
- * `/api/indexers-enriched` by prefix, and a bare `startsWith` would do precisely that.
- */
-function isMigrated(path: string): boolean {
-  return MIGRATED.some((p) => (p.endsWith('/') ? path.startsWith(p) : path === p));
-}
 
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const path = request.nextUrl.pathname;

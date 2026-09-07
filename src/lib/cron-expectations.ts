@@ -31,7 +31,7 @@ export interface CronExpectation {
    */
   staleAfterMinutes: number;
   /** Where it is scheduled, because the answer changes where you go to fix it. */
-  where: 'vercel' | 'droplet';
+  where: 'vercel' | 'kittiwake';
   what: string;
 }
 
@@ -45,24 +45,60 @@ export interface CronExpectation {
 export const RETIRED_CRONS: Record<string, string> = {
   'compute-scores':
     'folded into `refresh`, which computes the composite score in the same pass. The runner has no such case any more.',
+
+  // Removed from vercel.json in b2f7273 with the Dispatch gateway, and left declared here, so
+  // /api/health reported four permanently stale crons that had in fact been deleted on purpose.
+  // Exactly the `compute-scores` failure again, five weeks later.
+  'check-provider-liveness':
+    'watched Dispatch RPC providers. Deleted with the Dispatch gateway (nightswatchhq/lodestar#99); there are no providers left to watch.',
+  'dispatch-notifications':
+    'push notifications for the Dispatch gateway, discontinued along with push itself.',
+  'check-dips':
+    'watched the DIPS allocation for the governance change that turns it on. Superseded by dips-nest, which indexes the contracts directly.',
+  'check-dips-chain':
+    'compared the DIPS nest against the allocator it indexes. Retired with check-dips.',
+  'check-nest-health':
+    'watched the nuthatch nests this dashboard stands on. Deleted in b2f7273. NOTE: nothing replaced it, and the nests have been unwatched since 2026-09-07 14:45 — see nightswatchhq/nuthatch#1199, a stalled seal that this check would not have caught anyway because it read /ready, which cannot distinguish a stalled seal from a healthy one.',
+
+  // The old unprefixed steps. Everything below now runs inside kittiwake under a `kittiwake:`
+  // name; these rows are history and must not read as a job that stopped.
+  refresh: 'moved into kittiwake as `kittiwake:refresh`.',
+  snapshot: 'moved into kittiwake as `kittiwake:snapshot-network`.',
+  delegations: 'moved into kittiwake as `kittiwake:ingest-delegations`.',
+  epochs: 'moved into kittiwake as `kittiwake:ingest-epochs`.',
+  allocations: 'moved into kittiwake as `kittiwake:ingest-allocations`.',
+  disputes: 'moved into kittiwake as `kittiwake:ingest-disputes`.',
+  rav: 'moved into kittiwake as `kittiwake:ingest-rav`.',
 };
 
 export const CRON_EXPECTATIONS: CronExpectation[] = [
-  // ── The droplet runner (scripts/cron-runner.ts, system cron) ───────────────
-  { step: 'refresh', staleAfterMinutes: 20, where: 'droplet', what: 'the enrichment pipeline, and where indexer scores are computed' },
-  { step: 'snapshot', staleAfterMinutes: 20, where: 'droplet', what: 'network snapshot' },
-  { step: 'delegations', staleAfterMinutes: 60, where: 'droplet', what: 'delegation events' },
-  { step: 'epochs', staleAfterMinutes: 45, where: 'droplet', what: 'epoch ingestion' },
-  { step: 'allocations', staleAfterMinutes: 180, where: 'droplet', what: 'allocation deltas' },
-  { step: 'disputes', staleAfterMinutes: 1080, where: 'droplet', what: 'disputes, every six hours' },
+  // ── kittiwake's scheduler (crates/kittiwake-bin/src/jobs.rs) ──────────────
+  //
+  // These were Vercel crons until 2026-09-07 and are now kittiwake's, writing under a
+  // `kittiwake:` prefix. For a few hours both wrote the same tables, which is the two-writer
+  // state kittiwake#1 exists to prevent; the vercel.json entries were removed in the same change
+  // as this table, so there is one writer again.
+  //
+  // Windows are roughly three times the job's own interval, as above.
+  { step: 'kittiwake:refresh', staleAfterMinutes: 20, where: 'kittiwake', what: 'the enrichment pipeline, and where indexer composite scores are computed' },
+  { step: 'kittiwake:snapshot-network', staleAfterMinutes: 20, where: 'kittiwake', what: 'network snapshot' },
+  { step: 'kittiwake:ingest-epochs', staleAfterMinutes: 45, where: 'kittiwake', what: 'epoch ingestion' },
+  { step: 'kittiwake:ingest-delegations', staleAfterMinutes: 60, where: 'kittiwake', what: 'delegation events' },
+  { step: 'kittiwake:ingest-allocations', staleAfterMinutes: 180, where: 'kittiwake', what: 'allocation deltas' },
+  { step: 'kittiwake:ingest-disputes', staleAfterMinutes: 1080, where: 'kittiwake', what: 'disputes, every six hours' },
+  { step: 'kittiwake:ingest-rav', staleAfterMinutes: 180, where: 'kittiwake', what: 'RAV ingestion' },
+  { step: 'kittiwake:ingest-horizon-activity', staleAfterMinutes: 20, where: 'kittiwake', what: 'Horizon provision and thaw activity; runs every two minutes, so this window is ten ticks rather than three - the floor in the test is what sets it' },
+  { step: 'kittiwake:refresh-chain-health', staleAfterMinutes: 100, where: 'kittiwake', what: 'the indexer chain-health probe' },
+  { step: 'kittiwake:warm-ipfs', staleAfterMinutes: 40, where: 'kittiwake', what: 'fetches subgraph metadata so a subgraph is findable by name' },
+  { step: 'kittiwake:warm', staleAfterMinutes: 20, where: 'kittiwake', what: 'the response cache warmer; fires every minute by definition, so the 20-minute floor applies rather than a multiple of its schedule' },
 
   // ── Vercel crons (vercel.json) ────────────────────────────────────────────
-  { step: 'rav', staleAfterMinutes: 180, where: 'vercel', what: 'RAV ingestion' },
-  { step: 'check-dips', staleAfterMinutes: 40, where: 'vercel', what: 'watches the DIPS allocation for the governance change that turns it on' },
-  { step: 'check-dips-chain', staleAfterMinutes: 180, where: 'vercel', what: 'the DIPS nest against the allocator it indexes' },
-  { step: 'check-provider-liveness', staleAfterMinutes: 60, where: 'vercel', what: 'registry versus reality for data-service providers' },
-  { step: 'check-nest-health', staleAfterMinutes: 60, where: 'vercel', what: 'the nuthatch nests this dashboard stands on' },
-  { step: 'dispatch-notifications', staleAfterMinutes: 40, where: 'vercel', what: 'push notifications' },
+  //
+  // The two that did not move. `tap-provision` holds a signing key and spends GRT, which is a
+  // custody decision rather than a port (kittiwake#11); `reconcile-bounties` belongs with the Dock
+  // (kittiwake#16). Both stay here until those are settled.
+  { step: 'tap-provision', staleAfterMinutes: 20, where: 'vercel', what: 'tops up TAP escrow for claimed bounties; holds the signer key' },
+  { step: 'reconcile-bounties', staleAfterMinutes: 40, where: 'vercel', what: 'reads the BountyBoard contract and updates sync_bounties' },
 ];
 
 export interface CronStatus {
@@ -73,7 +109,7 @@ export interface CronStatus {
   /** Later than its declared window, or never seen at all. */
   stale: boolean;
   ageMinutes: number | null;
-  where?: 'vercel' | 'droplet';
+  where?: 'vercel' | 'kittiwake';
   what?: string;
   /** Present only for a step in `RETIRED_CRONS`, and it explains itself. */
   retired?: string;

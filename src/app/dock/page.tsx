@@ -1182,7 +1182,7 @@ function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => vo
               </ol>
               <p className="text-xs text-[var(--text-faint)]">
                 New to this?{' '}
-                <a href="/blog/sync-bounty-indexer-guide" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-text)] hover:underline">
+                <a href="https://learn-thegraph.com/dispatches/sync-bounty-indexer-guide/" target="_blank" rel="noopener noreferrer" className="text-[var(--accent-text)] hover:underline">
                   Full guide for indexers →
                 </a>
               </p>
@@ -1987,7 +1987,7 @@ function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
                 </li>
               </ol>
               <a
-                href="/blog/sync-bounty-indexer-guide"
+                href="https://learn-thegraph.com/dispatches/sync-bounty-indexer-guide/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block text-xs text-[var(--accent-text)] hover:underline mt-1"

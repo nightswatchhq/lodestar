@@ -147,6 +147,23 @@ The approval step is skipped on subsequent delegations if the existing GRT allow
 
 Code: [`src/app/delegate/`](src/app/delegate/) · API: [`src/app/api/delegate/recommend/`](src/app/api/delegate/recommend/)
 
+## Backend migration
+
+The API is moving from Next.js route handlers to **kittiwake**, a single Rust process that fronts
+the nuthatch nests. The two run side by side on one domain: the edge forwards the routes kittiwake
+serves and leaves the rest here, so there is no flag day.
+
+The count is deliberately not repeated here, because a number typed into a README is a number that
+goes stale. It lives in one generated place: [docs/MIGRATION.md](docs/MIGRATION.md), produced from
+`src/lib/migration.ts`. The same figures render at
+[`/migration`](https://www.lodestar-dashboard.com/migration) with `/api/migration` as the
+machine-readable form.
+
+That one file is also what `src/proxy.ts` routes from, so the progress figure and the routing
+decision cannot disagree. A test walks `src/app/api` and fails if a route exists without a line in
+the table, which is what stops a new route becoming an uncounted straggler. Regenerate the doc with
+`pnpm migration:doc` after changing the inventory; CI fails if the committed copy is stale.
+
 ## Tech Stack
 
 - Next.js 16.2.6 (App Router, Turbopack)

@@ -1,52 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/refresh",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/ingest-epochs",
-      "schedule": "3-59/10 * * * *"
-    },
-    {
-      "path": "/api/cron/ingest-delegations",
-      "schedule": "8-59/15 * * * *"
-    },
-    {
-      "path": "/api/cron/ingest-allocations",
-      "schedule": "13 * * * *"
-    },
-    {
-      "path": "/api/cron/ingest-disputes",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/ingest-rav",
-      "schedule": "23 * * * *"
-    },
-    {
-      "path": "/api/cron/snapshot-network",
-      "schedule": "2-59/5 * * * *"
-    },
-    {
-      "path": "/api/cron/refresh-chain-health",
-      "schedule": "*/30 * * * *"
-    },
-    {
-      "path": "/api/cron/ingest-horizon-activity",
-      "schedule": "*/2 * * * *"
-    },
-    {
       "path": "/api/cron/tap-provision",
       "schedule": "1-59/5 * * * *"
     },
     {
       "path": "/api/cron/reconcile-bounties",
       "schedule": "*/10 * * * *"
-    },
-    {
-      "path": "/api/cron/warm-ipfs",
-      "schedule": "4-59/10 * * * *"
     }
   ]
 }
