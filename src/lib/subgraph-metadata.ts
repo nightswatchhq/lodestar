@@ -59,7 +59,7 @@ export async function ipfsJson<T = Record<string, unknown>>(cid: string): Promis
       `;
       const hit = rows[0];
       if (hit && (hit.json !== null || (hit.error && Date.now() - new Date(hit.fetched_at).getTime() < 3600_000))) {
-        return hit.json;
+        return undouble(hit.json);
       }
     }
     let json: T | null = null;
@@ -73,8 +73,15 @@ export async function ipfsJson<T = Record<string, unknown>>(cid: string): Promis
     }
     if (hasDbAccess() && db) {
       try {
+        // `sql.json`, never a pre-stringified value with a `::jsonb` cast - the same lesson as
+        // servability-rounds.ts, learned again the expensive way. postgres.js serialises a json
+        // parameter itself, so a string handed to it lands as a JSON *string* inside the jsonb:
+        // the column holds `"{\"displayName\":\"Lido\"}"` rather than an object, and
+        // `json->>'displayName'` reads null on every row. All 15,972 cached documents were stored
+        // that way, which is why no subgraph on the dashboard had a name, why the names batch
+        // returned `{}`, and why name search returned nothing while looking like it worked.
         await db`
-          INSERT INTO ipfs_metadata (cid, json, error, fetched_at) VALUES (${cid}, ${json === null ? null : JSON.stringify(json)}::jsonb, ${error}, NOW())
+          INSERT INTO ipfs_metadata (cid, json, error, fetched_at) VALUES (${cid}, ${json === null ? null : db.json(json as never)}, ${error}, NOW())
           ON CONFLICT (cid) DO UPDATE SET json = EXCLUDED.json, error = EXCLUDED.error, fetched_at = NOW()
         `;
       } catch (e) {
@@ -84,6 +91,40 @@ export async function ipfsJson<T = Record<string, unknown>>(cid: string): Promis
     if (error && json === null) throw new Error(error); // `cached()` does not memoise a rejection
     return json;
   }).catch(() => null);
+}
+
+/**
+ * Undo a document that was stored as a JSON string containing JSON rather than as JSON.
+ *
+ * Tolerant on read, strict on write. The write above is fixed and the table has been repaired, but
+ * a row written by an older deployment - or by a rollback to one - is still readable this way, and
+ * a name that comes back is worth more than a principle about clean data.
+ */
+function undouble<T>(v: T | null): T | null {
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v) as T; } catch { return v as T; }
+}
+
+/**
+ * How many ids may go into one `IN (...)` list.
+ *
+ * The nest takes its SQL as a URL query parameter and refuses a request line over 16 KB with a bare
+ * `400`. A bytes32 id costs 69 characters quoted, so 433 of them - which is what a search for
+ * "uniswap" produces - builds a 34 KB URL and fails. Measured: 200 ids and 15.7 KB is accepted, 433
+ * and 33.9 KB is not. At 100 the URL is about 8 KB.
+ *
+ * This was invisible until the double-encoded metadata was repaired, because before that no search
+ * ever matched enough documents to build a long list.
+ */
+const IN_LIST_CHUNK = 100;
+
+/** Run a nest query once per chunk of ids and concatenate the rows. */
+async function nuthatchSqlChunked<T>(ids: string[], build: (chunk: string[]) => string, basePath: string): Promise<T[]> {
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += IN_LIST_CHUNK) {
+    out.push(...(await nuthatchSql<T>(build(ids.slice(i, i + IN_LIST_CHUNK)), basePath)));
+  }
+  return out;
 }
 
 /** A bytes32 metadata hash to its CIDv0, or null for the zero hash a subgraph without metadata carries. */
@@ -104,10 +145,11 @@ export async function subgraphMetadataForDeployments(deploymentIds: string[]): P
   const out = new Map<string, { subgraphId: string; metadata: SubgraphMetadataDoc | null; version: VersionMetadataDoc | null }>();
   const ids = [...new Set(deploymentIds.map((d) => d.toLowerCase()))];
   if (ids.length === 0) return out;
-  const list = ids.map((d) => `'${d}'`).join(', ');
-  const rows = await nuthatchSql<DeploymentSubgraphRow>(
-    `SELECT deployment_id, subgraph_id, subgraph_metadata, version_metadata, is_current, version_number, deprecated FROM (` +
-    `SELECT *, ROW_NUMBER() OVER (PARTITION BY LOWER(deployment_id) ORDER BY created_at DESC) AS rn FROM deployment_subgraphs WHERE LOWER(deployment_id) IN (${list})) WHERE rn = 1`,
+  const rows = await nuthatchSqlChunked<DeploymentSubgraphRow>(
+    ids,
+    (chunk) =>
+      `SELECT deployment_id, subgraph_id, subgraph_metadata, version_metadata, is_current, version_number, deprecated FROM (` +
+      `SELECT *, ROW_NUMBER() OVER (PARTITION BY LOWER(deployment_id) ORDER BY created_at DESC) AS rn FROM deployment_subgraphs WHERE LOWER(deployment_id) IN (${chunk.map((d) => `'${d}'`).join(', ')})) WHERE rn = 1`,
     GNS_BASE_PATH,
   );
   await Promise.all(rows.map(async (r) => {
@@ -214,7 +256,7 @@ const figuresSql = (ids: string[]) =>
 async function hitsForDeployments(ids: string[], limit: number): Promise<SearchHit[]> {
   if (ids.length === 0) return [];
   const [figures, meta] = await Promise.all([
-    nuthatchSql<DeploymentFiguresRow>(figuresSql(ids), ALLOC_BASE_PATH),
+    nuthatchSqlChunked<DeploymentFiguresRow>(ids, figuresSql, ALLOC_BASE_PATH),
     subgraphMetadataForDeployments(ids),
   ]);
   const byId = new Map(figures.map((f) => [f.id.toLowerCase(), f]));
@@ -253,8 +295,10 @@ export async function searchSubgraphsByName(q: string, limit = 10): Promise<Sear
   if (docs.length === 0) return [];
   const hashes = docs.map((d) => { try { return ipfsHashToBytes32(d.cid).toLowerCase(); } catch { return null; } }).filter((h): h is string => !!h);
   if (hashes.length === 0) return [];
-  const current = await nuthatchSql<SubgraphCurrentRow>(
-    `SELECT subgraph_id, current_deployment_id, subgraph_metadata FROM subgraph_current WHERE NOT deprecated AND LOWER(subgraph_metadata) IN (${hashes.map((h) => `'${h}'`).join(', ')})`,
+  const current = await nuthatchSqlChunked<SubgraphCurrentRow>(
+    hashes,
+    (chunk) =>
+      `SELECT subgraph_id, current_deployment_id, subgraph_metadata FROM subgraph_current WHERE NOT deprecated AND LOWER(subgraph_metadata) IN (${chunk.map((h) => `'${h}'`).join(', ')})`,
     GNS_BASE_PATH,
   );
   return hitsForDeployments([...new Set(current.map((c) => c.current_deployment_id.toLowerCase()))], limit);
