@@ -37,10 +37,12 @@ export function StatCard({
   unavailable = false,
   className,
 }: StatCardProps) {
+  // No overflow-hidden on the Card: it clipped the tooltip at the card edge. The
+  // glow is rounded to the card radius instead, which is all the clipping was for.
   return (
-    <Card className={cn('relative overflow-hidden group p-5', className)} hover>
+    <Card className={cn('relative group p-5', className)} hover>
       {/* Subtle accent glow on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[var(--accent-dim)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      <div className="absolute inset-0 rounded-[inherit] bg-gradient-to-br from-[var(--accent-dim)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       <div className="relative flex items-start justify-between">
         <div className="flex-1">
           <p className="text-[11px] text-[var(--text-muted)] mb-1.5 flex items-center gap-1.5">
