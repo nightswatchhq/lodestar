@@ -2,6 +2,79 @@
 
 All notable changes to Lodestar are documented here. Versions follow `MAJOR.MINOR.PATCH`.
 
+## [5.0.0] - 2026-09-07
+
+Two foundations moved in four days, and the version number is major because of what is underneath
+rather than what is on screen. Every panel renders the same figures from the same URLs. Neither of
+the things that produce them is what it was on 3 September.
+
+### The Graph gateway is gone
+
+Twenty-nine merged branches under `nuthatch#1160` took every protocol figure off the gateway and
+onto nuthatch nests we run ourselves. Indexers, curators, epochs, network stats, GRT flow, token
+metrics, provisions, portfolio, rewards history, payments, POI, delegation events, stake history,
+subgraph names and versions and curation, the OpenGraph images, and nine crons. There is no
+`GRAPH_API_KEY` in the repository, no gateway client, no fallback path, and no per-surface flags,
+because a flag with nothing on the other side of it is only a way to break production on a typo.
+
+Removed rather than migrated: the QoS oracle and everything derived from it, indexer trends,
+conversions, the protocols and networks registries, the playground, the gateway probe, subgraph
+health alerts, the metered gateway and its keys, and two query proxies. ENS moved to reverse
+resolution over a mainnet RPC instead.
+
+Seven parity bugs were found and fixed on the way, each one a figure that would have been quietly
+wrong rather than obviously broken: an epoch's `totalQueryFees` was gross **plus** the protocol cut
+instead of less it; nest lists ordered by a `VARCHAR` alias sorted as text, so 9 came after 10; the
+stake history's delegated series omitted thawing; `stakedTokens` was read as a current balance where
+the subgraph means a cumulative total; and a delegators list was ordered by nothing in particular
+while its own doc comment said otherwise.
+
+### The read API is now a Rust process
+
+Thirty-six of the ninety API routes are served by a long-lived Rust service on our own hardware,
+behind Caddy, in front of the same nests. `src/proxy.ts` replaces `src/middleware.ts`, which is the
+deprecated convention in Next 16, and carries the rewrite.
+
+The switch is `LODESTAR_API_ORIGIN`. **Unset means no rewrite happens at all**, so a rollback is an
+environment change taking effect on the next request rather than a revert and a build.
+
+Measured immediately before the switch, median of three requests per route with a unique parameter
+so neither side could answer from a CDN: **median 657x faster** across 24 comparable routes, best
+1300x, worst 0.8x. Every migrated route except two now answers in under 5 ms of work where the
+previous handler took 230 to 870. The cold path is **unchanged** at 23.5 seconds, because that is
+the nest folding a query and no runtime alters what a fold costs. What changed is that forty
+concurrent cold readers now cost the nest one fold rather than forty.
+
+### Two bugs that had been invisible for months
+
+**Subgraph metadata was stored as a string of JSON.** `${JSON.stringify(doc)}::jsonb` makes
+postgres.js serialise a JavaScript string as a JSON *string*, so the column held
+`"{\"displayName\":\"Lido Ethereum\"}"` and `json->>'displayName'` returned null on all 15,972
+cached documents. Every deployment rendered nameless, `/api/subgraph-names` returned `{}`, and
+search returned nothing for every query with a 200 status. All of which looks exactly like a world
+in which subgraphs do not have names.
+
+Found because the Rust port's search returned zero results for "uniswap" and so did production. Two
+systems agreeing is usually reassuring; here it meant the same broken rows underneath both. The
+write now uses `db.json(...)`, the read tolerates a legacy row, and the 15,972 rows were repaired in
+place, recovering 15,782 display names. `src/lib/servability-rounds.ts:30` already carried a comment
+describing this exact bug, learned on a different table in 4.29.0.
+
+**A busy search built a 34 KB URL.** The nest refuses a request line over 16 KB with a bare `400`,
+and a search matching 433 cached documents builds an `IN (...)` list that size. Measured: 200 ids at
+15.7 KB accepted, 433 at 33.9 KB refused. Unreachable until the first bug was fixed, because no
+search had ever matched enough documents to build a long list. Both codebases now chunk at 100 ids.
+
+### Also
+
+Stat-card tooltips were being buried by a clip, a stuck fill-mode and the hover lift. The crons are
+staggered so the nest-reading ones stop landing on the same minute. Each nest admits two concurrent
+SQL queries rather than one, so a page's `Promise.all` is actually parallel. `unavailable` is no
+longer rendered as zero.
+
+230 files changed, 5,771 insertions, 20,559 deletions. The dashboard is **14,788 lines smaller**
+than it was with the gateway in it. 2,244 tests.
+
 ## [4.29.0] - 2026-09-03
 
 One day on from 4.28.0, and two threads that did not know about each other.
