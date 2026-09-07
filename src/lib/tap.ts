@@ -28,6 +28,21 @@ const PAYMENTS_ESCROW       = '0xf6Fcc27aAf1fcD8B254498c9794451d82afC673E' as co
 const GRT_TOKEN             = '0x9623063377AD1B27544C965cCd7342f7EA7e88C7' as const;
 
 // Minimum escrow (wei) before we top up — 1 GRT should last ~10^18 playground queries.
+/**
+ * The fallback when `ARBITRUM_RPC_URL` is unset.
+ *
+ * A public endpoint, rate-limited, and not what production should be using: the indexer directory
+ * fans out one oracle call per indexer and a free endpoint answers a handful a minute before it
+ * starts refusing.
+ *
+ * It replaces a default of `https://gateway.lodestar-dashboard.com/rpc/42161`, which was the
+ * Dispatch gateway and has answered nothing since 2026-07-20. Production sets the variable, so
+ * nothing was broken - but the first fresh environment would have failed against a host that does
+ * not exist, with an error naming a domain that looks like ours and is not listening. A slow
+ * fallback is a bad default; a dead one is a trap.
+ */
+const PUBLIC_ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
+
 export const MIN_ESCROW_WEI = 1_000_000_000_000_000_000n; // 1 GRT
 
 // EIP-712 domain for GraphTallyCollector on Arbitrum One.
@@ -63,7 +78,7 @@ const GRT_ABI = parseAbi([
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function rpcUrl(): string {
-  return process.env.ARBITRUM_RPC_URL ?? 'https://gateway.lodestar-dashboard.com/rpc/42161';
+  return process.env.ARBITRUM_RPC_URL ?? PUBLIC_ARBITRUM_RPC;
 }
 
 function getPublicClient() {
