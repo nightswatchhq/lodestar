@@ -15,7 +15,7 @@ function isMigrated(path: string): boolean {
 
 describe('the migrated route list', () => {
   it('is not empty, which would silently disable the whole cutover', () => {
-    expect(list.length).toBeGreaterThan(30);
+    expect(list.length).toBeGreaterThan(20);
   });
 
   /**
@@ -34,7 +34,7 @@ describe('the migrated route list', () => {
   it('takes parameterised routes and everything under them', () => {
     expect(isMigrated('/api/indexer/0xabc')).toBe(true);
     expect(isMigrated('/api/indexer-status/0xabc')).toBe(true);
-    expect(isMigrated('/api/apr-provenance/0xabc')).toBe(true);
+    expect(isMigrated('/api/subgraph-curation/QmAbc')).toBe(false);
   });
 
   /**
@@ -43,11 +43,16 @@ describe('the migrated route list', () => {
    * They were never in the parity harness. Until the ports are finished they stay on Next, and this
    * test is what stops them drifting back in unnoticed. See nightswatchhq/kittiwake#23.
    */
-  it('keeps the three deployment routes on Next until their ports are finished', () => {
+  it('keeps the eight unfinished ports on Next', () => {
     for (const path of [
       '/api/indexing-status/QmAbc',
       '/api/subgraph-curation/QmAbc',
       '/api/subgraph-history/QmAbc',
+      '/api/grt-flow',
+      '/api/sql/catalog',
+      '/api/rewards-history',
+      '/api/apr-provenance/0xabc',
+      '/api/indexer-stake-history/0xabc',
     ]) {
       expect(isMigrated(path), `${path} is not a finished port`).toBe(false);
     }
@@ -74,10 +79,14 @@ describe('the migrated route list', () => {
     }
   });
 
-  /** `/api/sql/query` and `/api/sql/catalog` moved; `/api/sql/named` did not. */
+  /**
+   * `/api/sql/query` moved. `/api/sql/catalog` moved and came back, its shape having never been
+   * compared. `/api/sql/named` was never ported. Three routes under one prefix with three different
+   * answers, which is why this is a list and not a `startsWith`.
+   */
   it('splits the sql routes rather than taking the prefix', () => {
     expect(isMigrated('/api/sql/query')).toBe(true);
-    expect(isMigrated('/api/sql/catalog')).toBe(true);
+    expect(isMigrated('/api/sql/catalog')).toBe(false);
     expect(isMigrated('/api/sql/named')).toBe(false);
   });
 });

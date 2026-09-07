@@ -29,11 +29,15 @@ const EDGE_SECRET = process.env.LODESTAR_EDGE_SECRET;
 /**
  * The routes kittiwake serves, as its own router lists them.
  *
- * `/api/indexing-status/`, `/api/subgraph-curation/` and `/api/subgraph-history/` were in this list
- * and have been taken out. They answered 200 but with a different payload entirely: the history
- * route returned `{allocations, signals}` where the frontend reads `{history}`. They were never in
- * the parity harness, so nothing caught it; they are in it now, and they come back here when the
- * ports are finished. See nightswatchhq/kittiwake#23.
+ * **Eight routes have been taken out again**: `indexing-status`, `subgraph-curation`,
+ * `subgraph-history`, `grt-flow`, `sql/catalog`, `rewards-history`, `apr-provenance` and
+ * `indexer-stake-history`. Every one answered 200 with a payload the frontend could not read -
+ * `subgraph-history` returned `{allocations, signals}` where the page reads `{history}`,
+ * `indexer-stake-history` returned no `history` at all.
+ *
+ * None of the eight was in the parity harness, which is the whole reason they shipped. That gap is
+ * now a test on the kittiwake side: nothing the service serves may go uncompared. They come back
+ * here as their ports are finished and the harness agrees. See nightswatchhq/kittiwake#23.
  *
  * An explicit list rather than a prefix, because the two services split `/api` between them and
  * `/api/studio/*`, `/api/scuttlebutt/*` and the long tail are still here. Anything absent from this
@@ -44,7 +48,6 @@ const EDGE_SECRET = process.env.LODESTAR_EDGE_SECRET;
  * catches that, and `docs/status.md` in the kittiwake repo is what it writes.
  */
 const MIGRATED: readonly string[] = [
-  '/api/apr-provenance/',
   '/api/chain-lag',
   '/api/curators',
   '/api/delegation-events',
@@ -53,10 +56,8 @@ const MIGRATED: readonly string[] = [
   '/api/dips',
   '/api/dropped-chains',
   '/api/epochs',
-  '/api/grt-flow',
   '/api/horizon/activity',
   '/api/indexer-node-health',
-  '/api/indexer-stake-history/',
   '/api/indexer-status/',
   '/api/indexer/',
   '/api/indexers',
@@ -68,8 +69,6 @@ const MIGRATED: readonly string[] = [
   '/api/price',
   '/api/provisions',
   '/api/reo',
-  '/api/rewards-history',
-  '/api/sql/catalog',
   '/api/sql/query',
   '/api/subgraph-deployments',
   '/api/subgraph-fees-30d',
