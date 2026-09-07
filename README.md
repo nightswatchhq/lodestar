@@ -106,7 +106,7 @@ Each indexer receives a composite score (0–100) across eleven dimensions, comb
 - **No black boxes** — every dimension, weight, and threshold is visible in [`src/lib/risk-score.ts`](src/lib/risk-score.ts)
 - **Zero extra API calls** — scores are computed from data the enrichment pipeline already fetches
 - **Delegation-neutral self-stake** — attracting delegation is a sign of trust, not something to penalise
-- **Delegator-first** — the score explicitly penalises high cuts; an operationally excellent indexer that takes 100% of rewards still scores poorly because delegators earn nothing
+- **Delegator-first, but a deduction rather than a disqualification** — a 100% reward cut zeroes Delegator Cut (10%) and Delegator APY (8%), and caps Cut Stability (6%) at 5. That costs a flawless indexer 24 points, taking it from 100 (A) to **76 (B)**. It is a visible markdown, not a failing grade. If you want cuts excluded outright rather than marked down, that is the ≥ 90% hard filter in [One-Click Delegation](#one-click-delegation), which the score deliberately does not duplicate
 - **Feedback welcome** — if the weights or thresholds feel off, [open an issue](https://github.com/nightswatchhq/lodestar/issues)
 
 ## One-Click Delegation

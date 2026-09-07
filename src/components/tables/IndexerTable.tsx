@@ -17,6 +17,7 @@ import {
 import { useEnrichedIndexers, useIndexers, useNetworkStats } from '@/hooks/useNetworkStats';
 import { useFoghornGrades } from '@/hooks/useFoghorn';
 import { gradeVariant } from '@/lib/foghorn';
+import { SCORE_DIMENSION_COUNT, SCORE_DIMENSION_SUMMARY } from '@/lib/risk-score';
 import {
   weiToGRT,
   formatGRT,
@@ -451,7 +452,7 @@ export function IndexerTable() {
         },
       }),
       columnHelper.accessor('score', {
-        header: () => <HeaderTip label="Score" tip="Composite grade (A-F) across 7 dimensions: REO compliance, self-stake, cut stability, allocation efficiency, over-delegation, transparency, and delegation trend." />,
+        header: () => <HeaderTip label="Score" tip={`Composite grade (A–F) across ${SCORE_DIMENSION_COUNT} weighted dimensions: ${SCORE_DIMENSION_SUMMARY}. A 100% reward cut costs 24 points, so an indexer taking everything can still show a B. Read the cut column, not just the grade.`} />,
         cell: (info) => {
           const row = info.row.original;
           const score = info.getValue();

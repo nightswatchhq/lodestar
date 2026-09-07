@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { calculateIndexerScore, SCORE_WEIGHTS, type ScoreInput } from '../risk-score';
+import {
+  calculateIndexerScore,
+  SCORE_WEIGHTS,
+  SCORE_LABELS,
+  SCORE_DIMENSION_COUNT,
+  SCORE_DIMENSION_SUMMARY,
+  type ScoreInput,
+} from '../risk-score';
 
 // Fix Date.now for deterministic cut stability tests
 const FIXED_NOW = 1711382400000; // 2024-03-25T12:00:00Z
@@ -43,6 +50,67 @@ describe('SCORE_WEIGHTS', () => {
   it('sum to 100', () => {
     const total = Object.values(SCORE_WEIGHTS).reduce((s, w) => s + w, 0);
     expect(total).toBe(100);
+  });
+
+  // The published copy has to name every dimension, not a subset. The Score tooltip used to name
+  // seven of eleven and leave out Delegator Cut, so an indexer taking everything was graded in a
+  // column whose own explanation never mentioned cuts. Deriving the string is the fix; this is
+  // the check that it stayed derived. See nightswatchhq/kittiwake#14.
+  it('are all named in the summary the UI publishes, with their real percentages', () => {
+    expect(SCORE_DIMENSION_COUNT).toBe(Object.keys(SCORE_WEIGHTS).length);
+    for (const [key, weight] of Object.entries(SCORE_WEIGHTS)) {
+      const label = SCORE_LABELS[key as keyof typeof SCORE_LABELS].toLowerCase();
+      expect(SCORE_DIMENSION_SUMMARY).toContain(`${label} ${weight}%`);
+    }
+  });
+
+  it('lists the summary heaviest first, so the tooltip reads as a priority order', () => {
+    const percentages = [...SCORE_DIMENSION_SUMMARY.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+    expect(percentages).toHaveLength(Object.keys(SCORE_WEIGHTS).length);
+    expect(percentages).toEqual([...percentages].sort((a, b) => b - a));
+  });
+});
+
+// ---------- what the published claim says a greedy indexer scores ----------
+
+// The README used to promise that "an operationally excellent indexer that takes 100% of rewards
+// still scores poorly". It does not: a flawless indexer taking the lot scores 76, a B. The copy now
+// says 76/B, and this pins the arithmetic that copy describes so the two cannot drift apart again.
+// Mirrors `taking_everything_costs_a_flawless_indexer_twenty_four_points` in kittiwake's
+// crates/score, which asserts the same 100 -> 76 on the same inputs. If these two ever disagree,
+// one of the implementations has drifted.
+describe('a 100% reward cut', () => {
+  it('costs a flawless indexer 24 points and lands on B, not a failing grade', () => {
+    const flawless = makeInput({
+      selfStakeGRT: 20_000_000,
+      rewardCutPPM: 0,
+      queryFeeCutPPM: 0,
+      delegationUtilization: 10,
+      queryFeesCollectedGRT: 200_000,
+      rollingAPY30d: 25,
+      delegatorAPR: 25,
+      allocatedTokens: '900000000000000000000000',
+      distinctDataServices: 3,
+    });
+    const greedy = makeInput({
+      ...flawless,
+      rewardCutPPM: 1_000_000,
+      queryFeeCutPPM: 1_000_000,
+      rollingAPY30d: 0,
+      delegatorAPR: 0,
+    });
+
+    const good = calculateIndexerScore(flawless);
+    const bad = calculateIndexerScore(greedy);
+
+    expect(bad.breakdown.delegatorCut).toBe(0);
+    expect(bad.breakdown.cutStability).toBe(5);
+    expect(bad.breakdown.delegatorAPY).toBe(0);
+    expect(good.composite).toBe(100);
+    expect(good.grade).toBe('A');
+    expect(bad.composite).toBe(76);
+    expect(bad.grade).toBe('B');
+    expect(good.composite - bad.composite).toBe(24);
   });
 });
 
