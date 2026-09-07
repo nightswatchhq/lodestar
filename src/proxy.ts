@@ -115,9 +115,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   if (API_ORIGIN && isMigrated(path)) {
     const target = new URL(request.nextUrl.pathname + request.nextUrl.search, API_ORIGIN);
     const headers = new Headers(request.headers);
-    // The client's own address, leftmost, as the backend expects to read it. Vercel already put it
-    // there; this makes the intent explicit rather than depending on it.
-    if (ip !== 'unknown') headers.set('x-forwarded-for', ip);
+    // The client's address in a header of our own, not `X-Forwarded-For`. Caddy sits between this
+    // and the backend and **replaces** the forwarded chain with its own peer unless that peer is a
+    // configured trusted proxy - which is correct of it, and which means anything we put there is
+    // gone by the time the backend reads it. A header Caddy does not manage passes through
+    // untouched. See nightswatchhq/kittiwake#21.
+    if (ip !== 'unknown') headers.set('x-lodestar-client', ip);
     if (EDGE_SECRET) headers.set('x-lodestar-edge', EDGE_SECRET);
     const response = NextResponse.rewrite(target, { request: { headers } });
     // Data, not a page. Without this the CDN would cache a figure that is fresh for thirty seconds
