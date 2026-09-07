@@ -43,16 +43,14 @@ describe('the migrated route list', () => {
    * They were never in the parity harness. Until the ports are finished they stay on Next, and this
    * test is what stops them drifting back in unnoticed. See nightswatchhq/kittiwake#23.
    */
-  it('keeps the eight unfinished ports on Next', () => {
+  it('keeps the six still-unfinished ports on Next', () => {
     for (const path of [
       '/api/indexing-status/QmAbc',
       '/api/subgraph-curation/QmAbc',
       '/api/subgraph-history/QmAbc',
       '/api/grt-flow',
-      '/api/sql/catalog',
       '/api/rewards-history',
       '/api/apr-provenance/0xabc',
-      '/api/indexer-stake-history/0xabc',
     ]) {
       expect(isMigrated(path), `${path} is not a finished port`).toBe(false);
     }
@@ -80,13 +78,14 @@ describe('the migrated route list', () => {
   });
 
   /**
-   * `/api/sql/query` moved. `/api/sql/catalog` moved and came back, its shape having never been
-   * compared. `/api/sql/named` was never ported. Three routes under one prefix with three different
-   * answers, which is why this is a list and not a `startsWith`.
+   * `/api/sql/query` and `/api/sql/catalog` have moved; `/api/sql/named` was never ported. The
+   * catalogue went, came back when its shape turned out never to have been compared, and has gone
+   * again now that it matches. Three routes under one prefix, which is why this is a list and not
+   * a `startsWith`.
    */
   it('splits the sql routes rather than taking the prefix', () => {
     expect(isMigrated('/api/sql/query')).toBe(true);
-    expect(isMigrated('/api/sql/catalog')).toBe(false);
+    expect(isMigrated('/api/sql/catalog')).toBe(true);
     expect(isMigrated('/api/sql/named')).toBe(false);
   });
 });
