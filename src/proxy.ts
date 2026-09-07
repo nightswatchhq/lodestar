@@ -29,10 +29,10 @@ const EDGE_SECRET = process.env.LODESTAR_EDGE_SECRET;
 /**
  * The routes kittiwake serves, as its own router lists them.
  *
- * Eight routes were taken out again on 7 September, having shipped with the wrong shape. Two are
- * back: `sql/catalog` and `indexer-stake-history`, both now agreeing with the old handler in the
- * parity harness. **Six remain out**: `indexing-status`, `subgraph-curation`, `subgraph-history`,
- * `grt-flow`, `rewards-history` and `apr-provenance`.
+ * Eight routes were taken out on 7 September, having shipped with the wrong shape. **Seven are
+ * back**, each agreeing with the old handler in the parity harness. One remains out:
+ * `indexing-status`, whose port needs the live serving probe and is a subsystem rather than a
+ * shape.
  *
  * Every one of the eight answered 200 with a payload the frontend could not read -
  * `subgraph-history` returned `{allocations, signals}` where the page reads `{history}`,
@@ -78,6 +78,11 @@ const MIGRATED: readonly string[] = [
   '/api/subgraph-names',
   '/api/subgraph-search',
   '/api/sql/catalog',
+  '/api/grt-flow',
+  '/api/rewards-history',
+  '/api/apr-provenance/',
+  '/api/subgraph-curation/',
+  '/api/subgraph-history/',
   '/api/indexer-stake-history/',
   '/api/token-metrics',
   '/api/tvl',
