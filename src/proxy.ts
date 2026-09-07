@@ -74,6 +74,7 @@ const MIGRATED: readonly string[] = [
   '/api/subgraph-search',
   '/api/token-metrics',
   '/api/tvl',
+  '/api/whoami',
 ];
 
 /**
