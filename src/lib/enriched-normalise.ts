@@ -38,6 +38,8 @@ interface KittiwakeRow {
   // job writes null where it has no figure. Added kittiwake#38.
   queryFeesCollectedGrt?: string | null;
   rewardsEarnedGrt?: string | null;
+  rollingApy30d?: string | null;
+  rollingApy90d?: string | null;
   lastUpdated?: string;
 }
 
@@ -112,14 +114,19 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     // every indexer score 0 and the recommendation arbitrary.
     scoreBreakdown: null,
 
-    // **Not sent by kittiwake.** Left null/zero deliberately so the Cooldown and APY columns
-    // render as "—" rather than as a confident wrong number. Restoring them is a backend change; see
-    // the field inventory in #114.
+    // **Not sent by kittiwake.** Left null/zero deliberately so the Cooldown column renders as
+    // "—" rather than as a confident wrong number. Restoring them is a backend change; see the
+    // field inventory in #114.
     queryFeeCut: 0,
     delegatorParameterCooldown: 0,
     lastDelegationParameterUpdate: 0,
-    rollingAPY30d: null,
-    rollingAPY90d: null,
+
+    // Sent since kittiwake#41. Null where the indexer has neither pool growth nor closed
+    // allocations in the window, which is not the same as an APY of zero.
+    rollingAPY30d:
+      r.rollingApy30d === null || r.rollingApy30d === undefined ? null : num(r.rollingApy30d),
+    rollingAPY90d:
+      r.rollingApy90d === null || r.rollingApy90d === undefined ? null : num(r.rollingApy90d),
 
     // Sent since kittiwake#38. Null is kept distinct from zero: an indexer that collected nothing
     // and one whose fees were never recorded are different answers, and the table renders the
