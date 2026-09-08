@@ -96,16 +96,32 @@ export const CONTRACTS = [
   // ---------------------------------------------------------------------------------------------
   // The rest of what the frontend destructures.
   //
-  // Added after #114 and the null-name crash. Twenty-one `fetch*` helpers in `src/lib/api.ts`
-  // declare a named return type and then hand back `response.json()` unchecked - the same gap that
-  // let `/api/indexers-enriched` change contract silently and render a table of dashes for a day.
-  // `tsc` cannot see a network payload, so these are where that shape is actually asserted.
+  // Added after #114 and the null-name crash, when twenty-one `fetch*` helpers in `src/lib/api.ts`
+  // declared a named return type and then handed back `response.json()` unchecked - the same gap
+  // that let `/api/indexers-enriched` change contract silently and render a table of dashes for a
+  // day.
+  //
+  // Those helpers now parse rather than cast (`src/lib/contract.ts`, #124), so the client refuses a
+  // payload it cannot read. **These checks are still the other half.** The parser prevents a bad
+  // payload reaching a render; it runs only when a browser asks, so it cannot tell anyone that a
+  // route has changed until somebody visits the page. These run every fifteen minutes whether or
+  // not anyone is looking. Keep the two lists in step: a route that changes shape wants both
+  // updating, and the vocabularies were kept deliberately alike so they can be compared by eye.
   //
   // `{address}` and `{hash}` are substituted from live data at run time rather than hardcoded, so a
   // fixture indexer leaving the network does not red the monitor for the wrong reason.
   // ---------------------------------------------------------------------------------------------
   { path: '/api/payments', name: 'payments', required: ['data.totalCollected', 'data.activePayers', 'data.escrowAccounts'] },
   { path: '/api/poi', name: 'POI overview', required: ['data.summary', 'data.deployments'] },
+  // **This one is red on purpose.** `/poi/[deployment]` reads `detail.epochs.reduce(...)`, and since
+  // `/api/poi` moved to kittiwake the `?deployment=` parameter has been ignored: the route answers
+  // the overview shape (`{ deployments, summary }`) filtered to one row, with no `epochs`. The page
+  // is a client-side `TypeError: Cannot read properties of undefined (reading 'reduce')` and renders
+  // "Something went wrong". Nothing was watching that route's detail form, which is why it went
+  // unnoticed. Loosening this to match what kittiwake currently sends would codify the outage, which
+  // is the mistake the `/api/indexers-enriched` entry above records. It goes green when the backend
+  // honours the parameter again.
+  { path: '/api/poi?deployment={poiDeployment}', name: 'POI deployment detail', required: ['data.deploymentId', 'data.epochs'] },
   { path: '/api/portfolio?address={address}', name: 'delegator portfolio', required: ['data.delegator', 'data.networkParams'] },
   { path: '/api/provisions?indexer={address}', name: 'provisions', required: ['data.provisions'] },
   { path: '/api/rewards-history?address={address}', name: 'rewards history', required: ['history'] },
