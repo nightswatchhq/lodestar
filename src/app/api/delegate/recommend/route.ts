@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cacheGet } from '@/lib/cache';
+import { normaliseEnrichedResponse } from '@/lib/enriched-normalise';
 import { SCORE_WEIGHTS } from '@/lib/risk-score';
 import type { EnrichedIndexer } from '@/lib/enriched';
 
@@ -102,7 +103,24 @@ export async function GET(req: NextRequest) {
     network:   Math.min(10, Math.max(0, Number(sp.get('network')   ?? 5))),
   };
 
-  const indexers = await cacheGet<EnrichedIndexer[]>('lodestar:indexers-enriched');
+  // **The cache key is no longer authoritative** (#114). It was written by a platform cron that was
+  // removed at the kittiwake cutover, so this route answered 503 "Indexer data not yet available"
+  // for a day while `/api/indexers-enriched` served a hundred perfectly good rows - and `/delegate`
+  // rendered its explainer with no recommendation and, because the page's error branch never fired,
+  // no explanation either. The cache is kept as the fast path and the live route is the truth.
+  let indexers = await cacheGet<EnrichedIndexer[]>('lodestar:indexers-enriched');
+
+  if (!indexers?.length) {
+    try {
+      const res = await fetch(new URL('/api/indexers-enriched', req.url), {
+        headers: { 'User-Agent': 'lodestar-recommend' },
+      });
+      if (res.ok) indexers = normaliseEnrichedResponse(await res.json()).indexers;
+    } catch (e) {
+      // Fall through to the 503 below, but say why in the log rather than only in the status.
+      console.error('recommend: could not load enriched indexers:', e);
+    }
+  }
 
   if (!indexers?.length) {
     return NextResponse.json({ error: 'Indexer data not yet available' }, { status: 503 });

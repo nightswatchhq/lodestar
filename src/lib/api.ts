@@ -8,6 +8,7 @@ import {
   type PaymentsOverview,
 } from './queries';
 import type { EnrichedIndexer } from './enriched';
+import { normaliseEnrichedResponse, type EnrichedResponse } from './enriched-normalise';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status';
@@ -66,13 +67,13 @@ export async function fetchIndexers(params: {
 /**
  * Fetch enriched indexers (pre-computed by cron job)
  */
-export async function fetchEnrichedIndexers(): Promise<{
-  indexers: EnrichedIndexer[];
-  computedAt: number;
-}> {
+export async function fetchEnrichedIndexers(): Promise<EnrichedResponse> {
   const response = await fetch('/api/indexers-enriched');
   if (!response.ok) throw new Error('Enriched data not available');
-  return response.json();
+  // Parsed, not cast. The previous version declared this return type and handed back
+  // `response.json()` unchecked, so a contract change on the server was invisible to the compiler
+  // and to every test - which is exactly how #114 rendered a table of dashes for a day.
+  return normaliseEnrichedResponse(await response.json());
 }
 
 /**
