@@ -13,6 +13,7 @@ import {
   assessCrons,
   staleCrons,
   failingCrons,
+  supersededIngestionKeys,
   type CronRunRow,
 } from '../cron-expectations';
 
@@ -190,5 +191,34 @@ describe('assessCrons', () => {
         `${m} points at ${named}, which is not declared`
       ).toBe(true);
     }
+  });
+});
+
+/**
+ * The platform crons stopped on purpose on 2026-09-07, so their `ingestion_state` rows stopped
+ * advancing. Judging them would leave /api/health permanently degraded over rows nobody intends to
+ * write again - the retired-cron problem wearing different clothes.
+ */
+describe('supersededIngestionKeys', () => {
+  it('supersedes an unprefixed feed once kittiwake writes the same one', () => {
+    const s = supersededIngestionKeys(['rav', 'kittiwake:rav', 'epochs', 'kittiwake:epochs']);
+    expect([...s].sort()).toEqual(['epochs', 'rav']);
+  });
+
+  it('keeps judging a feed whose kittiwake counterpart is missing', () => {
+    // The important half. If kittiwake stops writing one, the frozen old row must not quietly
+    // start covering for it.
+    const s = supersededIngestionKeys(['rav', 'kittiwake:rav', 'disputes']);
+    expect(s.has('disputes')).toBe(false);
+    expect(s.has('rav')).toBe(true);
+  });
+
+  it('never supersedes a kittiwake row itself', () => {
+    const s = supersededIngestionKeys(['kittiwake:rav', 'rav']);
+    expect(s.has('kittiwake:rav')).toBe(false);
+  });
+
+  it('is empty when nothing has moved', () => {
+    expect(supersededIngestionKeys(['rav', 'epochs']).size).toBe(0);
   });
 });

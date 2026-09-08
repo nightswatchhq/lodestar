@@ -180,3 +180,25 @@ export function staleCrons(statuses: CronStatus[]): CronStatus[] {
 export function failingCrons(statuses: CronStatus[]): CronStatus[] {
   return statuses.filter((s) => !s.stale && s.success === false);
 }
+
+/**
+ * A `kittiwake:`-prefixed ingestion key supersedes its unprefixed twin.
+ *
+ * The platform crons were removed on 2026-09-07, so the unprefixed rows in `ingestion_state`
+ * stopped advancing and would have read as a stalled pipeline for ever while kittiwake wrote the
+ * same tables perfectly. Same shape as the retired-cron problem: a row that stops on purpose has to
+ * be told apart from one that stops by accident, or the surface cries wolf and the next real
+ * stoppage goes with it.
+ *
+ * Deliberately keyed on the presence of the newer row rather than on a hardcoded list, so a key
+ * whose kittiwake counterpart is missing keeps being judged. If kittiwake stops writing one, the
+ * old row does not quietly start covering for it.
+ */
+export const KITTIWAKE_PREFIX = 'kittiwake:';
+
+export function supersededIngestionKeys(keys: readonly string[]): Set<string> {
+  const owned = new Set(
+    keys.filter((k) => k.startsWith(KITTIWAKE_PREFIX)).map((k) => k.slice(KITTIWAKE_PREFIX.length)),
+  );
+  return new Set(keys.filter((k) => !k.startsWith(KITTIWAKE_PREFIX) && owned.has(k)));
+}
