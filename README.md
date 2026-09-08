@@ -280,7 +280,14 @@ Dumps are custom-format (`-Fc`). Restore with:
 
 ```bash
 pg_restore -h <host> -p <port> -U postgres -d <db> --no-owner --no-acl lodestar-<ts>.dump
+psql -h <host> -p <port> -U postgres -d <db> -f scripts/fix-ownership.sql
 ```
+
+**The second line is not optional.** `--no-owner` gives every restored object to the user doing the
+restore, which above is `postgres`, while the application connects as `lodestar`. Skip it and the
+database comes back complete and entirely unreadable by the app: every statement fails with `42501`,
+and a fire-and-forget writer will not tell you (this is #113, which cost one table months of silently
+discarded clicks). `scripts/fix-ownership.sql` is idempotent and prints what it had to change.
 
 Restores are periodically test-verified against a throwaway Postgres container. These are nightly logical dumps (no point-in-time recovery) — appropriate for an analytics DB that re-ingests from chain.
 

@@ -40,3 +40,9 @@ CREATE INDEX IF NOT EXISTS idx_subgraph_alerts_enabled ON subgraph_alerts (enabl
 CREATE INDEX IF NOT EXISTS idx_subgraph_alert_log_alert ON subgraph_alert_log (alert_id);
 
 COMMIT;
+
+-- Ownership. The application connects as `lodestar`; a migration run as the superuser creates
+-- tables owned by `postgres`, and every statement from the app then fails with 42501 - silently, in
+-- the case of a fire-and-forget writer (#113). Idempotent, and a no-op when already correct.
+ALTER TABLE subgraph_alerts OWNER TO lodestar;
+ALTER TABLE subgraph_alert_log OWNER TO lodestar;

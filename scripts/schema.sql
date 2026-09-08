@@ -339,3 +339,26 @@ CREATE TABLE IF NOT EXISTS servability_rounds (
 
 CREATE INDEX IF NOT EXISTS idx_servability_rounds_hash_probed
   ON servability_rounds (deployment_hash, probed_at DESC);
+
+-- Ownership. The application connects as `lodestar`; a migration run as the superuser creates
+-- tables owned by `postgres`, and every statement from the app then fails with 42501 - silently, in
+-- the case of a fire-and-forget writer (#113). Idempotent, and a no-op when already correct.
+ALTER TABLE ingestion_state OWNER TO lodestar;
+ALTER TABLE epochs OWNER TO lodestar;
+ALTER TABLE indexers OWNER TO lodestar;
+ALTER TABLE indexer_snapshots OWNER TO lodestar;
+ALTER TABLE allocations OWNER TO lodestar;
+ALTER TABLE rav_redemptions OWNER TO lodestar;
+ALTER TABLE delegation_events OWNER TO lodestar;
+ALTER TABLE delegations OWNER TO lodestar;
+ALTER TABLE disputes OWNER TO lodestar;
+ALTER TABLE parameter_changes OWNER TO lodestar;
+ALTER TABLE network_snapshots OWNER TO lodestar;
+ALTER TABLE indexer_scores OWNER TO lodestar;
+ALTER TABLE community_votes OWNER TO lodestar;
+ALTER TABLE roadmap_community_updates OWNER TO lodestar;
+ALTER TABLE push_subscriptions OWNER TO lodestar;
+ALTER TABLE notification_log OWNER TO lodestar;
+ALTER TABLE device_tokens OWNER TO lodestar;
+ALTER TABLE cron_runs OWNER TO lodestar;
+ALTER TABLE servability_rounds OWNER TO lodestar;
