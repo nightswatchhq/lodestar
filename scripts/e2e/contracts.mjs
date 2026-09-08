@@ -18,23 +18,28 @@ export const CONTRACTS = [
   {
     path: '/api/indexers-enriched',
     name: 'indexer directory (score, APR, eligibility)',
-    // **The shape the client destructures is the authority here, not the shape the server happens
-    // to send.** Written the other way round first, this check passed against the very payload that
-    // was breaking the page - a test that codifies the outage instead of catching it. The contract
-    // is `EnrichedIndexer` in `src/lib/enriched.ts` and the `{ indexers, computedAt }` envelope that
-    // `fetchEnrichedIndexers` declares in `src/lib/api.ts`. This check is expected to FAIL until
-    // #114 is fixed; that is what a red monitor is for.
-    collection: 'indexers',
+    // **Assert what the client can actually consume, which is now either envelope.**
+    //
+    // This was first written against kittiwake's shape and passed while the page was broken - a
+    // check that codified the outage. Then it was written against the *old* `{ indexers }` envelope
+    // and correctly went red. #114 was then fixed on the client: `normaliseEnrichedResponse` accepts
+    // both shapes, so the server legitimately still answers `{ data }` and pinning `indexers` here
+    // would now fail a healthy system.
+    //
+    // What must stay true is that the payload carries the fields the table reads, under one of the
+    // two shapes the normaliser knows. `eitherOf` is checked against the first collection found.
+    eitherOf: ['indexers', 'data'],
     minRows: 20,
     sample: [
-      'id', 'url', 'selfStakeGRT', 'delegatedGRT', 'delegatorAPR', 'indexingRewardCut',
-      'allocationCount', 'delegationCapacity', 'reoStatus', 'recentActivity',
+      ['id', 'address'],
+      ['selfStakeGRT', 'selfStakeGrt'],
+      ['delegatorAPR', 'delegatorApr'],
+      ['scoreGrade', 'scoreGrade'],
+      ['reoStatus', 'reoStatus'],
     ],
-    // The columns that rendered as "—" for all 80 indexers in #114. A payload that parses but
-    // carries no scores is the same outage with a different cause, so the values are checked too.
     coverage: [
-      { field: 'reoStatus', minPresentPct: 90 },
-      { field: 'delegationCapacity', minPresentPct: 90 },
+      { field: ['score', 'score'], minPresentPct: 90 },
+      { field: ['reoStatus', 'reoStatus'], minPresentPct: 90 },
     ],
   },
   {

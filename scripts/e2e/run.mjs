@@ -78,6 +78,40 @@ async function checkContract(c) {
     }
   }
 
+  // A route the client normalises may legitimately answer in more than one shape; assert that it is
+  // one the normaliser knows, and that the rows carry the fields under whichever names go with it.
+  if (c.eitherOf) {
+    const key = c.eitherOf.find((k) => Array.isArray(body[k]));
+    if (!key) {
+      return fail('contract', c.name,
+        `${c.path}: none of ${c.eitherOf.map((k) => `"${k}"`).join(' or ')} is an array. ` +
+        `Top-level keys: ${Object.keys(body).join(', ')}. This is the #114 shape change.`);
+    }
+    const rows = body[key];
+    if (rows.length < (c.minRows ?? 1)) {
+      return fail('contract', c.name, `${c.path}: ${rows.length} row(s), expected at least ${c.minRows ?? 1}`);
+    }
+    const alt = c.eitherOf.indexOf(key); // 0 = legacy names, 1 = kittiwake names
+    const first = rows[0];
+    const missing = (c.sample ?? []).map((pair) => pair[alt]).filter((f) => !(f in first));
+    if (missing.length) {
+      return fail('contract', c.name,
+        `${c.path}: rows under "${key}" are missing ${missing.map((m) => `"${m}"`).join(', ')}. ` +
+        `Row keys: ${Object.keys(first).slice(0, 14).join(', ')}`);
+    }
+    for (const cov of c.coverage ?? []) {
+      const f = cov.field[alt];
+      const present = rows.filter((x) => !isEmpty(x[f])).length;
+      const pct = Math.round((present / rows.length) * 100);
+      if (pct < cov.minPresentPct) {
+        return fail('contract', c.name,
+          `${c.path}: "${f}" present on only ${pct}% of ${rows.length} rows (want >= ${cov.minPresentPct}%) ` +
+          '- the column renders empty at this rate');
+      }
+    }
+    return pass(`contract ${c.name}`);
+  }
+
   if (c.collection) {
     const rows = dig(body, c.collection);
     if (!Array.isArray(rows)) {
