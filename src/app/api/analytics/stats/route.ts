@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { isAnalyticsAuthorized } from '@/lib/analytics-auth';
 
+/**
+ * Recent click-through events plus per-wallet and per-venue aggregates.
+ *
+ * This returns wallet addresses tied to session ids and to referred dollar amounts, so the guard
+ * fails closed: with ANALYTICS_SECRET unset the route denies everyone rather than waving everyone
+ * through, which is what the old `if (secret && ...)` did (#113).
+ */
 export async function GET(req: NextRequest) {
-  const secret = process.env.ANALYTICS_SECRET;
-  if (secret && req.headers.get('x-analytics-secret') !== secret) {
+  if (!isAnalyticsAuthorized(req)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
