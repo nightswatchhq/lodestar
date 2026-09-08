@@ -5,7 +5,9 @@
 export interface EnrichedIndexer {
   // Base indexer fields
   id: string;
-  name: string;
+  /** Null for every mainnet indexer today: none set `defaultDisplayName`, and kittiwake sends no
+   * name field. Typed honestly so a consumer has to handle it rather than find out in a browser. */
+  name: string | null;
   stakedTokens: string;
   lockedTokens: string;
   delegatedTokens: string;

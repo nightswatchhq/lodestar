@@ -417,7 +417,7 @@ export default function DelegatePage() {
           <DelegatePanel
             indexer={{
               id: active.indexer.id,
-              name: active.indexer.ensName ?? active.indexer.name,
+              name: active.indexer.ensName ?? active.indexer.name ?? active.indexer.id,
               stakedTokens: active.indexer.stakedTokens,
               lockedTokens: active.indexer.lockedTokens,
               delegatedTokens: active.indexer.delegatedTokens,

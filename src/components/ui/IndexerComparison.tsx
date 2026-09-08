@@ -9,7 +9,8 @@ import { calculateDelegationCapacity, calculateEstimatedAPR } from '@/lib/reward
 
 interface IndexerForComparison {
   id: string;
-  name: string;
+  /** Null for every mainnet indexer today - see EnrichedIndexer.name. */
+  name: string | null;
   stakedTokens: string;
   lockedTokens?: string;
   delegatedTokens: string;
