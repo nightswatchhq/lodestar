@@ -46,7 +46,26 @@ const LIMITS: Array<[RegExp, number]> = [
   // Signing is cheap; the query behind it is not, and each one is a request we put our name to.
   [/^\/api\/sql\/receipt/, 10],
   [/^\/api\/sql\//, 30],
-  [/^\/api\//, 200],
+  // **Its own tier, and a generous one, because `/indexers` fans out per row.** `SyncDot` fires one
+  // request per indexer from the browser - 87 of them on a full directory, before pagination or a
+  // refetch - and with no entry here they all landed in the catch-all below and ate the *shared*
+  // 200/min that every other route on the page draws from. A reader doing nothing unusual got 429s,
+  // which is what Tehn hit on 2026-09-08.
+  //
+  // Bucketing matters more than the number: keys are `${ip}:${tier}`, so giving this route a tier of
+  // its own stops one page's fan-out starving the rest of the API for that reader. The number is
+  // then sized for the honest worst case - a full directory plus a couple of page turns.
+  //
+  // The real fix is not to make 87 requests to render 87 dots; that is a batching change to the
+  // route and the component, and it is not smuggled in here.
+  [/^\/api\/indexer-node-health/, 200],
+  // Same fan-out shape, same reasoning: read per row, cheap, and previously sharing one bucket.
+  [/^\/api\/dropped-chains/, 120],
+  // The catch-all. Raised from 200: this is a public read-only dashboard whose pages legitimately
+  // make dozens of calls each, and the per-instance note at the top of this file means the figure
+  // was never a global quota anyway - it is a guard against one IP leaning on one warm instance.
+  // Rationing a reader off a public good is a worse failure than serving a few extra reads.
+  [/^\/api\//, 400],
 ];
 
 const WINDOW_MS = 60_000;
