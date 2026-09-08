@@ -53,3 +53,7 @@ next-env.d.ts
 
 # claude runtime locks
 /.claude/scheduled_tasks.lock
+test-results/
+playwright-report/
+playwright-report.json
+.playwright/
