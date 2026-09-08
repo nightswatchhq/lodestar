@@ -34,6 +34,10 @@ interface KittiwakeRow {
   undelegationsIn7d: number;
   netFlowGrt7d: string;
   geoHash: string | null;
+  // Both NUMERIC in Postgres and so sent as text, and both genuinely nullable: the refresh
+  // job writes null where it has no figure. Added kittiwake#38.
+  queryFeesCollectedGrt?: string | null;
+  rewardsEarnedGrt?: string | null;
   lastUpdated?: string;
 }
 
@@ -108,15 +112,22 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     // every indexer score 0 and the recommendation arbitrary.
     scoreBreakdown: null,
 
-    // **Not sent by kittiwake.** Left null/zero deliberately so the Cooldown, Fees and APY columns
+    // **Not sent by kittiwake.** Left null/zero deliberately so the Cooldown and APY columns
     // render as "—" rather than as a confident wrong number. Restoring them is a backend change; see
     // the field inventory in #114.
     queryFeeCut: 0,
     delegatorParameterCooldown: 0,
     lastDelegationParameterUpdate: 0,
-    queryFeesCollectedGRT: null,
     rollingAPY30d: null,
     rollingAPY90d: null,
+
+    // Sent since kittiwake#38. Null is kept distinct from zero: an indexer that collected nothing
+    // and one whose fees were never recorded are different answers, and the table renders the
+    // second as a dash.
+    queryFeesCollectedGRT:
+      r.queryFeesCollectedGrt === null || r.queryFeesCollectedGrt === undefined
+        ? null
+        : num(r.queryFeesCollectedGrt),
     overDelegationDilution: null,
     reoSource: null,
     reoRenewalTimestamp: null,
@@ -125,7 +136,7 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     stakedTokens: grtToWei(selfStake),
     delegatedTokens: grtToWei(delegated),
     lockedTokens: '0',
-    rewardsEarned: '0',
+    rewardsEarned: grtToWei(r.rewardsEarnedGrt ?? '0'),
     delegatorShares: '0',
     createdAt: 0,
   } as unknown as EnrichedIndexer;
