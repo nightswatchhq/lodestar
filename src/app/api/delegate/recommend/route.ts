@@ -34,7 +34,16 @@ function buildWeights(prefs: Record<string, number>): Record<string, number> {
 }
 
 function computeScore(indexer: EnrichedIndexer, weights: Record<string, number>): number {
-  const bd = indexer.scoreBreakdown as Record<string, number>;
+  const bd = indexer.scoreBreakdown as Record<string, number> | null | undefined;
+  // **Kittiwake sends a composite `score` but not the per-dimension breakdown the sliders weight**
+  // (#114). Two things went wrong here at once and both are worth naming: dereferencing the absent
+  // breakdown threw, turning a clean 503 into a 500; and defaulting it to `{}` would have been
+  // quietly worse - every indexer scores 0, and the "recommendation" becomes whichever one happened
+  // to sort first, presented to a delegator as a considered pick.
+  //
+  // So fall back to the composite score, which is a real ranking, and let `buildReasons` say that
+  // the preferences could not be applied.
+  if (!bd) return indexer.score ?? 0;
   return Object.entries(weights).reduce(
     (sum, [dim, w]) => sum + ((bd[dim] ?? 0) * w) / 100,
     0,
@@ -42,11 +51,23 @@ function computeScore(indexer: EnrichedIndexer, weights: Record<string, number>)
 }
 
 function buildReasons(indexer: EnrichedIndexer, weights: Record<string, number>): string[] {
-  const bd = indexer.scoreBreakdown as Record<string, number>;
+  const bd = indexer.scoreBreakdown as Record<string, number> | null | undefined;
+
+  // Without the breakdown the ranking is the composite score, so say so rather than dressing it up
+  // as a preference-weighted pick the user's sliders influenced.
+  if (!bd) {
+    const reasons = [`Overall score ${(indexer.score ?? 0).toFixed(0)}/100`];
+    if (indexer.delegatorAPR) reasons.push(`${indexer.delegatorAPR.toFixed(1)}% estimated APR`);
+    if (indexer.effectiveCut !== null && indexer.effectiveCut !== undefined) {
+      reasons.push(`${indexer.effectiveCut.toFixed(1)}% effective cut`);
+    }
+    reasons.push('Ranked on overall score; preference sliders need per-dimension data this feed does not carry');
+    return reasons;
+  }
 
   // Top 3 contributing dimensions
   const top = Object.entries(weights)
-    .map(([dim, w]) => ({ dim, contribution: ((bd[dim] ?? 0) * w) / 100 }))
+    .map(([dim, w]) => ({ dim, contribution: ((bd?.[dim] ?? 0) * w) / 100 }))
     .sort((a, b) => b.contribution - a.contribution)
     .slice(0, 3)
     .map(({ dim }) => dim);
