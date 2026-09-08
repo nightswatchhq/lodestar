@@ -1,5 +1,6 @@
 import { createPublicClient, http, type Address } from 'viem';
 import { arbitrum } from 'viem/chains';
+import { arbitrumRpcUrl } from './arbitrum-rpc';
 
 // Rewards Eligibility Oracle (GIP-0079) on Arbitrum One
 export const REO_ADDRESS = '0x8ec2767a9d9ba02b4e09e8ff4fac2e14a340f304' as const;
@@ -43,23 +44,9 @@ export const REO_ABI = [
   },
 ] as const;
 
-/**
- * The fallback when `ARBITRUM_RPC_URL` is unset.
- *
- * A public endpoint, rate-limited, and not what production should be using: the indexer directory
- * fans out one oracle call per indexer and a free endpoint answers a handful a minute before it
- * starts refusing.
- *
- * It replaces a default of `https://gateway.lodestar-dashboard.com/rpc/42161`, which was the
- * Dispatch gateway and has answered nothing since 2026-07-20. Production sets the variable, so
- * nothing was broken - but the first fresh environment would have failed against a host that does
- * not exist, with an error naming a domain that looks like ours and is not listening. A slow
- * fallback is a bad default; a dead one is a trap.
- */
-const PUBLIC_ARBITRUM_RPC = 'https://arb1.arbitrum.io/rpc';
 
 // Server-side public client for Arbitrum One.
-const rpcUrl = process.env.ARBITRUM_RPC_URL ?? PUBLIC_ARBITRUM_RPC;
+const rpcUrl = arbitrumRpcUrl();
 export const arbitrumClient = createPublicClient({
   chain: arbitrum,
   transport: http(rpcUrl),

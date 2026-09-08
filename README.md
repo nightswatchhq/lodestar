@@ -249,7 +249,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | `PUSH_CHANNEL_ADDRESS` | Push Protocol channel wallet address | No |
 | `PUSH_CHANNEL_PRIVATE_KEY` | Push Protocol channel private key | No |
 | `PUSH_ENV` | Push Protocol environment — `staging` or `prod` | No |
-| `DISPATCH_GATEWAY_URL` | PostgREST endpoint for Seahorn swap data | No |
 | `INDEXER_AGENT_URL` | Indexer agent management API URL | No |
 | `INDEXER_AGENT_TOKEN` | Basic auth credentials for indexer agent (`user:pass`) | No |
 | `SCUTTLEBUTT_ADMIN_SECRET` | Admin login password for Scuttlebutt (moderation). Auth fails closed if unset | No |

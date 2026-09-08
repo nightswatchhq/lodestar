@@ -1,5 +1,6 @@
 import { createPublicClient, http, type Address, type PublicClient } from 'viem';
 import { arbitrum } from 'viem/chains';
+import { arbitrumRpcUrl } from './arbitrum-rpc';
 
 // Reading the DIPS issuance split straight from the IssuanceAllocator, as a second opinion on the
 // nest that normally answers for it.
@@ -54,7 +55,7 @@ export const ALLOCATOR_ABI = [
   },
 ] as const;
 
-const rpcUrl = process.env.ARBITRUM_RPC_URL ?? 'https://gateway.lodestar-dashboard.com/rpc/42161';
+const rpcUrl = arbitrumRpcUrl();
 
 export const allocatorClient = createPublicClient({
   chain: arbitrum,
