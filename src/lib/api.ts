@@ -7,8 +7,8 @@ import {
   type CuratorPortfolioResponse,
   type PaymentsOverview,
 } from './queries';
-import type { EnrichedIndexer } from './enriched';
 import { normaliseEnrichedResponse, type EnrichedResponse } from './enriched-normalise';
+import { parseResponse } from './contract';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status';
@@ -21,8 +21,13 @@ import type { DeveloperActivityResponse } from '@/app/api/developer-activity/rou
 export async function fetchNetworkStats(): Promise<NetworkStatsResponse> {
   const response = await fetch('/api/network-stats');
   if (!response.ok) throw new Error(`Network stats failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as NetworkStatsResponse;
+  // `grtSupply` is optional in the declared type and legitimately absent when the on-chain read
+  // fails, so it is not asserted. `graphNetwork` is what every caller destructures.
+  return parseResponse('/api/network-stats', await response.json(), {
+    objects: ['data', 'data.graphNetwork'],
+    present: ['data.graphNetwork.currentEpoch', 'data.graphNetwork.totalTokensStaked'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -31,8 +36,11 @@ export async function fetchNetworkStats(): Promise<NetworkStatsResponse> {
 export async function fetchEpochHistory(count = 30): Promise<EpochHistoryResponse> {
   const response = await fetch(`/api/epochs?count=${count}`);
   if (!response.ok) throw new Error(`Epoch history failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as EpochHistoryResponse;
+  return parseResponse('/api/epochs', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.epoches': ['id'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -60,8 +68,11 @@ export async function fetchIndexers(params: {
 
   const response = await fetch(`/api/indexers?${qs}`);
   if (!response.ok) throw new Error(`Indexers failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as IndexersResponse;
+  return parseResponse('/api/indexers', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.indexers': ['id', 'stakedTokens', 'indexingRewardCut'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -85,7 +96,12 @@ export async function fetchGRTPrice(): Promise<{
 }> {
   const response = await fetch('/api/price');
   if (!response.ok) throw new Error('Failed to fetch GRT price');
-  return response.json();
+  // Both keys are asserted present rather than numeric: when every upstream fails the route answers
+  // `{ price: null, change24h: null }`, which the declared type does not admit but the callers
+  // already render as unavailable. Tightening that is a route change, not a parser change.
+  return parseResponse('/api/price', await response.json(), {
+    present: ['price', 'change24h'],
+  });
 }
 
 /**
@@ -96,7 +112,7 @@ export async function fetchTVL(): Promise<{
 }> {
   const response = await fetch('/api/tvl');
   if (!response.ok) throw new Error('Failed to fetch TVL');
-  return response.json();
+  return parseResponse('/api/tvl', await response.json(), { present: ['tvl'] });
 }
 
 /**
@@ -105,8 +121,12 @@ export async function fetchTVL(): Promise<{
 export async function fetchIndexerProvisions(indexer: string): Promise<IndexerProvisionsResponse> {
   const response = await fetch(`/api/provisions?indexer=${encodeURIComponent(indexer)}`);
   if (!response.ok) throw new Error(`Indexer provisions failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as IndexerProvisionsResponse;
+  // An indexer with no provisions answers `{ data: { provisions: [] } }`, which is correct.
+  return parseResponse('/api/provisions', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.provisions'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -115,8 +135,12 @@ export async function fetchIndexerProvisions(indexer: string): Promise<IndexerPr
 export async function fetchDelegatorPortfolio(address: string): Promise<DelegatorPortfolioResponse> {
   const response = await fetch(`/api/portfolio?address=${encodeURIComponent(address)}&type=delegator`);
   if (!response.ok) throw new Error(`Delegator portfolio failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as DelegatorPortfolioResponse;
+  // `delegator` is `Delegator | null` - an address that has never delegated is a null, not a fault.
+  return parseResponse('/api/portfolio?type=delegator', await response.json(), {
+    objects: ['data'],
+    present: ['data.delegator'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -125,8 +149,12 @@ export async function fetchDelegatorPortfolio(address: string): Promise<Delegato
 export async function fetchCuratorPortfolio(address: string): Promise<CuratorPortfolioResponse> {
   const response = await fetch(`/api/portfolio?address=${encodeURIComponent(address)}&type=curator`);
   if (!response.ok) throw new Error(`Curator portfolio failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as CuratorPortfolioResponse;
+  // `curator` is `Curator | null`, same as the delegator side.
+  return parseResponse('/api/portfolio?type=curator', await response.json(), {
+    objects: ['data'],
+    present: ['data.curator'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -156,8 +184,10 @@ export async function fetchSubgraphDeployments(params: {
   if (params.orderDirection) qs.set('orderDirection', params.orderDirection);
   const response = await fetch(`/api/subgraph-deployments?${qs}`);
   if (!response.ok) throw new Error(`Deployments fetch failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/subgraph-deployments', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -178,8 +208,12 @@ export async function fetchSubgraphDeployments30d(): Promise<{
 }[]> {
   const response = await fetch('/api/subgraph-fees-30d');
   if (!response.ok) throw new Error(`30d fees fetch failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  // `queryFees30d` is the whole point of this route as distinct from the one above, so a row
+  // without it is a contract change however healthy the rest of the payload looks.
+  return parseResponse('/api/subgraph-fees-30d', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'queryFees30d'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -188,8 +222,12 @@ export async function fetchSubgraphDeployments30d(): Promise<{
 export async function fetchManifestAnalysis(hash: string): Promise<ManifestAnalysis> {
   const response = await fetch(`/api/manifest?hash=${encodeURIComponent(hash)}`);
   if (!response.ok) throw new Error(`Manifest analysis failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/manifest', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.dataSources', 'data.breakdown'],
+    present: ['data.score', 'data.network'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -198,8 +236,12 @@ export async function fetchManifestAnalysis(hash: string): Promise<ManifestAnaly
 export async function fetchPOIOverview(): Promise<POIOverview> {
   const response = await fetch('/api/poi');
   if (!response.ok) throw new Error(`POI overview failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/poi', await response.json(), {
+    objects: ['data', 'data.summary'],
+    arrays: ['data.deployments'],
+    present: ['data.summary.overallConsensusRate'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -208,8 +250,12 @@ export async function fetchPOIOverview(): Promise<POIOverview> {
 export async function fetchPOIDeployment(deployment: string): Promise<POIDeploymentDetail> {
   const response = await fetch(`/api/poi?deployment=${encodeURIComponent(deployment)}`);
   if (!response.ok) throw new Error(`POI detail failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/poi?deployment', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.epochs'],
+    present: ['data.deploymentId', 'data.ipfsHash'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -218,8 +264,13 @@ export async function fetchPOIDeployment(deployment: string): Promise<POIDeploym
 export async function fetchIndexingStatus(hash: string): Promise<DeploymentIndexingStatus> {
   const response = await fetch(`/api/indexing-status/${encodeURIComponent(hash)}`);
   if (!response.ok) throw new Error(`Indexing status failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  // A deployment nobody has allocated to answers `{ indexers: [] }`, which is a real answer.
+  return parseResponse('/api/indexing-status', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.indexers'],
+    present: ['data.deploymentId'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -254,8 +305,12 @@ export async function fetchIndexerStatus(address: string): Promise<{
 }> {
   const response = await fetch(`/api/indexer-status/${encodeURIComponent(address)}`);
   if (!response.ok) throw new Error(`Indexer status failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/indexer-status', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.deployments'],
+    present: ['data.indexerAddress'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -267,7 +322,9 @@ export async function fetchChainLag(): Promise<{
 }> {
   const response = await fetch('/api/chain-lag');
   if (!response.ok) throw new Error('Failed to fetch chain lag');
-  return response.json();
+  // The envelope is returned whole here, and `data` is explicitly nullable in the declared type, so
+  // this asserts the key exists rather than what is under it.
+  return parseResponse('/api/chain-lag', await response.json(), { present: ['data'] });
 }
 
 /**
@@ -279,7 +336,12 @@ export async function fetchVotes(period?: string, voter?: string): Promise<Votes
   if (voter) params.set('voter', voter);
   const response = await fetch(`/api/vote?${params}`);
   if (!response.ok) throw new Error('Failed to fetch votes');
-  return response.json();
+  // `userVote` is null for a caller who has not voted, and is only sent when `voter` was asked for,
+  // so it is not asserted. A period with no votes yet answers with two empty arrays.
+  return parseResponse('/api/vote', await response.json(), {
+    arrays: ['tallies', 'voters'],
+    present: ['period'],
+  });
 }
 
 /**
@@ -296,7 +358,10 @@ export async function submitVote(message: VoteMessage, signature: string): Promi
   });
   const json = await response.json();
   if (!response.ok) throw new Error(json.error || 'Failed to submit vote');
-  return json;
+  return parseResponse('/api/vote (POST)', json, {
+    objects: ['vote'],
+    present: ['success', 'vote.voter', 'vote.indexer', 'vote.voteWeight'],
+  });
 }
 
 /**
@@ -317,7 +382,11 @@ export async function fetchRewardsHistory(
   const qs = new URLSearchParams({ address, days: String(days) });
   const response = await fetch(`/api/rewards-history?${qs}`);
   if (!response.ok) throw new Error(`Rewards history failed: ${response.status}`);
-  return response.json();
+  // An address with no rewards legitimately answers `{ history: [] }`. Rejecting empty results is
+  // what produced four false alarms the first time the e2e contracts ran; presence is not fullness.
+  return parseResponse('/api/rewards-history', await response.json(), {
+    rows: { history: ['date', 'timestamp', 'value', 'rewards', 'principal'] },
+  });
 }
 
 /**
@@ -326,8 +395,12 @@ export async function fetchRewardsHistory(
 export async function fetchPayments(): Promise<PaymentsOverview> {
   const response = await fetch('/api/payments');
   if (!response.ok) throw new Error(`Payments failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as PaymentsOverview;
+  return parseResponse('/api/payments', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.escrowAccounts', 'data.recentTransactions'],
+    present: ['data.totalCollected', 'data.activePayers'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -336,8 +409,12 @@ export async function fetchPayments(): Promise<PaymentsOverview> {
 export async function fetchIndexerPayments(receiver: string): Promise<PaymentsOverview> {
   const response = await fetch(`/api/payments?receiver=${encodeURIComponent(receiver)}`);
   if (!response.ok) throw new Error(`Indexer payments failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as PaymentsOverview;
+  return parseResponse('/api/payments?receiver', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.escrowAccounts', 'data.recentTransactions'],
+    present: ['data.totalCollected', 'data.activePayers'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -348,8 +425,11 @@ export async function fetchIndexerStakeHistory(
 ): Promise<{ history: Array<{ date: string; selfStakeGrt: number; delegatedGrt: number }> }> {
   const response = await fetch(`/api/indexer-stake-history/${encodeURIComponent(address)}`);
   if (!response.ok) throw new Error(`Stake history failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as { history: Array<{ date: string; selfStakeGrt: number; delegatedGrt: number }> };
+  return parseResponse('/api/indexer-stake-history', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.history': ['date', 'selfStakeGrt', 'delegatedGrt'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -389,8 +469,12 @@ export async function fetchTokenMetrics(count = 100): Promise<{
 }[]> {
   const response = await fetch(`/api/token-metrics?count=${count}`);
   if (!response.ok) throw new Error(`Token metrics failed: ${response.status}`);
-  const json = await response.json();
-  return json.data ?? [];
+  // The `?? []` this replaces was a silent fallback to an empty chart. Every success path on the
+  // route sends `data`, so its absence is a contract change and should say so.
+  return parseResponse('/api/token-metrics', await response.json(), {
+    rows: { data: ['epoch', 'issuance', 'totalBurn'] },
+    pick: 'data',
+  });
 }
 
 /**
@@ -399,8 +483,12 @@ export async function fetchTokenMetrics(count = 100): Promise<{
 export async function fetchDeveloperActivity(): Promise<DeveloperActivityResponse> {
   const response = await fetch('/api/developer-activity');
   if (!response.ok) throw new Error(`Developer activity failed: ${response.status}`);
-  const json = await response.json();
-  return json.data as DeveloperActivityResponse;
+  return parseResponse('/api/developer-activity', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.weeks'],
+    present: ['data.totalInWindow', 'data.windowMonths'],
+    pick: 'data',
+  });
 }
 
 /**
@@ -414,8 +502,12 @@ export async function fetchDelegationFlows(days = 90, compare = false): Promise<
 }[]> {
   const response = await fetch(`/api/delegation-flows?days=${days}${compare ? '&compare=1' : ''}`);
   if (!response.ok) throw new Error(`Delegation flows failed: ${response.status}`);
-  const json = await response.json();
-  return json.data ?? [];
+  // Another `?? []` removed: the route always sends `data` on success, so an empty chart should be
+  // an empty array from the server, never a missing key swallowed here.
+  return parseResponse('/api/delegation-flows', await response.json(), {
+    rows: { data: ['date', 'inflows', 'outflows', 'net'] },
+    pick: 'data',
+  });
 }
 
 export async function fetchParameterHistory(address: string): Promise<{
@@ -427,8 +519,12 @@ export async function fetchParameterHistory(address: string): Promise<{
 }[]> {
   const response = await fetch(`/api/parameter-history/${encodeURIComponent(address)}`);
   if (!response.ok) throw new Error(`Parameter history failed: ${response.status}`);
-  const json = await response.json();
-  return json.data ?? [];
+  // An indexer that has never changed a parameter answers `{ data: [] }` from the route itself, so
+  // the empty case needs no fallback here and the missing case is a genuine fault.
+  return parseResponse('/api/parameter-history', await response.json(), {
+    rows: { data: ['param_name', 'new_value', 'detected_at'] },
+    pick: 'data',
+  });
 }
 
 export interface ProvenanceEvent {
@@ -457,8 +553,15 @@ export interface AprProvenance {
 export async function fetchAprProvenance(address: string): Promise<AprProvenance> {
   const response = await fetch(`/api/apr-provenance/${encodeURIComponent(address)}`);
   if (!response.ok) throw new Error(`APR provenance failed: ${response.status}`);
-  const json = await response.json();
-  return json.data ?? { reconcile: null, events: [] };
+  // `reconcile` is legitimately null when the pool could not be read on-chain, and `events` is
+  // legitimately empty. The fallback this replaces made a missing payload indistinguishable from
+  // both of those, which is the shape of failure #114 took.
+  return parseResponse('/api/apr-provenance', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.events'],
+    present: ['data.reconcile'],
+    pick: 'data',
+  });
 }
 
 export interface CuratorSignalEntry {
@@ -480,15 +583,22 @@ export interface SubgraphCurationData {
 export async function fetchSubgraphCuration(hash: string): Promise<SubgraphCurationData> {
   const response = await fetch(`/api/subgraph-curation/${encodeURIComponent(hash)}`);
   if (!response.ok) throw new Error(`Subgraph curation failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/subgraph-curation', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.signals'],
+    present: ['data.totalSignalledTokens', 'data.queryFeesAmount'],
+    pick: 'data',
+  });
 }
 
 export async function fetchSubgraphSchema(hash: string): Promise<{ schemaText: string; schemaHash: string }> {
   const response = await fetch(`/api/subgraph-schema/${encodeURIComponent(hash)}`);
   if (!response.ok) throw new Error(`Schema fetch failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/subgraph-schema', await response.json(), {
+    objects: ['data'],
+    present: ['data.schemaText', 'data.schemaHash'],
+    pick: 'data',
+  });
 }
 
 export async function fetchCuratorLeaderboard(params: { first?: number; skip?: number } = {}): Promise<
@@ -498,6 +608,8 @@ export async function fetchCuratorLeaderboard(params: { first?: number; skip?: n
   const qs = new URLSearchParams({ first: String(first), skip: String(skip) });
   const response = await fetch(`/api/curators?${qs}`);
   if (!response.ok) throw new Error(`Curator leaderboard failed: ${response.status}`);
-  const json = await response.json();
-  return json.data;
+  return parseResponse('/api/curators', await response.json(), {
+    rows: { data: ['id'] },
+    pick: 'data',
+  });
 }

@@ -230,7 +230,7 @@ async function alertDiscord(summary) {
 }
 
 /**
- * Fill `{address}` and `{hash}` from live data.
+ * Fill `{address}`, `{hash}` and `{poiDeployment}` from live data.
  *
  * Hardcoding an indexer would red this monitor the day that indexer left the network - a false alarm
  * about the wrong thing, which is the failure mode these checks exist to avoid.
@@ -247,6 +247,14 @@ async function harvest() {
     const m = r.text.match(/"(Qm[1-9A-HJ-NP-Za-km-z]{44})"/);
     if (m) out.hash = m[1];
   } catch { /* as above */ }
+  try {
+    // From the POI overview's own first row, not from `{hash}`: an arbitrary subgraph need not have
+    // any closed allocations carrying a POI, and a legitimate 404 would red this for the wrong
+    // reason.
+    const r = await get('/api/poi');
+    const rows = JSON.parse(r.text)?.data?.deployments ?? [];
+    if (rows[0]?.deploymentId) out.poiDeployment = rows[0].deploymentId;
+  } catch { /* as above */ }
   return out;
 }
 
@@ -255,8 +263,8 @@ console.log(`lodestar e2e against ${BASE}\n`);
 const params = await harvest();
 await checkHealth();
 for (const c of CONTRACTS) {
-  if (/\{(address|hash)\}/.test(c.path)) {
-    const need = c.path.match(/\{(address|hash)\}/g).map((x) => x.slice(1, -1));
+  if (/\{\w+\}/.test(c.path)) {
+    const need = c.path.match(/\{\w+\}/g).map((x) => x.slice(1, -1));
     const missing = need.filter((k) => !params[k]);
     if (missing.length) {
       // Not silently skipped: a check that quietly does not run is indistinguishable from one that
