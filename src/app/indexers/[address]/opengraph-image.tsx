@@ -76,7 +76,7 @@ export default async function OGImage({ params }: { params: Promise<{ address: s
     const enriched = enrichedList?.find(e => e.id === addr);
 
     if (enriched) {
-      name = enriched.name;
+      name = enriched.name ?? name;
       selfStake = enriched.selfStakeGRT;
       delegated = enriched.delegatedGRT;
       allocations = enriched.allocationCount;

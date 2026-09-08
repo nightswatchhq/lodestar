@@ -45,7 +45,13 @@ import { IndexerComparison } from '@/components/ui/IndexerComparison';
 
 interface IndexerRow {
   id: string;
-  name: string;
+  /**
+   * **Nullable, and honestly so.** Typed `string` before, which is why `tsc` was happy while the
+   * filter dereferenced it and threw on every keystroke. 97 of 97 indexers on mainnet have no
+   * `defaultDisplayName`, and kittiwake sends no name field at all, so this is null for everyone -
+   * the common case, not an edge one.
+   */
+  name: string | null;
   address: string;
   url: string | null;
   selfStake: number;
@@ -75,10 +81,14 @@ interface IndexerRow {
 }
 
 // Search across name, address, and URL (many indexers have no display name set)
-const nameAddressFilter: FilterFn<IndexerRow> = (row, _columnId, filterValue) => {
+export const nameAddressFilter: FilterFn<IndexerRow> = (row, _columnId, filterValue) => {
   const search = (filterValue as string).toLowerCase();
   return (
-    row.original.name.toLowerCase().includes(search) ||
+    // The comment above this function has said "many indexers have no display name set" since it was
+    // written, and the line below dereferenced it anyway. It throws inside TanStack's `filterFn`, so
+    // the whole table unmounts into an error boundary on the first keystroke - "Something went
+    // wrong", not a bad search result.
+    (row.original.name?.toLowerCase().includes(search) ?? false) ||
     row.original.address.toLowerCase().includes(search) ||
     (row.original.url?.toLowerCase().includes(search) ?? false)
   );
