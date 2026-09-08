@@ -13,7 +13,7 @@ describe('rateLimit — tier limits', () => {
     ['/api/portfolio', 30],
     ['/api/vote', 60],
     ['/api/indexer-status/0xabc', 20],
-    ['/api/epochs', 200], // fallback
+    ['/api/epochs', 400], // fallback - raised from 200 for the per-row fan-out on /indexers
   ])('reports the right limit for %s', async (path, limit) => {
     const r = await rateLimit(freshIp(), path);
     expect(r.limit).toBe(limit);

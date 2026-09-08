@@ -255,7 +255,7 @@ function CompareContent() {
     const aprs = new Map<string, number>();
     const enrichedList = enrichedData && 'indexers' in enrichedData ? enrichedData.indexers : enrichedData ?? [];
     for (const e of enrichedList) {
-      names.set(e.id, e.name);
+      names.set(e.id, e.name ?? e.id);
       aprs.set(e.id, e.delegatorAPR);
     }
     return { nameMap: names, aprMap: aprs };

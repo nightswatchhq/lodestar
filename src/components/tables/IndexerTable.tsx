@@ -45,7 +45,13 @@ import { IndexerComparison } from '@/components/ui/IndexerComparison';
 
 interface IndexerRow {
   id: string;
-  name: string;
+  /**
+   * **Nullable, and honestly so.** Typed `string` before, which is why `tsc` was happy while the
+   * filter dereferenced it and threw on every keystroke. 97 of 97 indexers on mainnet have no
+   * `defaultDisplayName`, and kittiwake sends no name field at all, so this is null for everyone -
+   * the common case, not an edge one.
+   */
+  name: string | null;
   address: string;
   url: string | null;
   selfStake: number;
@@ -75,10 +81,14 @@ interface IndexerRow {
 }
 
 // Search across name, address, and URL (many indexers have no display name set)
-const nameAddressFilter: FilterFn<IndexerRow> = (row, _columnId, filterValue) => {
+export const nameAddressFilter: FilterFn<IndexerRow> = (row, _columnId, filterValue) => {
   const search = (filterValue as string).toLowerCase();
   return (
-    row.original.name.toLowerCase().includes(search) ||
+    // The comment above this function has said "many indexers have no display name set" since it was
+    // written, and the line below dereferenced it anyway. It throws inside TanStack's `filterFn`, so
+    // the whole table unmounts into an error boundary on the first keystroke - "Something went
+    // wrong", not a bad search result.
+    (row.original.name?.toLowerCase().includes(search) ?? false) ||
     row.original.address.toLowerCase().includes(search) ||
     (row.original.url?.toLowerCase().includes(search) ?? false)
   );
@@ -242,27 +252,42 @@ export function IndexerTable() {
   const isLoading = hasEnriched ? false : (enrichedLoading || indexersLoading);
 
   const tableData: IndexerRow[] = useMemo(() => {
+    // **The raw feed fills the gaps the enriched one no longer carries** (#114).
+    //
+    // Since the kittiwake cutover, `/api/indexers-enriched` no longer sends the delegation-parameter
+    // cooldown, the query-fee cut, lifetime rewards or the account name - so Cooldown rendered as a
+    // dash for every indexer even once the enriched payload was parsing again. The raw indexer feed
+    // is already fetched on this page and carries every one of them, keyed by the same id, so the
+    // gap closes here rather than waiting on a backend change.
+    //
+    // Enriched wins wherever both have a field: it is the one with the scores and the APR.
+    const rawById = new Map(
+      (indexersData?.indexers ?? []).map((i) => [i.id.toLowerCase(), i]),
+    );
+
     // Prefer enriched data from cron (includes APR, effective cut, activity — zero N+1 queries)
     if (hasEnriched) {
       return enrichedData!.indexers
-        .map((e: EnrichedIndexer): IndexerRow => ({
+        .map((e: EnrichedIndexer): IndexerRow => {
+          const raw = rawById.get(String(e.id).toLowerCase());
+          return ({
           id: e.id,
-          name: e.name,
+          name: e.name ?? raw?.account?.defaultDisplayName ?? null,
           address: e.id,
           url: e.url,
           selfStake: e.selfStakeGRT,
           delegated: e.delegatedGRT,
           capacity: e.delegationCapacity.utilizationPercent,
           rewardCut: e.indexingRewardCut,
-          queryCut: e.queryFeeCut,
+          queryCut: e.queryFeeCut || raw?.queryFeeCut || 0,
           cooldownRemaining: cooldownRemainingDays(
-            e.delegatorParameterCooldown ?? 0,
-            e.lastDelegationParameterUpdate ?? 0,
+            e.delegatorParameterCooldown || raw?.delegatorParameterCooldown || 0,
+            e.lastDelegationParameterUpdate || raw?.lastDelegationParameterUpdate || 0,
             Math.floor(Date.now() / 1000),
           ),
           allocations: e.allocationCount,
           allocated: weiToGRT(e.allocatedTokens),
-          rewards: weiToGRT(e.rewardsEarned),
+          rewards: weiToGRT(e.rewardsEarned && e.rewardsEarned !== '0' ? e.rewardsEarned : (raw?.rewardsEarned ?? '0')),
           feesCollected: e.queryFeesCollectedGRT ?? 0,
           reoStatus: e.reoStatus,
           reoSource: e.reoSource ?? null,
@@ -283,21 +308,22 @@ export function IndexerTable() {
           raw: {
             id: e.id,
             account: { id: e.id, defaultDisplayName: e.name, metadata: null },
-            stakedTokens: e.stakedTokens,
-            delegatedTokens: e.delegatedTokens,
+            stakedTokens: raw?.stakedTokens ?? e.stakedTokens,
+            delegatedTokens: raw?.delegatedTokens ?? e.delegatedTokens,
             allocatedTokens: e.allocatedTokens,
             allocationCount: e.allocationCount,
             indexingRewardCut: e.indexingRewardCut,
             queryFeeCut: e.queryFeeCut,
-            delegatorParameterCooldown: e.delegatorParameterCooldown,
-            lastDelegationParameterUpdate: e.lastDelegationParameterUpdate,
-            rewardsEarned: e.rewardsEarned,
-            delegatorShares: e.delegatorShares,
+            delegatorParameterCooldown: e.delegatorParameterCooldown || raw?.delegatorParameterCooldown || 0,
+            lastDelegationParameterUpdate: e.lastDelegationParameterUpdate || raw?.lastDelegationParameterUpdate || 0,
+            rewardsEarned: raw?.rewardsEarned ?? e.rewardsEarned,
+            delegatorShares: raw?.delegatorShares ?? e.delegatorShares,
             url: e.url,
             geoHash: e.geoHash,
-            createdAt: e.createdAt,
+            createdAt: raw?.createdAt ?? e.createdAt,
           },
-        }))
+        });
+        })
         .filter((row) => row.selfStake >= minStake);
     }
 

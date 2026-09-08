@@ -32,7 +32,9 @@ export function DelegationFeed({ indexerAddress: initialFilter }: DelegationFeed
     const map = new Map<string, string>();
     if (enrichedData?.indexers) {
       for (const idx of enrichedData.indexers) {
-        map.set(idx.name.toLowerCase(), idx.id);
+        // Skip rather than key the map on null. Every mainnet indexer has a null name today, so
+        // this threw on the first row and took the panel into an error boundary.
+        if (idx.name) map.set(idx.name.toLowerCase(), idx.id);
         map.set(idx.id.toLowerCase(), idx.id);
       }
     }
@@ -62,7 +64,7 @@ export function DelegationFeed({ indexerAddress: initialFilter }: DelegationFeed
     const map = new Map<string, string>();
     if (enrichedData?.indexers) {
       for (const idx of enrichedData.indexers) {
-        map.set(idx.id.toLowerCase(), idx.name);
+        map.set(idx.id.toLowerCase(), idx.name ?? idx.id);
       }
     }
     return map;
