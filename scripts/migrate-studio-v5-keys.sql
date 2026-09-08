@@ -36,3 +36,9 @@ CREATE INDEX IF NOT EXISTS idx_studio_api_keys_owner   ON studio_api_keys (owner
 CREATE INDEX IF NOT EXISTS idx_api_key_usage_key_id    ON api_key_usage (key_id);
 
 COMMIT;
+
+-- Ownership. The application connects as `lodestar`; a migration run as the superuser creates
+-- tables owned by `postgres`, and every statement from the app then fails with 42501 - silently, in
+-- the case of a fire-and-forget writer (#113). Idempotent, and a no-op when already correct.
+ALTER TABLE studio_api_keys OWNER TO lodestar;
+ALTER TABLE api_key_usage OWNER TO lodestar;

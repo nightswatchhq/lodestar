@@ -39,3 +39,10 @@ CREATE TABLE IF NOT EXISTS sync_bounties (
 
 CREATE INDEX IF NOT EXISTS idx_sync_bounties_deployment ON sync_bounties(deployment_id);
 CREATE INDEX IF NOT EXISTS idx_sync_bounties_status     ON sync_bounties(status);
+
+-- Ownership. The application connects as `lodestar`; a migration run as the superuser creates
+-- tables owned by `postgres`, and every statement from the app then fails with 42501 - silently, in
+-- the case of a fire-and-forget writer (#113). Idempotent, and a no-op when already correct.
+ALTER TABLE studio_subgraphs OWNER TO lodestar;
+ALTER TABLE studio_deploy_keys OWNER TO lodestar;
+ALTER TABLE sync_bounties OWNER TO lodestar;
