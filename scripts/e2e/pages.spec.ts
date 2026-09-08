@@ -40,20 +40,22 @@ test('the indexer directory shows scores and APR, not dashes', async ({ page }) 
   // Wait for rows to arrive at all.
   await expect(page.getByText(/Showing 1 to \d+ of \d+ indexers/)).toBeVisible();
 
-  const body = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
-
-  // #114: every one of 80 rows rendered "Oracle read unavailable" while the API reported
-  // reoStatus "eligible" on 100 of 100.
-  expect(
-    body.includes('Oracle read unavailable'),
-    'every indexer reports "Oracle read unavailable" - the enriched payload is not reaching the table (#114)',
-  ).toBe(false);
-
-  // At least one row must carry a real APR percentage. A directory of dashes is the outage.
-  expect(
-    /\d+\.\d+%/.test(body),
+  // **Auto-retrying locators, not a one-shot innerText read.** The enriched payload arrives after the
+  // first paint, so reading `main` at a fixed instant raced it: this passed in CI and failed locally
+  // in the same minute, on a page that was demonstrably fine. A monitor that is flaky pages someone
+  // at three in the morning for nothing, and is only slightly better than one that never fires.
+  //
+  // At least one row must carry a real percentage. A directory of dashes is the #114 outage.
+  await expect(
+    page.locator('td, [role="cell"]').filter({ hasText: /^\s*\d+\.\d+%/ }).first(),
     'no indexer shows a numeric APR or cut - the table is rendering its fallback path (#114)',
-  ).toBe(true);
+  ).toBeVisible({ timeout: 30_000 });
+
+  // ...and none may report the oracle as unreadable, which is what all 80 did during #114.
+  await expect(
+    page.getByText('Oracle read unavailable').first(),
+    'an indexer reports "Oracle read unavailable" - the enriched payload is not reaching the table (#114)',
+  ).toBeHidden();
 });
 
 test('delegate offers a recommendation, or says plainly that it cannot', async ({ page }) => {
@@ -71,6 +73,42 @@ test('delegate offers a recommendation, or says plainly that it cannot', async (
     hasRecommendation || saysWhyNot,
     'the delegate page shows neither a recommendation nor an error - it looks intact and does nothing (#114)',
   ).toBe(true);
+});
+
+/**
+ * The Delegation Activity filter, which crashed the same way the directory search did.
+ *
+ * `DelegationFeed` built a lookup with `map.set(idx.name.toLowerCase(), idx.id)` and `name` is null
+ * for all 97 mainnet indexers, so the panel threw into an error boundary. It was reported as a
+ * screenshot of "Something went wrong" and was found only because making the type honest made the
+ * compiler point at it - never by a test, because nothing exercised this control.
+ *
+ * **Unproven against the bug, and said so rather than implied.** Restoring the unguarded
+ * dereference and running this locally passes, because a local build has no database: the enriched
+ * route answers 500, `enrichedData` is undefined, and the crashing loop never runs. The preview
+ * environment is no better - it 503s on `/api/health` and `/api/network-stats` too. So this
+ * exercises the control against production, where it is green, but the mutation that would prove it
+ * needs an environment carrying both the regression and real data, which we do not have.
+ */
+test('the delegation activity filter does not throw on indexers with no name', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/delegators');
+  const box = page.getByPlaceholder(/filter by indexer/i).first();
+  await expect(box).toBeVisible({ timeout: 30_000 });
+  await box.fill('0x4e5c');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2500);
+
+  // The boundary, not the result: an empty filter result is fine, an unmounted panel is not.
+  const body = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
+  expect(
+    /Something went wrong|Application error|Unhandled Runtime Error/i.test(body),
+    'the delegation activity filter unmounted into an error boundary',
+  ).toBe(false);
+  expect(
+    errors.filter((e) => /toLowerCase|Cannot read properties of null/.test(e)),
+    'the null-name crash is back',
+  ).toHaveLength(0);
 });
 
 for (const path of ['/curators', '/delegators', '/subgraphs', '/payments', '/grt-flow', '/indexing']) {
