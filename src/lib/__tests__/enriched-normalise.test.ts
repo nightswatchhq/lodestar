@@ -93,3 +93,13 @@ describe('normaliseEnrichedResponse', () => {
     expect(indexers[0].reoStatus).toBe('unknown');
   });
 });
+
+describe('the recommendation path (#114 follow-up)', () => {
+  it('leaves scoreBreakdown absent rather than an empty object', () => {
+    // `computeScore` distinguishes the two. An empty object scores every indexer 0, and the
+    // "recommendation" becomes whichever one sorted first - presented to a delegator as a
+    // considered pick. Absent means "rank on the composite score instead", which is a real ranking.
+    const { indexers } = normaliseEnrichedResponse({ data: [KITTIWAKE_ROW] });
+    expect((indexers[0] as unknown as { scoreBreakdown: unknown }).scoreBreakdown).toBeNull();
+  });
+});

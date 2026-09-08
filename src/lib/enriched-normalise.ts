@@ -103,6 +103,11 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     score: r.score === null || r.score === undefined ? null : num(r.score),
     scoreGrade: (r.scoreGrade ?? null) as EnrichedIndexer['scoreGrade'],
 
+    // Absent upstream, and left absent on purpose: `computeScore` in /api/delegate/recommend
+    // distinguishes "no breakdown" from "a breakdown of zeroes", and an empty object would make
+    // every indexer score 0 and the recommendation arbitrary.
+    scoreBreakdown: null,
+
     // **Not sent by kittiwake.** Left null/zero deliberately so the Cooldown, Fees and APY columns
     // render as "—" rather than as a confident wrong number. Restoring them is a backend change; see
     // the field inventory in #114.
