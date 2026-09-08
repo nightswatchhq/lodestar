@@ -92,6 +92,38 @@ export const CONTRACTS = [
   { path: '/api/dips', name: 'DIPS', required: ['data'] },
   { path: '/api/feed', name: 'activity feed', collection: 'items', minRows: 1, sample: ['id'] },
   { path: '/api/price', name: 'GRT price', required: ['price'] },
+
+  // ---------------------------------------------------------------------------------------------
+  // The rest of what the frontend destructures.
+  //
+  // Added after #114 and the null-name crash. Twenty-one `fetch*` helpers in `src/lib/api.ts`
+  // declare a named return type and then hand back `response.json()` unchecked - the same gap that
+  // let `/api/indexers-enriched` change contract silently and render a table of dashes for a day.
+  // `tsc` cannot see a network payload, so these are where that shape is actually asserted.
+  //
+  // `{address}` and `{hash}` are substituted from live data at run time rather than hardcoded, so a
+  // fixture indexer leaving the network does not red the monitor for the wrong reason.
+  // ---------------------------------------------------------------------------------------------
+  { path: '/api/payments', name: 'payments', required: ['data.totalCollected', 'data.activePayers', 'data.escrowAccounts'] },
+  { path: '/api/poi', name: 'POI overview', required: ['data.summary', 'data.deployments'] },
+  { path: '/api/portfolio?address={address}', name: 'delegator portfolio', required: ['data.delegator', 'data.networkParams'] },
+  { path: '/api/provisions?indexer={address}', name: 'provisions', required: ['data.provisions'] },
+  { path: '/api/rewards-history?address={address}', name: 'rewards history', required: ['history'] },
+  { path: '/api/indexer-stake-history/{address}', name: 'indexer stake history', required: ['data.history'] },
+  { path: '/api/apr-provenance/{address}', name: 'APR provenance', required: ['data.events', 'data.reconcile'] },
+  { path: '/api/indexing-status/{hash}', name: 'indexing status', required: ['data.deploymentId', 'data.indexers'] },
+  { path: '/api/subgraph-curation/{hash}', name: 'subgraph curation', required: ['data.totalSignalledTokens', 'data.signals'] },
+  { path: '/api/subgraph-schema/{hash}', name: 'subgraph schema', required: ['data.schemaText'] },
+  { path: '/api/manifest?hash={hash}', name: 'manifest analysis', required: ['data.dataSources', 'data.network'] },
+  { path: '/api/vote', name: 'vote tallies', required: ['tallies', 'period'] },
+  { path: '/api/developer-activity', name: 'developer activity weeks', required: ['data.weeks', 'data.totalInWindow'] },
+  { path: '/api/dips', name: 'DIPS detail', required: ['data.live', 'data.allocations'] },
+  { path: '/api/grt-flow', name: 'GRT flow detail', required: ['data.allocated', 'data.delegated'] },
+  { path: '/api/chain-lag', name: 'chain lag detail', required: ['data.chains'] },
+  { path: '/api/network-stats', name: 'network stats detail', required: ['data.graphNetwork', 'data.grtSupply'] },
+  { path: '/api/subgraph-deployments', name: 'subgraph deployments', required: ['data'] },
+  { path: '/api/token-metrics', name: 'token metrics', required: ['data'] },
+  { path: '/api/tvl', name: 'TVL', required: ['tvl'] },
 ];
 
 /** Routes that must answer at all. Status only - nothing destructures these. */

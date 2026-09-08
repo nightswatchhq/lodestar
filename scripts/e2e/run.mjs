@@ -72,9 +72,17 @@ async function checkContract(c) {
     return fail('contract', c.name, `${c.path} returned non-JSON`);
   }
 
+  // **Presence, not fullness.** These assert the *shape*, and an empty result is a legitimate state
+  // for most of them: an address with no rewards answers `{"history": []}`, a period with no votes
+  // answers `{"tallies": []}`, an indexer who is not a delegator answers `{"delegator": null}`.
+  // Treating those as missing produced four false alarms on the first run, which is precisely the
+  // way a monitor loses the right to be believed. Where emptiness *is* the fault - a directory with
+  // no indexers - use `collection`/`minRows`/`coverage`, which check the rows themselves.
   for (const req of c.required ?? []) {
-    if (isEmpty(dig(body, req))) {
-      return fail('contract', c.name, `${c.path} is missing "${req}" - the frontend reads this by name`);
+    if (dig(body, req) === undefined) {
+      return fail('contract', c.name,
+        `${c.path} has no "${req}" - the frontend reads this by name. ` +
+        `Top-level keys: ${Object.keys(body).join(', ')}`);
     }
   }
 
@@ -221,10 +229,46 @@ async function alertDiscord(summary) {
   }
 }
 
+/**
+ * Fill `{address}` and `{hash}` from live data.
+ *
+ * Hardcoding an indexer would red this monitor the day that indexer left the network - a false alarm
+ * about the wrong thing, which is the failure mode these checks exist to avoid.
+ */
+async function harvest() {
+  const out = {};
+  try {
+    const r = await get('/api/indexers?first=1');
+    const rows = JSON.parse(r.text)?.data?.indexers ?? [];
+    if (rows[0]?.id) out.address = rows[0].id;
+  } catch { /* left undefined; the substitution below reports it */ }
+  try {
+    const r = await get('/api/subgraph-deployments');
+    const m = r.text.match(/"(Qm[1-9A-HJ-NP-Za-km-z]{44})"/);
+    if (m) out.hash = m[1];
+  } catch { /* as above */ }
+  return out;
+}
+
 const t0 = Date.now();
 console.log(`lodestar e2e against ${BASE}\n`);
+const params = await harvest();
 await checkHealth();
-for (const c of CONTRACTS) await checkContract(c);
+for (const c of CONTRACTS) {
+  if (/\{(address|hash)\}/.test(c.path)) {
+    const need = c.path.match(/\{(address|hash)\}/g).map((x) => x.slice(1, -1));
+    const missing = need.filter((k) => !params[k]);
+    if (missing.length) {
+      // Not silently skipped: a check that quietly does not run is indistinguishable from one that
+      // passed, which is the whole lesson of #114.
+      fail('contract', c.name, `could not harvest ${missing.join(', ')} to build ${c.path}`);
+      continue;
+    }
+    await checkContract({ ...c, path: c.path.replace(/\{(\w+)\}/g, (_, k) => params[k]) });
+  } else {
+    await checkContract(c);
+  }
+}
 for (const p of LIVENESS) await checkLiveness(p);
 for (const p of PAGES) await checkPage(p);
 
