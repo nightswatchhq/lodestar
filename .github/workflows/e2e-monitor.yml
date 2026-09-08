@@ -64,6 +64,11 @@ jobs:
           persist-credentials: false
 
       - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          # Matches ci.yml. Without it the action fails with "No pnpm version is specified" and,
+          # before the `if` below was narrowed, that fired a Discord alert claiming the site was
+          # broken when it was the workflow that was broken.
+          version: 10
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
           node-version: 22
@@ -73,12 +78,17 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: check the rendered pages
+        id: pages
         env:
           LODESTAR_BASE: ${{ inputs.base || 'https://www.lodestar-dashboard.com' }}
         run: pnpm exec playwright test
 
+      # **Only when the tests actually ran and failed.** `if: failure()` fired on a broken workflow
+      # too - a missing pnpm version posted "Lodestar rendered pages failing" to the channel while
+      # the site was perfectly healthy. An alert that cries wolf is worse than no alert, because it
+      # is the one people learn to scroll past.
       - name: report a rendering failure
-        if: failure()
+        if: steps.pages.conclusion == 'failure'
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
@@ -99,7 +109,7 @@ jobs:
             || { echo "ALERT DELIVERY FAILED"; exit 1; }
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: failure()
+        if: steps.pages.conclusion == 'failure'
         with:
           name: playwright-trace
           path: test-results/
