@@ -8,10 +8,10 @@ const freshIp = () => `10.0.0.${++ipCounter % 250}.${Date.now() % 1000}`;
 describe('rateLimit — tier limits', () => {
   it.each([
     ['/api/feed', 20],
-    ['/api/lodie/chat', 10],
+    ['/api/disassembly/verify', 4],
     ['/api/cron/refresh', 20],
     ['/api/portfolio', 30],
-    ['/api/vote', 60],
+    ['/api/scuttlebutt/messages', 60],
     ['/api/indexer-status/0xabc', 20],
     ['/api/epochs', 400], // fallback - raised from 200 for the per-row fan-out on /indexers
   ])('reports the right limit for %s', async (path, limit) => {
@@ -51,20 +51,23 @@ describe('rateLimit — tier limits', () => {
 describe('rateLimit — enforcement', () => {
   it('allows up to the limit then blocks (429) within the window', async () => {
     const ip = freshIp();
-    // /api/lodie/chat = 10 rpm
-    for (let i = 0; i < 10; i++) {
-      const r = await rateLimit(ip, '/api/lodie/chat');
+    // The budget is read from the first call rather than typed in, so changing the number in
+    // `rate-limit.ts` cannot leave this test quietly asserting the old one.
+    const first = await rateLimit(ip, '/api/disassembly/verify');
+    expect(first.allowed).toBe(true);
+    for (let i = 1; i < first.limit; i++) {
+      const r = await rateLimit(ip, '/api/disassembly/verify');
       expect(r.allowed, `request ${i + 1} should pass`).toBe(true);
     }
-    const blocked = await rateLimit(ip, '/api/lodie/chat');
+    const blocked = await rateLimit(ip, '/api/disassembly/verify');
     expect(blocked.allowed).toBe(false);
     expect(blocked.remaining).toBe(0);
   });
 
   it('decrements remaining on each hit', async () => {
     const ip = freshIp();
-    const r1 = await rateLimit(ip, '/api/vote'); // 60
-    const r2 = await rateLimit(ip, '/api/vote');
+    const r1 = await rateLimit(ip, '/api/scuttlebutt/messages'); // 60
+    const r2 = await rateLimit(ip, '/api/scuttlebutt/messages');
     expect(r1.remaining).toBe(59);
     expect(r2.remaining).toBe(58);
   });
@@ -72,17 +75,18 @@ describe('rateLimit — enforcement', () => {
   it('isolates counters per IP', async () => {
     const a = freshIp();
     const b = freshIp();
-    for (let i = 0; i < 10; i++) await rateLimit(a, '/api/lodie/chat');
-    const aBlocked = await rateLimit(a, '/api/lodie/chat');
-    const bOk = await rateLimit(b, '/api/lodie/chat');
+    const cap = (await rateLimit(a, '/api/disassembly/verify')).limit;
+    for (let i = 1; i < cap; i++) await rateLimit(a, '/api/disassembly/verify');
+    const aBlocked = await rateLimit(a, '/api/disassembly/verify');
+    const bOk = await rateLimit(b, '/api/disassembly/verify');
     expect(aBlocked.allowed).toBe(false);
     expect(bOk.allowed).toBe(true);
   });
 
   it('isolates counters per tier (different paths do not share a bucket)', async () => {
     const ip = freshIp();
-    for (let i = 0; i < 10; i++) await rateLimit(ip, '/api/lodie/chat'); // exhaust 10
-    const chatBlocked = await rateLimit(ip, '/api/lodie/chat');
+    for (let i = 0; i < 10; i++) await rateLimit(ip, '/api/disassembly/verify'); // exhaust 10
+    const chatBlocked = await rateLimit(ip, '/api/disassembly/verify');
     const feedOk = await rateLimit(ip, '/api/feed'); // separate tier
     expect(chatBlocked.allowed).toBe(false);
     expect(feedOk.allowed).toBe(true);

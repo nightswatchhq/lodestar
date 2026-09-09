@@ -177,11 +177,14 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // ── The long tail: kittiwake#20, to be triaged rather than worked through ──
   //
   // Triaged on 2026-09-09 by asking, for each one, whether anything in this repo actually calls
-  // it - through the hook, through the component, to a page that mounts it. Six do not, and carry
-  // a note saying so. They are still `next` rather than `doomed`, because "nobody reads it" is
-  // evidence and "we agreed to drop it" is a decision, and only the first of those has happened.
+  // it - through the hook, through the component, to a page that mounts it. Six did not, and five
+  // of those have since been deleted rather than ported (kittiwake#20).
+  //
+  // `/api/horizon/debug` is the one that stayed. Its only reference is its own auth test, but it is
+  // cron-authed, which is what an operator tool looks like rather than what dead code looks like -
+  // and "no in-repo consumer" is not "nobody reads it" for a public path on a public host. It wants
+  // confirming with a person before it goes.
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
-  { path: '/api/analytics/stats', state: 'next', workstream: 'the long tail', note: 'nothing references it, not even a test. Delete rather than port, kittiwake#20.' },
   { path: '/api/blog/search-index', state: 'next', workstream: 'the long tail' },
   { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
   { path: '/api/delegate/recommend', state: 'next', workstream: 'the long tail' },
@@ -190,8 +193,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/feed', state: 'next', workstream: 'the long tail' },
   { path: '/api/foghorn/[...path]', state: 'next', workstream: 'the long tail', note: 'a proxy; check it still needs to be one now both services sit on the same box' },
   { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
-  { path: '/api/horizon/events', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its tests. Delete rather than port, kittiwake#20.' },
-  { path: '/api/horizon/slashing', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its tests. Delete rather than port, kittiwake#20.' },
   { path: '/api/indexer-disputes/[address]', state: 'next', workstream: 'the long tail' },
   { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },
   { path: '/api/indexer/[address]/pnl', state: 'next', workstream: 'the long tail' },
@@ -203,8 +204,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/service-census', state: 'next', workstream: 'the long tail' },
   { path: '/api/subgraph-schema/[hash]', state: 'next', workstream: 'the long tail' },
   { path: '/api/subgraph-versions/[hash]', state: 'next', workstream: 'the long tail' },
-  { path: '/api/vote', state: 'next', workstream: 'the long tail', note: 'reachable only through VoteButton and VoterList, which no page mounts. Delete the route and the two components together, kittiwake#20.' },
-  { path: '/api/x402/query', state: 'next', workstream: 'the long tail', note: 'its only client is src/lib/x402-client.ts, which nothing imports. Delete both, kittiwake#20.' },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
@@ -227,12 +226,12 @@ const UNMIGRATED: readonly RouteRecord[] = [
   },
 
   // ── Agreed for deletion, kittiwake#20. Not outstanding work. ──────────────
-  { path: '/api/lodie/chat', state: 'doomed', workstream: 'deletions', note: 'discontinued' },
-  { path: '/api/lodie/health', state: 'doomed', workstream: 'deletions', note: 'discontinued' },
+  //
+  // The push and Lodie routes were here and are now gone, along with the UI behind them: the crons
+  // that fed push were struck when it was discontinued on 2026-09-06, so the subscribe button was
+  // offering people a thing that could no longer notify them. `provider-liveness` is the last one
+  // standing and goes with the Dispatch removal, #99.
   { path: '/api/provider-liveness', state: 'doomed', workstream: 'deletions', note: 'goes with the Dispatch removal, nightswatchhq/lodestar#99' },
-  { path: '/api/push/register-device', state: 'doomed', workstream: 'deletions', note: 'push is discontinued' },
-  { path: '/api/push/subscribe', state: 'doomed', workstream: 'deletions', note: 'push is discontinued' },
-  { path: '/api/push/test', state: 'doomed', workstream: 'deletions', note: 'push is discontinued' },
 
   // ── Scheduled endpoints. kittiwake schedules its own; these two have not moved.
   {

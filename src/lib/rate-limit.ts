@@ -12,11 +12,9 @@
 // [path pattern, requests per minute]
 const LIMITS: Array<[RegExp, number]> = [
   [/^\/api\/cron\//, 20],
-  [/^\/api\/lodie\/chat/, 10],
   [/^\/api\/indexer-status\//, 20],
   [/^\/api\/portfolio/, 30],
   [/^\/api\/feed/, 20],
-  [/^\/api\/vote/, 60],
   // Source verification spins a sandbox microVM + full build per call — very
   // expensive. Keep it tight; the route also enforces a global Redis-backed cap.
   [/^\/api\/disassembly\/verify/, 4],
@@ -24,9 +22,6 @@ const LIMITS: Array<[RegExp, number]> = [
   // throttle. The SSE stream is long-lived (one request), so this mainly bounds
   // POST/GET history calls.
   [/^\/api\/scuttlebutt\//, 60],
-  // Keyless x402 relay: each call costs the caller real USDC, so abuse is
-  // self-limiting, but the route makes an outbound gateway request per hit.
-  [/^\/api\/x402\//, 30],
   // Public SQL. Every call is an analytical query against the Helsinki box, which also runs the
   // Lodestar Oracle, dips-nest and the data-service gateway — so the thing being rationed is not
   // bandwidth but the CPU those depend on. Five a minute is enough to explore a dataset and not
