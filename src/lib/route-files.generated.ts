@@ -100,6 +100,7 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/subgraph-schema/[hash]',
   '/api/subgraph-search',
   '/api/subgraph-versions/[hash]',
+  '/api/support',
   '/api/token-metrics',
   '/api/tvl',
 ];

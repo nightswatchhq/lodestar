@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export function Footer() {
   return (
     <footer className="md:pl-[var(--sidebar-width)] lg:pr-[var(--feed-active-width)] pb-[calc(var(--bottom-nav-height)+var(--safe-bottom))] md:pb-0 transition-[padding] duration-200">
@@ -70,6 +72,12 @@ export function Footer() {
             >
               {'\uD83D\uDC9C'} Sponsor
             </a>
+            <Link
+              href="/support"
+              className="text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"
+            >
+              {'\uD83E\uDDED'} Support
+            </Link>
           </div>
         </div>
       </div>
