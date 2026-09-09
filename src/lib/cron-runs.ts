@@ -74,3 +74,34 @@ export async function withCronTracking<T extends { ingested?: number; count?: nu
     throw e;
   }
 }
+
+/**
+ * Record that a cron completed, without ever being able to break it.
+ *
+ * `tap-provision` and `reconcile-bounties` never wrote a `cron_runs` row, so `/api/health` had no
+ * way to tell "ran and did nothing" from "has not run since August". That matters most for
+ * `tap-provision`, which spends GRT every five minutes with a signing key and was doing so
+ * unobserved.
+ *
+ * Deliberately not `withCronTracking`: these handlers have several early returns and one of them
+ * moves money, so this is an additive call on the paths that finished rather than a restructuring.
+ * The catch is the point - a failure to write the audit row must never fail the run itself.
+ */
+export async function noteCronRun(
+  sql: DbClient,
+  step: string,
+  startedAt: Date,
+  rowsAffected?: number,
+): Promise<void> {
+  try {
+    await recordCronRun(sql, {
+      step,
+      startedAt,
+      durationMs: Date.now() - startedAt.getTime(),
+      rowsAffected,
+      success: true,
+    });
+  } catch {
+    // Swallowed on purpose. See above.
+  }
+}

@@ -14,6 +14,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { HorizonParameters } from '@/components/ui/HorizonParameters';
 import { HorizonActivity } from '@/components/ui/HorizonActivity';
 import { CatalystCoverage } from '@/components/ui/CatalystCoverage';
+import { BackendMigration } from '@/components/ui/BackendMigration';
 import { DipsStatus } from '@/components/ui/DipsStatus';
 import { DipsAgreements } from '@/components/ui/DipsAgreements';
 import dynamic from 'next/dynamic';
@@ -146,6 +147,11 @@ export default function ProtocolOverview() {
           roadmap is the live argument in the ecosystem right now; move it down the
           page once it stops being. */}
       <CatalystCoverage />
+
+      {/* The backend migration, in progress and visible while it is. Computed from the same route
+          list the edge routes from, so the figure cannot flatter itself. Remove this card when the
+          port is finished; a progress bar at 100% is clutter. */}
+      <BackendMigration />
 
       {/* DIPS: live contracts, zero allocation. Sits directly under the Catalyst card because it is
           the one roadmap item where the protocol has already moved and nobody has noticed. Renders

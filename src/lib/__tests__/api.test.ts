@@ -46,21 +46,50 @@ beforeEach(() => {
   mockFetch.mockReset();
 });
 
+/**
+ * Minimal payloads that still satisfy each route's contract (`src/lib/contract.ts`).
+ *
+ * These used to be skeletons - `{ data: {} }` was enough to prove a URL was built correctly, and
+ * that is all these tests were ever asked to prove. That is the habit #124 is about: a fixture that
+ * asserts nothing about shape cannot notice when the shape changes, which is how #114 stayed green
+ * through a day of dashes. So a fixture here now carries the keys the client destructures and
+ * nothing more, and a route that stops sending one of them fails a test rather than a page.
+ *
+ * Empty collections are deliberate throughout: presence is not fullness, and an address with no
+ * history is not a broken contract.
+ */
+const OK = {
+  networkStats: { data: { graphNetwork: { currentEpoch: 900, totalTokensStaked: '1' }, grtSupply: null } },
+  epochs: { data: { epoches: [] } },
+  indexers: { data: { indexers: [] } },
+  provisions: { data: { provisions: [] } },
+  portfolio: { data: { delegator: null, curator: null } },
+  votes: { period: '2026-05', tallies: [], voters: [], userVote: null },
+  poiOverview: { data: { summary: { overallConsensusRate: 1 }, deployments: [] } },
+  poiDeployment: { data: { deploymentId: 'Qm1', ipfsHash: 'Qm1', epochs: [] } },
+  indexingStatus: { data: { deploymentId: 'Qm1', indexers: [] } },
+  indexerStatus: { data: { indexerAddress: '0xabc', deployments: [] } },
+  payments: {
+    data: { totalCollected: '1', activePayers: 2, escrowAccounts: [], recentTransactions: [] },
+  },
+  curation: { data: { totalSignalledTokens: '1', queryFeesAmount: '2', signals: [] } },
+} as const;
+
 describe('api: URL building', () => {
   it('builds epoch URL with the count query param', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { epochs: [] } }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.epochs));
     await fetchEpochHistory(42);
     expect(mockFetch).toHaveBeenCalledWith('/api/epochs?count=42');
   });
 
   it('defaults epoch count to 30', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: {} }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.epochs));
     await fetchEpochHistory();
     expect(mockFetch).toHaveBeenCalledWith('/api/epochs?count=30');
   });
 
   it('encodes indexer params with defaults applied', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { indexers: [] } }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.indexers));
     await fetchIndexers({});
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('/api/indexers?');
@@ -71,7 +100,7 @@ describe('api: URL building', () => {
   });
 
   it('overrides indexer params when provided', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: {} }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.indexers));
     await fetchIndexers({ first: 5, skip: 10, orderBy: 'createdAt', orderDirection: 'asc' });
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('first=5');
@@ -81,7 +110,7 @@ describe('api: URL building', () => {
   });
 
   it('URL-encodes addresses to prevent injection', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: {} }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.provisions));
     await fetchIndexerProvisions('0xAbc&evil=1');
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain(encodeURIComponent('0xAbc&evil=1'));
@@ -89,7 +118,7 @@ describe('api: URL building', () => {
   });
 
   it('selects delegator vs curator portfolio via type param', async () => {
-    mockFetch.mockImplementation(() => Promise.resolve(jsonResponse({ data: {} })));
+    mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(OK.portfolio)));
     await fetchDelegatorPortfolio('0xdel');
     await fetchCuratorPortfolio('0xcur');
     expect(mockFetch.mock.calls[0][0]).toContain('type=delegator');
@@ -113,7 +142,7 @@ describe('api: URL building', () => {
   });
 
   it('builds vote URL with period and voter', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ votes: [] }));
+    mockFetch.mockResolvedValue(jsonResponse(OK.votes));
     await fetchVotes('2026-05', '0xvoter');
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('period=2026-05');
@@ -135,9 +164,8 @@ describe('api: URL building', () => {
 
 describe('api: response unwrapping', () => {
   it('unwraps the .data envelope', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { totalSupply: '123' } }));
-    const result = await fetchNetworkStats();
-    expect(result).toEqual({ totalSupply: '123' });
+    mockFetch.mockResolvedValue(jsonResponse(OK.networkStats));
+    expect(await fetchNetworkStats()).toEqual(OK.networkStats.data);
   });
 
   it('returns the raw json for enriched indexers (no envelope)', async () => {
@@ -151,14 +179,23 @@ describe('api: response unwrapping', () => {
     expect(await fetchGRTPrice()).toEqual({ price: 0.1, change24h: -2 });
   });
 
-  it('falls back to [] when token-metrics data is missing', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({}));
-    expect(await fetchTokenMetrics()).toEqual([]);
+  // These two used to assert `?? []` - that a route answering `{}` produced an empty chart rather
+  // than an error. That is the silent degraded render #114 turned into a day, so it is now a throw
+  // that names what arrived. An empty chart is still reachable, but only when the server sends an
+  // empty array on purpose.
+  it('throws rather than rendering an empty chart when token-metrics omits data', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ metrics: [] }));
+    await expect(fetchTokenMetrics()).rejects.toThrow(/expected an array at "data".*metrics/s);
   });
 
-  it('falls back to [] when delegation-flows data is missing', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({}));
-    expect(await fetchDelegationFlows()).toEqual([]);
+  it('throws rather than rendering an empty chart when delegation-flows omits data', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ flows: [] }));
+    await expect(fetchDelegationFlows()).rejects.toThrow(/expected an array at "data".*flows/s);
+  });
+
+  it('still accepts a deliberately empty collection', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    expect(await fetchTokenMetrics()).toEqual([]);
   });
 });
 
@@ -188,7 +225,12 @@ describe('api: submitVote', () => {
   const message = { voter: '0x1', indexer: '0x2' } as unknown as VoteMessage;
 
   it('POSTs JSON body with content-type header', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ success: true, vote: {} }));
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        success: true,
+        vote: { voter: '0x1', indexer: '0x2', isDelegator: true, voteWeight: 1, period: '2026-05' },
+      }),
+    );
     await submitVote(message, '0xsig');
     const [url, init] = mockFetch.mock.calls[0];
     expect(url).toBe('/api/vote');
@@ -238,8 +280,9 @@ describe('api: raw-json (no envelope) endpoints', () => {
 
 describe('api: .data-envelope endpoints (happy + error)', () => {
   it('fetchSubgraphDeployments30d unwraps .data and hits the right path', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: [{ id: 'd1' }] }));
-    expect(await fetchSubgraphDeployments30d()).toEqual([{ id: 'd1' }]);
+    const rows = [{ id: 'd1', ipfsHash: 'Qm1', queryFees30d: '0' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: rows }));
+    expect(await fetchSubgraphDeployments30d()).toEqual(rows);
     expect(mockFetch).toHaveBeenCalledWith('/api/subgraph-fees-30d');
   });
 
@@ -249,8 +292,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchPOIOverview unwraps .data', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { deployments: [] } }));
-    expect(await fetchPOIOverview()).toEqual({ deployments: [] });
+    mockFetch.mockResolvedValue(jsonResponse(OK.poiOverview));
+    expect(await fetchPOIOverview()).toEqual(OK.poiOverview.data);
     expect(mockFetch).toHaveBeenCalledWith('/api/poi');
   });
 
@@ -260,8 +303,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchPOIDeployment encodes the deployment and unwraps .data', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { id: 'Qm1' } }));
-    expect(await fetchPOIDeployment('Qm/with slash')).toEqual({ id: 'Qm1' });
+    mockFetch.mockResolvedValue(jsonResponse(OK.poiDeployment));
+    expect(await fetchPOIDeployment('Qm/with slash')).toEqual(OK.poiDeployment.data);
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('deployment=');
     expect(url).toContain(encodeURIComponent('Qm/with slash'));
@@ -273,8 +316,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchIndexingStatus encodes the hash into the path segment', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { status: 'synced' } }));
-    expect(await fetchIndexingStatus('Qm Hash&x')).toEqual({ status: 'synced' });
+    mockFetch.mockResolvedValue(jsonResponse(OK.indexingStatus));
+    expect(await fetchIndexingStatus('Qm Hash&x')).toEqual(OK.indexingStatus.data);
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toBe(`/api/indexing-status/${encodeURIComponent('Qm Hash&x')}`);
   });
@@ -285,8 +328,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchIndexerStatus encodes the address into the path and unwraps .data', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { totalAllocations: 3 } }));
-    expect(await fetchIndexerStatus('0xABC')).toEqual({ totalAllocations: 3 });
+    mockFetch.mockResolvedValue(jsonResponse(OK.indexerStatus));
+    expect(await fetchIndexerStatus('0xABC')).toEqual(OK.indexerStatus.data);
     expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer-status/0xABC');
   });
 
@@ -296,8 +339,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchPayments unwraps .data', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { escrow: '1' } }));
-    expect(await fetchPayments()).toEqual({ escrow: '1' });
+    mockFetch.mockResolvedValue(jsonResponse(OK.payments));
+    expect(await fetchPayments()).toEqual(OK.payments.data);
     expect(mockFetch).toHaveBeenCalledWith('/api/payments');
   });
 
@@ -307,8 +350,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchIndexerPayments adds the receiver query param', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { escrow: '2' } }));
-    expect(await fetchIndexerPayments('0xRecv&evil')).toEqual({ escrow: '2' });
+    mockFetch.mockResolvedValue(jsonResponse(OK.payments));
+    expect(await fetchIndexerPayments('0xRecv&evil')).toEqual(OK.payments.data);
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('receiver=');
     expect(url).toContain(encodeURIComponent('0xRecv&evil'));
@@ -321,8 +364,9 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchIndexerStakeHistory unwraps .data from the path endpoint', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { history: [{ date: 'd' }] } }));
-    expect(await fetchIndexerStakeHistory('0xStk')).toEqual({ history: [{ date: 'd' }] });
+    const history = [{ date: 'd', selfStakeGrt: 1, delegatedGrt: 2 }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { history } }));
+    expect(await fetchIndexerStakeHistory('0xStk')).toEqual({ history });
     expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer-stake-history/0xStk');
   });
 
@@ -331,15 +375,22 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
     await expect(fetchIndexerStakeHistory('0xabc')).rejects.toThrow('Stake history failed: 500');
   });
 
-  it('fetchParameterHistory falls back to [] when data is missing', async () => {
+  it('fetchParameterHistory throws when data is missing entirely', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}));
-    expect(await fetchParameterHistory('0xPrm')).toEqual([]);
+    await expect(fetchParameterHistory('0xPrm')).rejects.toThrow('expected an array at "data"');
     expect(mockFetch.mock.calls[0][0]).toBe('/api/parameter-history/0xPrm');
   });
 
+  // An indexer that has never changed a parameter: the route sends the empty array itself.
+  it('fetchParameterHistory accepts an empty history', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    expect(await fetchParameterHistory('0xPrm')).toEqual([]);
+  });
+
   it('fetchParameterHistory returns the data array when present', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: [{ param_name: 'cut' }] }));
-    expect(await fetchParameterHistory('0xabc')).toEqual([{ param_name: 'cut' }]);
+    const rows = [{ param_name: 'cut', new_value: 1, detected_at: 'now' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: rows }));
+    expect(await fetchParameterHistory('0xabc')).toEqual(rows);
   });
 
   it('fetchParameterHistory throws with status on failure', async () => {
@@ -348,8 +399,8 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchSubgraphCuration unwraps .data from the path endpoint', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: { signals: [] } }));
-    expect(await fetchSubgraphCuration('QmHash')).toEqual({ signals: [] });
+    mockFetch.mockResolvedValue(jsonResponse(OK.curation));
+    expect(await fetchSubgraphCuration('QmHash')).toEqual(OK.curation.data);
     expect(mockFetch.mock.calls[0][0]).toBe('/api/subgraph-curation/QmHash');
   });
 
@@ -370,8 +421,9 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchCuratorLeaderboard applies first/skip defaults and unwraps .data', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: [{ curator: '0x1' }] }));
-    expect(await fetchCuratorLeaderboard()).toEqual([{ curator: '0x1' }]);
+    const rows = [{ id: '0x1', curator: '0x1' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: rows }));
+    expect(await fetchCuratorLeaderboard()).toEqual(rows);
     const url = mockFetch.mock.calls[0][0] as string;
     expect(url).toContain('first=50');
     expect(url).toContain('skip=0');
@@ -391,8 +443,9 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   });
 
   it('fetchTokenMetrics returns the data array when present and builds count query', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ data: [{ epoch: 1 }] }));
-    expect(await fetchTokenMetrics(7)).toEqual([{ epoch: 1 }]);
+    const rows = [{ epoch: 1, issuance: 2, totalBurn: 3 }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: rows }));
+    expect(await fetchTokenMetrics(7)).toEqual(rows);
     expect(mockFetch.mock.calls[0][0]).toBe('/api/token-metrics?count=7');
   });
 

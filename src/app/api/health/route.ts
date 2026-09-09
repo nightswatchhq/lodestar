@@ -10,6 +10,7 @@ import {
   type CronStatus,
 } from '@/lib/cron-expectations';
 import { isCronAuthorized } from '@/lib/cron-auth';
+import { supersededIngestionKeys, KITTIWAKE_PREFIX } from '@/lib/cron-expectations';
 
 // Staleness thresholds in minutes per ingestion type
 const FRESHNESS_THRESHOLDS: Record<string, number> = {
@@ -29,6 +30,8 @@ interface IngestionStatus {
   last_updated: string | null;
   age_minutes: number | null;
   healthy: boolean;
+  /** Set when kittiwake now writes this feed and the unprefixed row is history, not a stoppage. */
+  superseded_by?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -72,17 +75,23 @@ export async function GET(request: NextRequest) {
     try {
       const rows = await db`SELECT key, updated_at FROM ingestion_state`;
       const now = Date.now();
+      // An unprefixed feed that kittiwake now writes stopped on purpose. Judging it would leave
+      // this endpoint permanently degraded over a row nobody intends to advance again.
+      const superseded = supersededIngestionKeys(rows.map((r) => r.key));
 
       for (const row of rows) {
         const updatedAt = row.updated_at ? new Date(row.updated_at).getTime() : null;
         const ageMinutes = updatedAt ? Math.round((now - updatedAt) / 60000) : null;
         const threshold = FRESHNESS_THRESHOLDS[row.key] ?? 360;
-        const healthy = ageMinutes !== null ? ageMinutes <= threshold : false;
+        const isSuperseded = superseded.has(row.key);
 
         ingestion[row.key] = {
           last_updated: row.updated_at ?? null,
           age_minutes: ageMinutes,
-          healthy,
+          // Superseded rows are reported but never counted against the verdict, and they say what
+          // replaced them so the timestamp is not read as a fault.
+          healthy: isSuperseded ? true : ageMinutes !== null && ageMinutes <= threshold,
+          ...(isSuperseded ? { superseded_by: `${KITTIWAKE_PREFIX}${row.key}` } : {}),
         };
       }
     } catch (e) {

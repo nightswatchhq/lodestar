@@ -234,12 +234,16 @@ export function CatalystCoverage() {
               How much of the Foundation&apos;s roadmap community tools already cover
             </p>
           </div>
-          <Link
+          {/* A plain anchor, not next/link: this leaves the origin, and a Link would prefetch
+              it across origins and be blocked by CORS. */}
+          <a
             href={CATALYST_SOURCE_POST}
+            target="_blank"
+            rel="noreferrer"
             className="text-xs text-[var(--accent-text)] hover:underline shrink-0"
           >
             The scoring →
-          </Link>
+          </a>
         </div>
       </CardHeader>
 

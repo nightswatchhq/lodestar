@@ -31,3 +31,8 @@ CREATE INDEX IF NOT EXISTS idx_ct_wallet   ON clickthrough_events (wallet) WHERE
 CREATE INDEX IF NOT EXISTS idx_ct_pending  ON clickthrough_events (clicked_at) WHERE converted IS NULL AND wallet IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_ct_venue    ON clickthrough_events (venue);
 CREATE INDEX IF NOT EXISTS idx_ct_clicked  ON clickthrough_events (clicked_at DESC);
+
+-- Ownership. The application connects as `lodestar`; a migration run as the superuser creates
+-- tables owned by `postgres`, and every statement from the app then fails with 42501 - silently, in
+-- the case of a fire-and-forget writer (#113). Idempotent, and a no-op when already correct.
+ALTER TABLE clickthrough_events OWNER TO lodestar;

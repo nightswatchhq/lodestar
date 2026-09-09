@@ -17,6 +17,8 @@ import { BOUNTY_BOARD_ABI } from '@/lib/bountyBoard';
 import { listReconcilableBounties, updateBountyStatus } from '@/lib/studio/db';
 import { reconcileBountyStatus, needsUpdate } from '@/lib/studio/bounty-reconcile';
 import { log } from '@/lib/logger';
+import { noteCronRun } from '@/lib/cron-runs';
+import { db } from '@/lib/db';
 
 const BOUNTY_BOARD = (process.env.NEXT_PUBLIC_BOUNTY_BOARD_ADDRESS ?? '').trim() as `0x${string}`;
 
@@ -27,6 +29,7 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const startedAt = new Date();
   if (!isAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!hasDbAccess()) return NextResponse.json({ error: 'DB unavailable' }, { status: 503 });
   if (!BOUNTY_BOARD || BOUNTY_BOARD.length !== 42) {
@@ -65,5 +68,6 @@ export async function GET(req: NextRequest) {
     log.api.info({ scanned: bounties.length, changes }, 'reconcile-bounties: applied changes');
   }
 
+  await noteCronRun(db!, 'reconcile-bounties', startedAt, changes.length);
   return NextResponse.json({ scanned: bounties.length, updated: changes.length, changes });
 }

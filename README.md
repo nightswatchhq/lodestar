@@ -106,7 +106,7 @@ Each indexer receives a composite score (0–100) across eleven dimensions, comb
 - **No black boxes** — every dimension, weight, and threshold is visible in [`src/lib/risk-score.ts`](src/lib/risk-score.ts)
 - **Zero extra API calls** — scores are computed from data the enrichment pipeline already fetches
 - **Delegation-neutral self-stake** — attracting delegation is a sign of trust, not something to penalise
-- **Delegator-first** — the score explicitly penalises high cuts; an operationally excellent indexer that takes 100% of rewards still scores poorly because delegators earn nothing
+- **Delegator-first, but a deduction rather than a disqualification** — a 100% reward cut zeroes Delegator Cut (10%) and Delegator APY (8%), and caps Cut Stability (6%) at 5. That costs a flawless indexer 24 points, taking it from 100 (A) to **76 (B)**. It is a visible markdown, not a failing grade. If you want cuts excluded outright rather than marked down, that is the ≥ 90% hard filter in [One-Click Delegation](#one-click-delegation), which the score deliberately does not duplicate
 - **Feedback welcome** — if the weights or thresholds feel off, [open an issue](https://github.com/nightswatchhq/lodestar/issues)
 
 ## One-Click Delegation
@@ -146,6 +146,23 @@ With default preferences this is effectively "highest overall risk score among R
 The approval step is skipped on subsequent delegations if the existing GRT allowance covers the amount. First-time delegators need two transactions; all others need one.
 
 Code: [`src/app/delegate/`](src/app/delegate/) · API: [`src/app/api/delegate/recommend/`](src/app/api/delegate/recommend/)
+
+## Backend migration
+
+The API is moving from Next.js route handlers to **kittiwake**, a single Rust process that fronts
+the nuthatch nests. The two run side by side on one domain: the edge forwards the routes kittiwake
+serves and leaves the rest here, so there is no flag day.
+
+The count is deliberately not repeated here, because a number typed into a README is a number that
+goes stale. It lives in one generated place: [docs/MIGRATION.md](docs/MIGRATION.md), produced from
+`src/lib/migration.ts`. The same figures render at
+[`/migration`](https://www.lodestar-dashboard.com/migration) with `/api/migration` as the
+machine-readable form.
+
+That one file is also what `src/proxy.ts` routes from, so the progress figure and the routing
+decision cannot disagree. A test walks `src/app/api` and fails if a route exists without a line in
+the table, which is what stops a new route becoming an uncounted straggler. Regenerate the doc with
+`pnpm migration:doc` after changing the inventory; CI fails if the committed copy is stale.
 
 ## Tech Stack
 
@@ -232,7 +249,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | `PUSH_CHANNEL_ADDRESS` | Push Protocol channel wallet address | No |
 | `PUSH_CHANNEL_PRIVATE_KEY` | Push Protocol channel private key | No |
 | `PUSH_ENV` | Push Protocol environment — `staging` or `prod` | No |
-| `DISPATCH_GATEWAY_URL` | PostgREST endpoint for Seahorn swap data | No |
 | `INDEXER_AGENT_URL` | Indexer agent management API URL | No |
 | `INDEXER_AGENT_TOKEN` | Basic auth credentials for indexer agent (`user:pass`) | No |
 | `SCUTTLEBUTT_ADMIN_SECRET` | Admin login password for Scuttlebutt (moderation). Auth fails closed if unset | No |
@@ -263,7 +279,14 @@ Dumps are custom-format (`-Fc`). Restore with:
 
 ```bash
 pg_restore -h <host> -p <port> -U postgres -d <db> --no-owner --no-acl lodestar-<ts>.dump
+psql -h <host> -p <port> -U postgres -d <db> -f scripts/fix-ownership.sql
 ```
+
+**The second line is not optional.** `--no-owner` gives every restored object to the user doing the
+restore, which above is `postgres`, while the application connects as `lodestar`. Skip it and the
+database comes back complete and entirely unreadable by the app: every statement fails with `42501`,
+and a fire-and-forget writer will not tell you (this is #113, which cost one table months of silently
+discarded clicks). `scripts/fix-ownership.sql` is idempotent and prints what it had to change.
 
 Restores are periodically test-verified against a throwaway Postgres container. These are nightly logical dumps (no point-in-time recovery) — appropriate for an analytics DB that re-ingests from chain.
 

@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'crypto';
+import { timingSafeMatch } from './secret-auth';
 
 /**
  * Authorize a cron/internal request against CRON_SECRET.
@@ -14,13 +14,5 @@ export function isCronAuthorized(req: { headers: { get(name: string): string | n
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return false; // fail closed
 
-  const header = req.headers.get('authorization') ?? '';
-  const expected = `Bearer ${cronSecret}`;
-
-  // timingSafeEqual requires equal-length buffers; length mismatch is an early
-  // (non-secret-dependent) reject.
-  const a = Buffer.from(header);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  return timingSafeMatch(req.headers.get('authorization'), `Bearer ${cronSecret}`);
 }

@@ -1,20 +1,19 @@
 /**
  * Composite Indexer Risk Score
  *
- * Ten dimensions, each scored 0–100, combined with transparent weights
- * into a single 0–100 composite score. Higher = better for delegators.
+ * Each dimension is scored 0–100 and combined with transparent weights into a single 0–100
+ * composite. Higher = better for delegators.
  *
- * Dimensions & weights:
- *   REO compliance       20%  — gates rewards; most critical signal
- *   Allocation efficiency 13% — operational competence
- *   Self-stake ratio     12%  — skin in the game
- *   Delegator cut        10%  — how much delegators keep (reward + query fee cuts)
- *   Over-delegation      10%  — delegation safety margin
- *   Transparency          9%  — presence and accountability
- *   Delegator APY         8%  — actual returns delivered to delegators
- *   Query volume          7%  — actual work served (query fees collected)
- *   Cut stability         7%  — trust / predictability
- *   Delegation trend      4%  — crowd signal (noisy, low weight)
+ * The dimensions and their weights are `SCORE_WEIGHTS` below, and this comment deliberately does
+ * not restate them. It used to, and the restatement went stale: it described ten dimensions when
+ * there were eleven, and was wrong about five of the weights it did list. That stale copy was then
+ * read out to users through the Score tooltip and Lodie's system prompt. If you want the numbers,
+ * read the table below: it is the one the arithmetic uses.
+ *
+ * A note on what the score does NOT do: it marks down a greedy cut, it does not disqualify one.
+ * A 100% reward cut zeroes delegatorCut (10) and delegatorAPY (8) and caps cutStability (6) at 5,
+ * which costs a flawless indexer 24 points, so 100 (A) becomes 76 (B). The hard exclusion at ≥ 90%
+ * lives in the one-click delegation filter, not here. See nightswatchhq/kittiwake#14.
  */
 
 import { scoreServedGap } from './served-gap';
@@ -66,6 +65,20 @@ export const SCORE_LABELS: Record<keyof ScoreBreakdown, string> = {
   delegatorAPY: 'Delegator APY',
   dataServiceDiversity: 'Data Service Coverage',
 };
+
+/**
+ * The dimension list as the UI states it, derived from the weights rather than retyped beside
+ * them. The Score tooltip previously named seven dimensions and omitted Delegator Cut, the one a
+ * delegator most needs, because it was a hand-written string nothing compared against this table.
+ * Generating it means a weight added, removed or re-tuned changes the published copy in the same
+ * commit. See nightswatchhq/kittiwake#14.
+ */
+export const SCORE_DIMENSION_COUNT = Object.keys(SCORE_WEIGHTS).length;
+
+export const SCORE_DIMENSION_SUMMARY = (Object.keys(SCORE_WEIGHTS) as (keyof ScoreBreakdown)[])
+  .sort((a, b) => SCORE_WEIGHTS[b] - SCORE_WEIGHTS[a])
+  .map((k) => `${SCORE_LABELS[k].toLowerCase()} ${SCORE_WEIGHTS[k]}%`)
+  .join(', ');
 
 // --- Individual dimension scorers ---
 

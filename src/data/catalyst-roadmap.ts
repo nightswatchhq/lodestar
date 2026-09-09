@@ -21,7 +21,21 @@
 
 export const CATALYST_LAST_SCORED = '2026-08-30';
 
-export const CATALYST_SOURCE_POST = '/blog/we-read-the-foundations-new-roadmap';
+/**
+ * The post, at its real home.
+ *
+ * Absolute rather than `/blog/...` on purpose. The blog moved to learn-thegraph.com and
+ * `next.config.ts` 308s the old paths there, which is right for a bookmark and wrong for a Next
+ * `<Link>`: the router prefetches with an RSC `fetch`, that fetch follows the redirect to another
+ * origin, and the browser blocks it for want of an `Access-Control-Allow-Origin` header. The
+ * console filled with CORS failures on the home page and the service worker resolved the
+ * FetchEvent with an error response.
+ *
+ * A link that leaves this origin must say so, and be rendered as a plain anchor. See
+ * `blog-links.test.ts`, which fails the build if a `<Link>` points at `/blog/`.
+ */
+export const CATALYST_SOURCE_POST =
+  'https://learn-thegraph.com/dispatches/we-read-the-foundations-new-roadmap/';
 
 /**
  * The delivery tracker behind these numbers: every workstream, what is verified

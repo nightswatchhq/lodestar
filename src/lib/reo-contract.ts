@@ -1,5 +1,6 @@
 import { createPublicClient, http, type Address } from 'viem';
 import { arbitrum } from 'viem/chains';
+import { arbitrumRpcUrl } from './arbitrum-rpc';
 
 // Rewards Eligibility Oracle (GIP-0079) on Arbitrum One
 export const REO_ADDRESS = '0x8ec2767a9d9ba02b4e09e8ff4fac2e14a340f304' as const;
@@ -43,9 +44,9 @@ export const REO_ABI = [
   },
 ] as const;
 
-// Server-side public client for Arbitrum One
-// Uses custom RPC if provided, otherwise Dispatch gateway (dogfooding!)
-const rpcUrl = process.env.ARBITRUM_RPC_URL ?? 'https://gateway.lodestar-dashboard.com/rpc/42161';
+
+// Server-side public client for Arbitrum One.
+const rpcUrl = arbitrumRpcUrl();
 export const arbitrumClient = createPublicClient({
   chain: arbitrum,
   transport: http(rpcUrl),

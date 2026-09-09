@@ -1,0 +1,116 @@
+# Is the live dashboard actually working?
+#
+# Everything else in CI tests the code in the pull request. This tests the deployed thing, because
+# the failure that prompted it could not be seen from the repository: #114 was a *shape* change on a
+# migrated route, so the API answered 200 with a hundred healthy rows while every score, APR and
+# eligibility column on `/indexers` rendered as a dash. `tsc` could not see it - the client casts
+# `response.json()` to a declared type - and no unit test talks to production.
+#
+# Scheduled rather than on push: the deploy is Vercel's and lands after the merge, so a push-triggered
+# run would test the previous build and pass while the new one was broken.
+name: e2e monitor
+
+on:
+  schedule:
+    # Every 15 minutes. The dashboard's own crons run on that order, so a slower cadence would let a
+    # broken deploy sit through a whole refresh cycle unreported.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "base URL to check (defaults to production)"
+        required: false
+        type: string
+
+concurrency:
+  group: e2e-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: live surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+
+      # No install step on purpose: the checker uses only `fetch`, which is built in. A monitor that
+      # depends on `npm ci` fails when the registry has a bad afternoon and reports that as the site
+      # being down.
+      - name: check the live surface
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          LODESTAR_BASE: ${{ inputs.base || 'https://www.lodestar-dashboard.com' }}
+        run: node scripts/e2e/run.mjs --alert
+
+  browser:
+    name: rendered pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Independent of the API job on purpose: a browser download having a bad morning must not stop
+    # the contract checks from reporting, and a rendering regression must not be masked by them.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          # Matches ci.yml. Without it the action fails with "No pnpm version is specified" and,
+          # before the `if` below was narrowed, that fired a Discord alert claiming the site was
+          # broken when it was the workflow that was broken.
+          version: 10
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: check the rendered pages
+        id: pages
+        env:
+          LODESTAR_BASE: ${{ inputs.base || 'https://www.lodestar-dashboard.com' }}
+        run: pnpm exec playwright test
+
+      # **Only when the tests actually ran and failed.** `if: failure()` fired on a broken workflow
+      # too - a missing pnpm version posted "Lodestar rendered pages failing" to the channel while
+      # the site was perfectly healthy. An alert that cries wolf is worse than no alert, because it
+      # is the one people learn to scroll past.
+      - name: report a rendering failure
+        if: steps.pages.conclusion == 'failure'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DISCORD_WEBHOOK_URL:-}" ] || { echo "no webhook configured; not alerting"; exit 0; }
+          # Names only. A Playwright failure message can carry a page's whole innerText, and this
+          # webhook posts to a channel.
+          names="$(node -e '
+            const r = require("./playwright-report.json");
+            const bad = [];
+            const walk = (s) => (s.suites||[]).forEach(walk) || (s.specs||[]).forEach(sp => { if (!sp.ok) bad.push(sp.title); });
+            (r.suites||[]).forEach(walk);
+            console.log(bad.slice(0, 10).map(t => "• " + t).join("\n") || "(no named failures)");
+          ' 2>/dev/null || echo '(could not read the report)')"
+          jq -n --arg c "🔴 **Lodestar rendered pages failing**\n\n$names\n\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{content: ($c | .[0:1900]), username: "lodestar-e2e"}' > payload.json
+          curl -sS -f -X POST -H "Content-Type: application/json" -d @payload.json "$DISCORD_WEBHOOK_URL" \
+            || { echo "ALERT DELIVERY FAILED"; exit 1; }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.pages.conclusion == 'failure'
+        with:
+          name: playwright-trace
+          path: test-results/
+          retention-days: 7

@@ -19,6 +19,7 @@ import {
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { arbitrum } from 'viem/chains';
+import { arbitrumRpcUrl } from './arbitrum-rpc';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ const PAYMENTS_ESCROW       = '0xf6Fcc27aAf1fcD8B254498c9794451d82afC673E' as co
 const GRT_TOKEN             = '0x9623063377AD1B27544C965cCd7342f7EA7e88C7' as const;
 
 // Minimum escrow (wei) before we top up — 1 GRT should last ~10^18 playground queries.
+
 export const MIN_ESCROW_WEI = 1_000_000_000_000_000_000n; // 1 GRT
 
 // EIP-712 domain for GraphTallyCollector on Arbitrum One.
@@ -63,7 +65,7 @@ const GRT_ABI = parseAbi([
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function rpcUrl(): string {
-  return process.env.ARBITRUM_RPC_URL ?? 'https://gateway.lodestar-dashboard.com/rpc/42161';
+  return arbitrumRpcUrl();
 }
 
 function getPublicClient() {
