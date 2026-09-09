@@ -1,10 +1,14 @@
 /**
  * `/api/support` contract, with GitHub mocked.
  *
- * The case worth the most here is the failure path. Folding an upstream error into an empty array
- * would let this route answer 200 with `{ issues: [] }`, the page would render "no open issues",
- * and a repository of thirty-two worked answers would read as a repository of none - cached that
- * way for fifteen minutes. So a rejection and an empty body both have to come back as 503.
+ * The cases worth the most here are the failure paths. Folding an upstream error into an empty
+ * array would let this route answer 200 with `{ issues: [] }`, the page would render "no open
+ * issues", and a repository of thirty-three worked answers would read as a repository of none,
+ * cached that way for fifteen minutes.
+ *
+ * So a failure serves the committed snapshot instead, and every one of these asserts the two
+ * things that keeps honest: the issues are the snapshot's rather than an empty list, and `stale`
+ * is set so the page says which it is showing.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -19,6 +23,7 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { GET } from '../support/route';
+import snapshot from '@/data/graph-support.json';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -82,44 +87,63 @@ describe('GET /api/support', () => {
     expect(body.issues.map((i: { number: number }) => i.number)).toEqual([31]);
   });
 
-  it('answers 503 rather than an empty archive when GitHub rejects the request', async () => {
+  it('serves the committed snapshot, flagged stale, when GitHub rejects the request', () => {
+    // A 401 from an expired token is the case this exists for: it happened in production on
+    // 2026-09-09 and left the page empty.
     mockFetch.mockResolvedValueOnce({
       ok: false,
-      status: 403,
+      status: 401,
       json: async () => ({}),
-      headers: new Headers({ 'x-ratelimit-remaining': '0' }),
+      headers: new Headers({ 'x-ratelimit-remaining': '4999' }),
     });
 
-    const res = await GET();
-    expect(res.status).toBe(503);
-    const body = await res.json();
-    expect(body.issues).toBeUndefined();
-    expect(body.error).toContain('403');
+    return GET().then(async (res) => {
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.stale).toBe(true);
+      expect(body.reason).toContain('401');
+      expect(body.issues.length).toBeGreaterThan(20);
+      expect(body.fetchedAt).toBe(snapshot.capturedAt);
+    });
   });
 
-  it('answers 503 when GitHub returns 200 with no issues at all', async () => {
+  it('serves the snapshot when GitHub returns 200 with no issues at all', async () => {
     // A clean result nobody expected. An empty archive is far more likely to be a broken request
-    // than a repository that has lost all thirty-two of its issues.
+    // than a repository that has lost all thirty-three of its issues.
     mockFetch.mockResolvedValueOnce(ok([]));
 
-    const res = await GET();
-    expect(res.status).toBe(503);
+    const body = await (await GET()).json();
+    expect(body.stale).toBe(true);
+    expect(body.issues.length).toBeGreaterThan(20);
   });
 
-  it('answers 503 when GitHub returns something that is not an array', async () => {
+  it('serves the snapshot when GitHub returns something that is not an array', async () => {
     mockFetch.mockResolvedValueOnce(ok({ message: 'Not Found' }));
 
-    const res = await GET();
-    expect(res.status).toBe(503);
+    const body = await (await GET()).json();
+    expect(body.stale).toBe(true);
+  });
+
+  it('never answers with an empty archive, whatever GitHub does', async () => {
+    mockFetch.mockResolvedValueOnce(ok([]));
+    const body = await (await GET()).json();
+    expect(body.issues).not.toEqual([]);
+  });
+
+  it('does not mark a live answer stale', async () => {
+    mockFetch.mockResolvedValueOnce(ok([ghIssue()]));
+    const body = await (await GET()).json();
+    expect(body.stale).toBeUndefined();
   });
 
   it('does not let a failure be cached', async () => {
     mockFetch.mockResolvedValueOnce(ok([]));
-    expect((await GET()).status).toBe(503);
+    expect((await (await GET()).json()).stale).toBe(true);
 
-    // Second call reaches GitHub again rather than serving a stored empty archive.
+    // Second call reaches GitHub again rather than serving a stored fallback, so a rotated token
+    // takes effect without waiting out the live path's fifteen minutes.
     mockFetch.mockResolvedValueOnce(ok([ghIssue()]));
-    expect((await GET()).status).toBe(200);
+    expect((await (await GET()).json()).stale).toBeUndefined();
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 

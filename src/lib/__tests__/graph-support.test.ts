@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
+import snapshot from '@/data/graph-support.json';
 import {
   areaCounts,
   areasOf,
@@ -206,5 +207,52 @@ describe('ordering', () => {
       'owner/indexer',
       'owner/reporter',
     ]);
+  });
+});
+
+describe('the committed snapshot', () => {
+  // src/data/graph-support.json is what /support serves when GitHub cannot be read, so a broken
+  // regeneration must fail here rather than reach a phone as an empty page. Refresh it with
+  // `pnpm support:snapshot`.
+  const issues = snapshot.issues as SupportIssue[];
+
+  it('holds the archive rather than an empty list', () => {
+    expect(issues.length).toBeGreaterThan(20);
+    expect(snapshot.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('has every field the page reads, on every issue', () => {
+    for (const i of issues) {
+      expect(typeof i.number, `#${i.number}`).toBe('number');
+      expect(i.title.length, `#${i.number} title`).toBeGreaterThan(0);
+      expect(i.url).toContain('github.com/nightswatchhq/graph-support/issues/');
+      expect(['open', 'closed']).toContain(i.state);
+      expect(Array.isArray(i.labels)).toBe(true);
+      expect(Number.isFinite(new Date(i.updatedAt).getTime()), `#${i.number} updatedAt`).toBe(true);
+    }
+  });
+
+  it('carries no pull requests, which the issues endpoint also returns', () => {
+    expect(issues.every((i) => i.url.includes('/issues/'))).toBe(true);
+  });
+
+  it('groups without losing an issue', () => {
+    // The real labels, not fixtures: multi-owner, multi-disposition, missing-owner and the
+    // dispositions that sit on open issues are all in here.
+    const grouped =
+      groupOpenByOwner(issues).reduce((n, g) => n + g.issues.length, 0) +
+      groupClosedByDisposition(issues).reduce((n, g) => n + g.issues.length, 0);
+    expect(grouped).toBe(issues.length);
+  });
+
+  it('files every open issue under an owner heading, blank included', () => {
+    const open = issues.filter((i) => i.state === 'open');
+    const grouped = groupOpenByOwner(issues).reduce((n, g) => n + g.issues.length, 0);
+    expect(grouped).toBe(open.length);
+  });
+
+  it('has labels outside the ones TRIAGE.md publishes, which is why nothing rejects them', () => {
+    const all = new Set(issues.flatMap((i) => i.labels));
+    expect(all.has('area/governance') || all.has('kind/question')).toBe(true);
   });
 });
