@@ -204,6 +204,7 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/service-census', state: 'next', workstream: 'the long tail' },
   { path: '/api/subgraph-schema/[hash]', state: 'next', workstream: 'the long tail' },
   { path: '/api/subgraph-versions/[hash]', state: 'next', workstream: 'the long tail' },
+  { path: '/api/support', state: 'next', workstream: 'the long tail' },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
