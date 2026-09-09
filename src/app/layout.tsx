@@ -10,7 +10,6 @@ import { Footer } from '@/components/layout/Footer';
 import { StarPrompt } from '@/components/StarPrompt';
 import { RedstartBanner } from '@/components/RedstartBanner';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
-import { NativePushManager } from '@/components/NativePushManager';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
@@ -93,7 +92,6 @@ export default function RootLayout({
             </main>
             <Footer />
             <StarPrompt />
-            <NativePushManager />
           </div>
         </Providers>
         <Analytics />

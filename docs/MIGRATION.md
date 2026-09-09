@@ -4,15 +4,15 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**36 of 81 routes** on kittiwake, **44%**. 45 left.
+**36 of 76 routes** on kittiwake, **47%**. 40 left.
 
-The denominator is routes meant to move that have not yet. It excludes 6 agreed for deletion, 3 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
+The denominator is routes meant to move that have not yet. It excludes 1 agreed for deletion, 3 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
 ## By block of work
 
 | Block | Done | Left |
 |---|---|---|
-| the long tail | 0/25 | 25 |
+| the long tail | 0/20 | 20 |
 | the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
 | the disassembler | 0/3 | 3 |
@@ -61,7 +61,6 @@ The denominator is routes meant to move that have not yet. It excludes 6 agreed 
 ## Still on Next
 
 - `/api/analytics/clickthrough`
-- `/api/analytics/stats`
 - `/api/blog/search-index`
 - `/api/data-services/query`
 - `/api/delegate/recommend`
@@ -73,8 +72,6 @@ The denominator is routes meant to move that have not yet. It excludes 6 agreed 
 - `/api/feed`
 - `/api/foghorn/[...path]`
 - `/api/horizon/debug`
-- `/api/horizon/events`
-- `/api/horizon/slashing`
 - `/api/indexer-disputes/[address]`
 - `/api/indexer/[address]/pnl`
 - `/api/indexer/[address]/revenue`
@@ -103,8 +100,6 @@ The denominator is routes meant to move that have not yet. It excludes 6 agreed 
 - `/api/studio/subgraphs/[id]`
 - `/api/subgraph-schema/[hash]`
 - `/api/subgraph-versions/[hash]`
-- `/api/vote`
-- `/api/x402/query`
 
 ## Staying on Next by decision
 
@@ -120,12 +115,7 @@ The denominator is routes meant to move that have not yet. It excludes 6 agreed 
 
 | Route | Why |
 |---|---|
-| `/api/lodie/chat` | discontinued |
-| `/api/lodie/health` | discontinued |
 | `/api/provider-liveness` | goes with the Dispatch removal, nightswatchhq/lodestar#99 |
-| `/api/push/register-device` | push is discontinued |
-| `/api/push/subscribe` | push is discontinued |
-| `/api/push/test` | push is discontinued |
 
 ## Descheduled crons, handlers kept as the rollback
 
