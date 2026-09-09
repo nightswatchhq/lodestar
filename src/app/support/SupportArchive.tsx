@@ -152,6 +152,24 @@ export default function SupportArchive() {
 
   return (
     <div>
+      {data?.stale && (
+        <div className="mb-6 rounded-[var(--radius-card)] border-[0.5px] border-[var(--amber-dim)] bg-[var(--bg-surface)] px-4 py-3">
+          <p className="text-xs leading-relaxed text-[var(--amber)]">
+            Showing a snapshot from{' '}
+            {new Date(data.fetchedAt).toLocaleDateString('en-GB', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })}
+            . GitHub could not be read just now{data.reason ? ` (${data.reason})` : ''}, so anything
+            filed or closed since then is missing here.
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Every issue still links to the live thread, which is the current version of it.
+          </p>
+        </div>
+      )}
+
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <div className="flex rounded-full border-[0.5px] border-[var(--border)] p-0.5">
           {(

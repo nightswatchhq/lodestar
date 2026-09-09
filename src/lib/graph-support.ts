@@ -32,11 +32,20 @@ export interface SupportIssue {
   updatedAt: string;
 }
 
-/** What `/api/support` answers. `error` and `issues` are mutually exclusive by construction. */
+/** What `/api/support` answers. */
 export interface SupportArchive {
   issues: SupportIssue[];
-  /** When the underlying fetch ran, so the page can say how fresh the cached copy is. */
+  /** When the data was read from GitHub, so the page can say how fresh it is. */
   fetchedAt: string;
+  /**
+   * Set when GitHub could not be read and the committed snapshot is being served instead.
+   *
+   * The page says so out loud, with the date. A snapshot presented as live is the same class of
+   * lie as an empty archive presented as an empty repository.
+   */
+  stale?: boolean;
+  /** Why the live read failed, when it did. */
+  reason?: string;
 }
 
 /** A rendered group: issues that share an owner, or share a disposition. */
