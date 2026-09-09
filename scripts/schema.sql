@@ -9,8 +9,14 @@ CREATE TABLE IF NOT EXISTS ingestion_state (
   last_epoch INTEGER,
   last_block INTEGER,
   last_id    TEXT,
+  -- A cursor that is a time rather than a block, in unix seconds. `last_block` is an int4 and the
+  -- RAV ingest was keeping a unix timestamp in it, which works until 19 January 2038 and then wraps
+  -- negative rather than stalling - turning every delta run into a full backfill, silently.
+  -- kittiwake#4. Additive: nothing that predates it reads this column.
+  last_timestamp BIGINT,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE ingestion_state ADD COLUMN IF NOT EXISTS last_timestamp BIGINT;
 
 -- Seed required cursor rows (ingest scripts expect these to exist)
 INSERT INTO ingestion_state (key) VALUES
