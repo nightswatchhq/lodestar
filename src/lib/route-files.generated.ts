@@ -12,7 +12,6 @@
  */
 export const ROUTE_FILES: readonly string[] = [
   '/api/analytics/clickthrough',
-  '/api/analytics/stats',
   '/api/apr-provenance/[address]',
   '/api/blog/search-index',
   '/api/chain-lag',
@@ -48,8 +47,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/health',
   '/api/horizon/activity',
   '/api/horizon/debug',
-  '/api/horizon/events',
-  '/api/horizon/slashing',
   '/api/indexer-disputes/[address]',
   '/api/indexer-node-health',
   '/api/indexer-stake-history/[address]',
@@ -61,8 +58,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/indexers',
   '/api/indexers-enriched',
   '/api/indexing-status/[hash]',
-  '/api/lodie/chat',
-  '/api/lodie/health',
   '/api/manifest',
   '/api/migration',
   '/api/network-stats',
@@ -74,9 +69,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/price',
   '/api/provider-liveness',
   '/api/provisions',
-  '/api/push/register-device',
-  '/api/push/subscribe',
-  '/api/push/test',
   '/api/qos/capture',
   '/api/reo',
   '/api/rewards-history',
@@ -110,6 +102,4 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/subgraph-versions/[hash]',
   '/api/token-metrics',
   '/api/tvl',
-  '/api/vote',
-  '/api/x402/query',
 ];
