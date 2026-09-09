@@ -20,6 +20,7 @@ import type {
 import type { DisassemblyDiff, HandlerDiffEntry, HandlerStatus } from '@/lib/disassembly/diff';
 import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/signal';
 import type { VerifyComparison, ModuleComparison, ModuleStatus, OverallVerdict } from '@/lib/disassembly/verify';
+import { emptySearchMessage } from '@/lib/search-backlog';
 
 const CATEGORY_META: Record<HostCategory, { label: string; variant: 'default' | 'accent' | 'success' | 'warning' | 'error' }> = {
   store: { label: 'store', variant: 'default' },
@@ -202,18 +203,23 @@ function SubgraphPicker({
 
   const isFullHash = QM_HASH_RE.test(value.trim());
 
-  const { data: results, isFetching } = useQuery<SubgraphSearchResult[]>({
+  const { data: answer, isFetching } = useQuery<{ hits: SubgraphSearchResult[]; warmBacklog: number | null }>({
     queryKey: ['subgraph-search', debounced],
     enabled: debounced.length >= 2 && !QM_HASH_RE.test(debounced),
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const r = await fetch(`/api/subgraph-search?q=${encodeURIComponent(debounced)}`);
-      const json: { data?: SubgraphSearchResult[] } = await r.json();
-      return json.data ?? [];
+      const json: { data?: SubgraphSearchResult[]; warmBacklog?: number | null } = await r.json();
+      // The backlog rides along with the hits rather than in its own state, so the message and the
+      // list it explains can never be from different answers. kittiwake#8.
+      return {
+        hits: json.data ?? [],
+        warmBacklog: typeof json.warmBacklog === 'number' ? json.warmBacklog : null,
+      };
     },
   });
 
-  const hits = (results ?? []).filter((s) => s.currentVersion?.subgraphDeployment?.ipfsHash).slice(0, 12);
+  const hits = (answer?.hits ?? []).filter((s) => s.currentVersion?.subgraphDeployment?.ipfsHash).slice(0, 12);
   const show = open && !isFullHash && debounced.length >= 2;
 
   return (
@@ -230,7 +236,7 @@ function SubgraphPicker({
       {show && (
         <ul className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-[var(--radius-card)] border-[0.5px] border-[var(--border)] bg-[var(--bg-surface)] shadow-lg">
           {hits.length === 0 ? (
-            <li className="px-3 py-2 text-[12px] text-[var(--text-faint)]">{isFetching ? 'Searching…' : 'No subgraphs found'}</li>
+            <li className="px-3 py-2 text-[12px] text-[var(--text-faint)]">{isFetching ? 'Searching…' : emptySearchMessage(debounced, answer?.warmBacklog)}</li>
           ) : (
             hits.map((s) => {
               const hash = s.currentVersion!.subgraphDeployment.ipfsHash;
