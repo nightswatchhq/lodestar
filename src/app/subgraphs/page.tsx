@@ -10,6 +10,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { useSubgraphDeployments, useSubgraphDeployments30d, useManifestAnalysis } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import type { ComplexityCategory } from '@/lib/manifest';
+import { emptySearchMessage } from '@/lib/search-backlog';
 
 // ---------- constants ----------
 
@@ -112,6 +113,9 @@ function SubgraphDirectory() {
   const [sortDesc, setSortDesc] = useState(() => searchParams.get('dir') !== 'asc');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
+  // Null until a search has answered: it is the API's own "we have not looked yet", and rendering
+  // it as zero would tell a searcher everything is indexed when nobody has checked. kittiwake#8.
+  const [warmBacklog, setWarmBacklog] = useState<number | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [feeWindow, setFeeWindow] = useState<'allTime' | '30d'>(() =>
     searchParams.get('window') === 'allTime' ? 'allTime' : '30d'
@@ -190,8 +194,10 @@ function SubgraphDirectory() {
         const res = await fetch(`/api/subgraph-search?q=${encodeURIComponent(searchQuery)}`);
         const json = await res.json();
         setSearchResults(json.data ?? []);
+        setWarmBacklog(typeof json.warmBacklog === 'number' ? json.warmBacklog : null);
       } catch {
         setSearchResults([]);
+        setWarmBacklog(null);
       } finally {
         setSearchLoading(false);
       }
@@ -536,7 +542,7 @@ function SubgraphDirectory() {
             </div>
           ) : (
             <p className="px-4 py-8 text-sm text-[var(--text-faint)] text-center">
-              No subgraphs found for &ldquo;{searchQuery}&rdquo;
+              {emptySearchMessage(searchQuery, warmBacklog)}
             </p>
           )}
         </Card>
