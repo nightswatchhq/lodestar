@@ -109,11 +109,29 @@ describe('isMigrated', () => {
 
   it('treats a trailing slash as exactly one more segment, not everything below', () => {
     expect(isMigrated('/api/indexer/0xabc')).toBe(true);
-    // The three faults this rule fixes. All were live: the first two answered 404 from a backend
-    // with no handler, the third was parsed as an address and answered 400.
-    expect(isMigrated('/api/indexer/0xabc/pnl')).toBe(false);
-    expect(isMigrated('/api/indexer/0xabc/revenue')).toBe(false);
+    // `/api/indexer/` must not reach anything under an address. `pnl` and `revenue` are forwarded
+    // now, but by their own wildcard entries below rather than by this rule, and a path this rule
+    // did swallow answered 404 from a backend with no handler for it.
+    expect(isMigrated('/api/indexer/0xabc/allocations')).toBe(false);
+    // Parsed as an address and answered 400 until it was pinned in NEVER_FORWARD. kittiwake has a
+    // handler for it now and it stays pinned, because the parity harness does not exercise a POST
+    // that queues an action on a live indexer agent.
     expect(isMigrated('/api/indexer/present-poi')).toBe(false);
+  });
+
+  it('matches a nested route through its wildcard segment, and only at that depth', () => {
+    // Both callers: the proxy passes a real request path, the inventory check passes the
+    // filesystem form. A pattern that matched one and not the other would leave the two lists
+    // disagreeing about the same route, which is the fault this file exists to prevent.
+    expect(isMigrated('/api/indexer/0xabc/pnl')).toBe(true);
+    expect(isMigrated('/api/indexer/[address]/pnl')).toBe(true);
+    expect(isMigrated('/api/indexer/0xabc/revenue')).toBe(true);
+
+    // One segment, not several, and not none.
+    expect(isMigrated('/api/indexer/0xabc/deeper/pnl')).toBe(false);
+    expect(isMigrated('/api/indexer//pnl')).toBe(false);
+    // The wildcard is in one position only; a different tail is not covered by it.
+    expect(isMigrated('/api/indexer/0xabc/losses')).toBe(false);
   });
 
   it('does not forward a bare prefix with nothing after it', () => {
