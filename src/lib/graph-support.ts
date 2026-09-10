@@ -122,14 +122,17 @@ const AREA_ORDER: readonly { key: string; label: string; blurb: string }[] = [
 ];
 
 const OWNER_ORDER: readonly { key: string; label: string; blurb: string }[] = [
+  // The two core-team owners share one badge. Which of them owns a given fault is frequently not
+  // knowable from outside, and naming one of them specifically asserts something the thread has
+  // usually not established. `owner/*` still distinguishes them in the repository.
   {
     key: 'owner/edge-and-node',
-    label: 'Edge & Node',
-    blurb: 'Only Edge & Node can fix these. Raised with them where there was somewhere to raise it.',
+    label: 'Edge & Node / The Graph Foundation',
+    blurb: 'The core teams. Raised with them where there was somewhere to raise it.',
   },
   {
     key: 'owner/foundation',
-    label: 'The Graph Foundation',
+    label: 'Edge & Node / The Graph Foundation',
     blurb: 'Governance, funding or protocol-parameter decisions rather than code.',
   },
   {
