@@ -30,8 +30,20 @@ import { useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
  * imported directly is a different type from the one wagmi hands back and the two do not unify.
  */
 
-/** The receipt as wagmi reports it, rather than as `viem` declares it. See the note above. */
-export type MinedReceipt = NonNullable<ReturnType<typeof useWaitForTransactionReceipt>['data']>;
+/**
+ * A mined receipt, declared structurally rather than imported.
+ *
+ * `NonNullable<ReturnType<typeof useWaitForTransactionReceipt>['data']>` looks like the right way
+ * to say this and is not: without type arguments the generic defaults collapse it to `{}`, so
+ * `receipt.logs` does not typecheck at the call sites. Importing `TransactionReceipt` from `viem`
+ * fails differently, per the note above. This lists what callers actually read, and the one cast
+ * that bridges it lives in this file rather than at every use.
+ */
+export interface MinedReceipt {
+  transactionHash: `0x${string}`;
+  status: 'success' | 'reverted';
+  logs: readonly { address: string; topics: readonly string[]; data: string }[];
+}
 
 /** Where a transaction is, from the user's point of view rather than wagmi's. */
 export type ContractStepStatus =
@@ -74,10 +86,14 @@ export function useContractStep(opts?: {
     useWriteContract();
 
   const {
-    data: receipt,
+    data: rawReceipt,
     isSuccess: mined,
     error: waitError,
   } = useWaitForTransactionReceipt({ hash: txHash });
+
+  // The one place the two viem copies are reconciled. wagmi's receipt has every field
+  // `MinedReceipt` names and more; the cast asserts the overlap rather than inventing it.
+  const receipt = rawReceipt as MinedReceipt | undefined;
 
   const [settled, setSettled] = useState(false);
   const [minedError, setMinedError] = useState<Error | null>(null);
