@@ -11,7 +11,6 @@
  *     pnpm migration:routes
  */
 export const ROUTE_FILES: readonly string[] = [
-  '/api/analytics/clickthrough',
   '/api/apr-provenance/[address]',
   '/api/blog/search-index',
   '/api/chain-lag',
