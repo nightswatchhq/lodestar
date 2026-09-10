@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContract } from 'wagmi';
+import { useContractStep } from '@/hooks/useContractStep';
 import { parseAbi, parseUnits, formatUnits } from 'viem';
 import { arbitrum } from 'wagmi/chains';
 import Link from 'next/link';
@@ -76,23 +77,25 @@ function SignalModal({
 
   const needsApproval = tokensIn > 0n && (allowance ?? 0n) < tokensIn;
 
-  const { writeContract: approve, data: approveTxHash, isPending: approvePending } = useWriteContract();
-  const { writeContract: signal, data: signalTxHash, isPending: signalPending } = useWriteContract();
-
-  const { isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveTxHash });
-  const { isSuccess: signalSuccess } = useWaitForTransactionReceipt({ hash: signalTxHash });
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt / URL params — intentional
-    if (approveSuccess) { refetchAllowance(); setStep('signal'); }
-  }, [approveSuccess]);
-  useEffect(() => {
-    if (signalSuccess) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt / URL params — intentional
+  const approveStep = useContractStep({
+    onMined: () => {
+      refetchAllowance();
+      setStep('signal');
+    },
+  });
+  const signalStep = useContractStep({
+    onMined: () => {
       setStep('done');
       queryClient.invalidateQueries({ queryKey: ['curatorPortfolio'] });
-    }
-  }, [signalSuccess]);
+    },
+  });
+
+  const approve = approveStep.write;
+  const signal = signalStep.write;
+  // `wallet` is the prompt being open. The buttons disabled on it before, and on nothing else, so
+  // a mining transaction left them live; `idle` is now the only state that accepts another click.
+  const approvePending = approveStep.status !== 'idle' && approveStep.status !== 'error';
+  const signalPending = signalStep.status !== 'idle' && signalStep.status !== 'error';
 
   const balanceGRT = weiToGRT(balance?.toString() ?? '0');
   const insufficient = tokensIn > 0n && balance !== undefined && tokensIn > balance;
@@ -208,10 +211,9 @@ function UnsignalModal({
 
   const sharesToBurn = BigInt(currentSignal) * BigInt(pct) / 100n;
 
-  const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt / URL params — intentional
-  useEffect(() => { if (isSuccess) setDone(true); }, [isSuccess]);
+  const burnStep = useContractStep({ onMined: () => setDone(true) });
+  const writeContract = burnStep.write;
+  const isPending = burnStep.status !== 'idle' && burnStep.status !== 'error';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
