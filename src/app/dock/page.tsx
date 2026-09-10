@@ -16,6 +16,7 @@ import { CONTRACTS } from '@/lib/wallet';
 import { BOUNTY_BOARD_ABI, GRT_ABI, SUBGRAPH_SERVICE_ABI, extractBountyId } from '@/lib/bountyBoard';
 import { SubgraphLifecyclePanel } from '@/components/studio/SubgraphLifecyclePanel';
 import { useContractStep } from '@/hooks/useContractStep';
+import { CopyButton } from '@/components/ui/CopyButton';
 import {
   dockKeys,
   useBounties,
@@ -92,27 +93,6 @@ const BOUNTY_BOARD_DEPLOYED =
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function CopyButton({ text, className }: { text: string; className?: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button
-      onClick={copy}
-      className={cn(
-        'px-2 py-1 text-xs rounded transition-colors',
-        'bg-[var(--bg-elevated)] hover:bg-[var(--border)] text-[var(--text-muted)]',
-        className,
-      )}
-    >
-      {copied ? 'Copied!' : 'Copy'}
-    </button>
-  );
-}
 
 function CodeBlock({ children }: { children: string }) {
   return (

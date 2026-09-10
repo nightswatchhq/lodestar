@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 // ── Types, mirroring /api/sql/catalog and /api/sql/query ─────────────────────
 
@@ -588,7 +589,7 @@ function NamedQueries() {
  * says plainly what it needs, rather than implying a click produces a receipt.
  */
 function TakeAReceipt({ name, args }: { name: string; args: Record<string, string> }) {
-  const [copied, setCopied] = useState(false);
+  const { copy, copied } = useCopyToClipboard();
   const [issuing, setIssuing] = useState(false);
   const [issueError, setIssueError] = useState<string | null>(null);
 
@@ -657,12 +658,7 @@ function TakeAReceipt({ name, args }: { name: string; args: Record<string, strin
       <div className="flex items-center justify-between gap-2 mb-1">
         <span className="text-[10px] text-[var(--text-faint)]">with your own key</span>
         <button
-          onClick={() => {
-            void navigator.clipboard?.writeText(cmd.replace(/\\\n/g, ' ')).then(
-              () => setCopied(true),
-              () => setCopied(false)
-            );
-          }}
+          onClick={() => void copy(cmd.replace(/\\\n/g, ' '))}
           className="text-[10px] px-2 py-0.5 rounded-[var(--radius-button)] bg-[var(--bg-elevated)] border-[0.5px] border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--accent)]"
         >
           {copied ? 'copied' : 'copy'}
