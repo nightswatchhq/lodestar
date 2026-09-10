@@ -1,16 +1,16 @@
 /**
  * The six issue templates in nightswatchhq/graph-support, as a chooser.
  *
- * Filing goes to GitHub's own form rather than being composed here and posted with a token. Two
- * reasons, and the second is the one that decides it. A server-side token would put back exactly
- * the credential this page just removed, and it would make every report arrive from one bot
- * account: that repository credits reporters by name and replies to them in the thread, and an
- * archive where every issue was opened by `lodestar-bot` cannot do either.
+ * This list is the fallback, not the source. `/api/file-issue` reads the forms themselves from
+ * kittiwake's mirror of the repository and the compose page renders those, so what a reporter
+ * fills in cannot drift from what the repository declares. What survives here is the one thing the
+ * mirror cannot supply when it is unreachable: six names, six descriptions and a link into
+ * GitHub's own form, which is the route this page had before it could file anything.
  *
- * So what Lodestar contributes is the part a reporter actually finds hard, which is knowing which
- * of the six to pick, and GitHub renders the form it already maintains. The one thing that can
- * drift is a renamed file; GitHub falls back to its own chooser when `template` names nothing,
- * which is a soft landing rather than a 404.
+ * Filing through Lodestar costs the reporter their authorship, because the credential is one
+ * account. `provenanceFooter` in `issue-form.ts` puts their handle in the body for that reason, and
+ * the compose page says so before they submit. The link out of it stays on the page for anyone who
+ * would rather open the thread under their own name, which is still the better way to do it.
  */
 
 const REPO = 'https://github.com/nightswatchhq/graph-support';
@@ -76,7 +76,7 @@ export const ISSUE_TEMPLATES: readonly IssueTemplate[] = [
  * into the search box and found nothing: that string is usually the best title the thread will
  * ever get, and that repository asks for the literal error text in the title on purpose.
  */
-export function newIssueUrl(template: IssueTemplate, title?: string): string {
+export function newIssueUrl(template: Pick<IssueTemplate, 'file'>, title?: string): string {
   const params = new URLSearchParams({ template: template.file });
   const seed = title?.trim();
   if (seed) params.set('title', seed);

@@ -6,7 +6,7 @@
 
 **38 of 77 routes** on kittiwake, **49%**. 39 left.
 
-The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 4 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
+The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 6 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
 ## By block of work
 
@@ -108,8 +108,10 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 |---|---|
 | `/api/cron/reconcile-bounties` | reads the BountyBoard contract and updates sync_bounties. Belongs with the Dock, kittiwake#16. |
 | `/api/cron/tap-provision` | holds TAP_SIGNER_PRIVATE_KEY and spends GRT. A custody decision rather than a port, kittiwake#11. |
+| `/api/file-issue` | holds GRAPH_SUPPORT_ISSUE_TOKEN, which writes to a public repository. It sits outside /api/support because everything under that prefix is proxied; moving it to kittiwake would move the credential onto the box that serves the archive it writes to. |
 | `/api/health` | judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker. |
 | `/api/indexing-status/[hash]` | pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves. |
+| `/api/issue-forms` | the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does. |
 | `/api/migration` | reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did. |
 | `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
 
