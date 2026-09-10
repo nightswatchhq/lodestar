@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 interface ProbeDetail {
   probe: {
@@ -61,9 +62,20 @@ function hashLabel(hash: string | null, index: Map<string, number>): { label: st
 
 export default function ProbeDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data, isLoading, error } = useProbeDetail(id);
+  const { data, isPending, fetchStatus, error } = useProbeDetail(id);
 
-  if (isLoading) {
+  if (isPending && fetchStatus === 'paused') {
+    return (
+      <div className="py-12">
+        <SourceUnavailable
+          what="This probe"
+          detail="The connection appears to be down, so it could not be looked up."
+        />
+      </div>
+    );
+  }
+
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -71,7 +83,20 @@ export default function ProbeDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  if (error || !data) {
+  if (error) {
+    return (
+      <div className="py-12">
+        <SourceUnavailable what="This probe" detail={error instanceof Error ? error.message : undefined} />
+        <div className="text-center">
+          <Link href="/foghorn" className="mt-6 inline-block text-sm text-[var(--accent-text)] hover:underline">
+            &larr; Back to Foghorn
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
     return (
       <div className="text-center py-24">
         <p className="text-[var(--text-muted)]">Probe not found.</p>

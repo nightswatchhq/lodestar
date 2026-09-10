@@ -24,6 +24,7 @@ import {
 } from '@/lib/utils';
 import { calculateDelegationCapacity } from '@/lib/rewards';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 interface IndexerDetail {
   id: string;
@@ -77,7 +78,7 @@ export default function DelegatePage({
   params: Promise<{ address: string }>;
 }) {
   const { address } = use(params);
-  const { data: indexer, isLoading, error } = useIndexerDetails(address);
+  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
   const { data: reoData } = useREOStatus(address);
@@ -99,7 +100,21 @@ export default function DelegatePage({
     ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
     : 0;
 
-  if (isLoading) {
+  // See the note on the detail page: a paused retry is not fetching, so `isLoading` let this fall
+  // through to "Indexer Not Found" and stay there. It matters more here, because this is the
+  // screen somebody is on when they are about to delegate.
+  if (isPending && fetchStatus === 'paused') {
+    return (
+      <div className="py-12">
+        <SourceUnavailable
+          what="This indexer"
+          detail="The connection appears to be down, so it could not be looked up."
+        />
+      </div>
+    );
+  }
+
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -107,7 +122,26 @@ export default function DelegatePage({
     );
   }
 
-  if (error || !indexer) {
+  // Distinguished for the same reason as the detail page, and it matters more here: this screen is
+  // where somebody is about to delegate, and "no such indexer" is the wrong thing to tell them
+  // when the truth is that we could not ask.
+  if (error) {
+    return (
+      <div className="py-12">
+        <SourceUnavailable
+          what="This indexer"
+          detail={error instanceof Error ? error.message : undefined}
+        />
+        <div className="text-center">
+          <Link href="/indexers" className="mt-6 inline-block text-sm text-[var(--accent-text)] hover:underline">
+            Back to Directory
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!indexer) {
     return (
       <div className="text-center py-24">
         <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Indexer Not Found</h2>

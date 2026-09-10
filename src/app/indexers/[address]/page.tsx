@@ -36,6 +36,7 @@ const StakeHistoryChart = dynamic(() => import('@/components/charts/StakeHistory
 const PnlPanel = dynamic(() => import('@/components/indexer/PnlPanel').then(m => ({ default: m.PnlPanel })), { ssr: false });
 import { ParameterHistory } from '@/components/ParameterHistory';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 interface IndexerDetail {
   id: string;
@@ -116,7 +117,7 @@ export default function IndexerDetailPage({
     redirect('/indexers');
   }
 
-  const { data: indexer, isLoading, error } = useIndexerDetails(address);
+  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
   const { data: provisionsData, isLoading: provisionsLoading } = useIndexerProvisions(address);
@@ -147,7 +148,23 @@ export default function IndexerDetailPage({
     ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
     : 0;
 
-  if (isLoading) {
+  // `isPending` rather than `isLoading`, and the difference is the whole bug. React-query pauses
+  // retries when it believes the connection is gone, and a paused query is not fetching: with
+  // `isLoading` the guard fell straight through to "not found" and stayed there, with no spinner
+  // and no error, telling somebody a real indexer did not exist because we could not reach our own
+  // backend. Observed on 2026-09-10: status pending, fetchStatus paused, failureCount 1, for ever.
+  if (isPending && fetchStatus === 'paused') {
+    return (
+      <div className="py-12">
+        <SourceUnavailable
+          what={`Indexer ${shortenAddress(address)}`}
+          detail="The connection appears to be down, so this could not be looked up."
+        />
+      </div>
+    );
+  }
+
+  if (isPending) {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -155,7 +172,29 @@ export default function IndexerDetailPage({
     );
   }
 
-  if (error || !indexer) {
+  // A failed request and an address nobody has staked from are different answers, and this used to
+  // give the second for both. Telling somebody their indexer does not exist because a nest was
+  // briefly unreachable is a claim about the network made out of our own outage.
+  if (error) {
+    return (
+      <div className="py-12">
+        <SourceUnavailable
+          what={`Indexer ${shortenAddress(address)}`}
+          detail={error instanceof Error ? error.message : undefined}
+        />
+        <div className="text-center">
+          <Link
+            href="/indexers"
+            className="mt-6 inline-flex items-center gap-2 text-sm text-[var(--accent-text)] hover:underline"
+          >
+            Back to Directory
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!indexer) {
     return (
       <div className="text-center py-24">
         <h2 className="text-xl font-semibold text-[var(--text)] mb-2">Indexer Not Found</h2>
