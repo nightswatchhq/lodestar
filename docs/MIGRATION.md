@@ -4,9 +4,9 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**32 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **66%** of the way from 93 on 10 September 2026.
+**31 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **67%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **53 of 77** are across, **69%**, with 24 to go.
+Of the port itself, **53 of 76** are across, **70%**, with 23 to go.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -16,7 +16,7 @@ That second denominator is routes meant to move that have not yet, and it exclud
 |---|---|---|
 | the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
-| the long tail | 0/5 | 5 |
+| the long tail | 0/4 | 4 |
 | the disassembler | 0/3 | 3 |
 | the SQL upper tier | 0/1 | 1 |
 | data plane | 53/53 | 0 |
@@ -80,7 +80,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 ## Still on Next
 
 - `/api/analytics/clickthrough`
-- `/api/blog/search-index`
 - `/api/data-services/query`
 - `/api/disassembly`
 - `/api/disassembly/diff`

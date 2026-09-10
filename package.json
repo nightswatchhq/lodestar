@@ -5,7 +5,7 @@
   "license": "BUSL-1.1",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/generate-blog-search-index.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
@@ -17,7 +17,8 @@
     "migration:doc": "tsx scripts/generate-migration-doc.mjs",
     "e2e": "node scripts/e2e/run.mjs",
     "e2e:alert": "node scripts/e2e/run.mjs --alert",
-    "e2e:browser": "playwright test"
+    "e2e:browser": "playwright test",
+    "blog:index": "tsx scripts/generate-blog-search-index.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.0",

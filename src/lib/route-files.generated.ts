@@ -13,7 +13,6 @@
 export const ROUTE_FILES: readonly string[] = [
   '/api/analytics/clickthrough',
   '/api/apr-provenance/[address]',
-  '/api/blog/search-index',
   '/api/chain-lag',
   '/api/cron/reconcile-bounties',
   '/api/cron/tap-provision',
