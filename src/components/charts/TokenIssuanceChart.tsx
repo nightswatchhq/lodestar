@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import {
   AreaChart,
@@ -25,7 +26,8 @@ type Window = 50 | 100 | 200 | 500;
 export function TokenIssuanceChart() {
   const [tab, setTab] = useState<Tab>('net');
   const [count, setCount] = useState<Window>(100);
-  const { data, isLoading } = useTokenMetrics(count);
+  const state = useQueryState(useTokenMetrics(count));
+  const data = state.kind === 'ready' ? state.data : undefined;
 
   const chartData = (data ?? []).map((d) => ({
     epoch: `E${d.epoch}`,
@@ -92,8 +94,12 @@ export function TokenIssuanceChart() {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {state.kind === 'loading' ? (
           <ChartSkeleton height="330px" />
+        ) : isUnavailable(state) ? (
+          <div className="h-[300px] flex items-center justify-center">
+            <p className="text-sm text-[var(--text-faint)]">{unavailableReason(state)}</p>
+          </div>
         ) : !hasData ? (
           <div className="h-[300px] flex items-center justify-center">
             <p className="text-sm text-[var(--text-faint)]">No epoch data available</p>

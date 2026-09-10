@@ -27,6 +27,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -255,9 +256,16 @@ export default function QosPage() {
   const [hours, setHours] = useState<6 | 24 | 168>(24);
   const [page, setPage] = useState(0);
   const [scorePage, setScorePage] = useState(0);
-  const { data: status, isLoading: statusLoading, isError: statusError } = useQosStatus();
-  const { data: buckets, isLoading: bucketsLoading } = useQosBuckets(hours);
-  const { data: compare, isLoading: compareLoading } = useQosCompare();
+  const statusState = useQueryState(useQosStatus());
+  const bucketsState = useQueryState(useQosBuckets(hours));
+  const compareState = useQueryState(useQosCompare());
+  const status = statusState.kind === 'ready' ? statusState.data : undefined;
+  const buckets = bucketsState.kind === 'ready' ? bucketsState.data : undefined;
+  const compare = compareState.kind === 'ready' ? compareState.data : undefined;
+  const statusLoading = statusState.kind === 'loading';
+  const statusError = isUnavailable(statusState);
+  const bucketsLoading = bucketsState.kind === 'loading';
+  const compareLoading = compareState.kind === 'loading';
 
   // Name enrichment. Raw hex addresses and Qm… hashes are unreadable, and both lookups already
   // exist: `/v1/indexers` returns ens_name in batch (same queryKey as the rest of the site, so this
@@ -875,7 +883,11 @@ export default function QosPage() {
             that had been stale for a month, was rewarding and punishing them for our blind spot.
           </p>
 
-          {scoredIndexers.length === 0 ? (
+          {/* "No rated indexers yet" is a statement about the probe history, so it needs the read
+              to have succeeded. */}
+          {isUnavailable(compareState) ? (
+            <div className="text-sm text-[var(--text-muted)]">{unavailableReason(compareState)}</div>
+          ) : scoredIndexers.length === 0 ? (
             <div className="text-sm text-[var(--text-muted)]">
               No rated indexers yet. Scoring needs enough probes to be meaningful.
             </div>
@@ -1122,6 +1134,8 @@ export default function QosPage() {
         <CardContent>
           {bucketsLoading ? (
             <div className="text-sm text-[var(--text-muted)]">Loading…</div>
+          ) : isUnavailable(bucketsState) ? (
+            <div className="text-sm text-[var(--text-muted)]">{unavailableReason(bucketsState)}</div>
           ) : rows.length === 0 ? (
             <div className="text-sm text-[var(--text-muted)]">
               No measurements in this window yet.

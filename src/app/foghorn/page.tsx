@@ -25,6 +25,12 @@ import {
   type AttentionItem,
 } from '@/lib/foghorn';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
+import {
+  isUnavailable,
+  unavailableReason,
+  useQueryState,
+  type QueryState,
+} from '@/hooks/useQueryState';
 
 function indexerLabel(address: string, ens?: string | null) {
   return ens || shortenAddress(address, 4);
@@ -186,8 +192,11 @@ function attentionMatches(
 }
 
 function NeedsAttentionSection() {
-  const { data, isLoading, isError } = useNeedsAttention();
-  const items = data?.items ?? [];
+  // "All clear. No indexers are currently serving bad or no data" is a safety claim, and a paused
+  // retry used to reach it: not loading, not an error, no items. A monitoring page that reports
+  // green because it could not ask is worse than one that reports nothing.
+  const attention = useQueryState(useNeedsAttention());
+  const items = attention.kind === 'ready' ? attention.data.items : [];
   const [indexerFilter, setIndexerFilter] = useState('');
   const [subgraphFilter, setSubgraphFilter] = useState('');
 
@@ -209,7 +218,7 @@ function NeedsAttentionSection() {
         {items.length > 0 && <Badge variant="error">{items.length}</Badge>}
       </div>
 
-      {!isLoading && !isError && items.length > 0 && (
+      {attention.kind === 'ready' && items.length > 0 && (
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="text"
@@ -245,10 +254,15 @@ function NeedsAttentionSection() {
         </p>
       )}
 
-      {isLoading ? (
+      {isUnavailable(attention) ? (
+        <Card>
+          <p className="text-sm text-[var(--text-muted)]">
+            {unavailableReason(attention)} This says nothing about whether anyone is serving bad
+            data.
+          </p>
+        </Card>
+      ) : attention.kind !== 'ready' ? (
         <Card><p className="text-sm text-[var(--text-muted)]">Loading…</p></Card>
-      ) : isError ? (
-        <Card><p className="text-sm text-[var(--text-muted)]">Foghorn data unavailable.</p></Card>
       ) : items.length === 0 ? (
         <Card className="border-l-2 border-l-[var(--green)]">
           <p className="text-sm text-[var(--green)]">
@@ -276,8 +290,8 @@ function NeedsAttentionSection() {
 
 function Leaderboard() {
   const [window, setWindow] = useState<7 | 30>(30);
-  const { data, isLoading, isError } = useFoghornIndexers(window);
-  const rows = data?.indexers ?? [];
+  const leaderboard = useQueryState(useFoghornIndexers(window));
+  const rows = leaderboard.kind === 'ready' ? leaderboard.data.indexers : [];
 
   return (
     <section className="space-y-3">
@@ -309,10 +323,10 @@ function Leaderboard() {
         <span className="text-[var(--red-text)]">red &lt;50</span>.
       </p>
       <Card className="p-0 overflow-hidden">
-        {isLoading ? (
+        {isUnavailable(leaderboard) ? (
+          <p className="text-sm text-[var(--text-muted)] p-4">{unavailableReason(leaderboard)}</p>
+        ) : leaderboard.kind !== 'ready' ? (
           <p className="text-sm text-[var(--text-muted)] p-4">Loading…</p>
-        ) : isError ? (
-          <p className="text-sm text-[var(--text-muted)] p-4">Foghorn data unavailable.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -387,8 +401,8 @@ const VERDICT_KINDS = [
 
 function VerdictsSection() {
   const [kind, setKind] = useState<string | undefined>(undefined);
-  const { data, isLoading, isError } = useVerdicts({ kind, limit: 200 });
-  const verdicts = data?.verdicts ?? [];
+  const verdictsQuery = useQueryState(useVerdicts({ kind, limit: 200 }));
+  const verdicts = verdictsQuery.kind === 'ready' ? verdictsQuery.data.verdicts : [];
 
   return (
     <section className="space-y-3">
@@ -417,10 +431,10 @@ function VerdictsSection() {
         ))}
       </div>
       <Card className="p-0 overflow-hidden">
-        {isLoading ? (
+        {isUnavailable(verdictsQuery) ? (
+          <p className="text-sm text-[var(--text-muted)] p-4">{unavailableReason(verdictsQuery)}</p>
+        ) : verdictsQuery.kind !== 'ready' ? (
           <p className="text-sm text-[var(--text-muted)] p-4">Loading…</p>
-        ) : isError ? (
-          <p className="text-sm text-[var(--text-muted)] p-4">Foghorn data unavailable.</p>
         ) : verdicts.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)] p-4">No verdicts for this filter.</p>
         ) : (
@@ -475,9 +489,12 @@ function VerdictsSection() {
 // ── Sybil clusters ─────────────────────────────────────────────────────────────
 
 function SybilSection() {
-  const { data, isLoading } = useSybilClusters();
-  const clusters = data?.clusters ?? [];
-  if (!isLoading && clusters.length === 0) return null;
+  const query = useQueryState(useSybilClusters());
+  const clusters = query.kind === 'ready' ? query.data.clusters : [];
+  // Hiding an empty section is the design. Hiding one that could not be read is a section that
+  // silently stops existing, so that case says so instead.
+  if (isUnavailable(query)) return <SectionUnavailable title="Sybil Swarms" state={query} />;
+  if (query.kind === 'ready' && clusters.length === 0) return null;
 
   return (
     <section className="space-y-3">
@@ -508,12 +525,27 @@ function SybilSection() {
   );
 }
 
+/** A section that would have hidden itself, saying why it is empty instead. */
+function SectionUnavailable({ title, state }: { title: string; state: QueryState<unknown> }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="text-lg font-semibold text-[var(--text)]">{title}</h2>
+      <Card>
+        <p className="text-sm text-[var(--text-muted)]">{unavailableReason(state)}</p>
+      </Card>
+    </section>
+  );
+}
+
 // ── Non-deterministic subgraphs ──────────────────────────────────────────────
 
 function NonDeterministicSection() {
-  const { data, isLoading } = useNonDeterministic();
-  const deps = data?.deployments ?? [];
-  if (!isLoading && deps.length === 0) return null;
+  const query = useQueryState(useNonDeterministic());
+  const deps = query.kind === 'ready' ? query.data.deployments : [];
+  if (isUnavailable(query)) {
+    return <SectionUnavailable title="Non-deterministic Subgraphs" state={query} />;
+  }
+  if (query.kind === 'ready' && deps.length === 0) return null;
 
   return (
     <section className="space-y-3">
@@ -551,9 +583,10 @@ function NonDeterministicSection() {
 // ── Divergence feed ──────────────────────────────────────────────────────────
 
 function DivergenceFeed() {
-  const { data, isLoading } = useFoghornFeed(30);
-  const events = data?.events ?? [];
-  if (!isLoading && events.length === 0) return null;
+  const query = useQueryState(useFoghornFeed(30));
+  const events = query.kind === 'ready' ? query.data.events : [];
+  if (isUnavailable(query)) return <SectionUnavailable title="Recent Divergences" state={query} />;
+  if (query.kind === 'ready' && events.length === 0) return null;
 
   return (
     <section className="space-y-3">

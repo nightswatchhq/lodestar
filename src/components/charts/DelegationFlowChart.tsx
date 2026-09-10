@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import {
   BarChart,
@@ -30,7 +31,8 @@ function formatDate(dateStr: string): string {
 export function DelegationFlowChart() {
   const [days, setDays] = useState<Window>(90);
   // Always fetch 2× window so we can compare current vs previous period
-  const { data, isLoading } = useDelegationFlows(days, true);
+  const state = useQueryState(useDelegationFlows(days, true));
+  const data = state.kind === 'ready' ? state.data : undefined;
 
   const cutoff = useMemo(() => {
     const d = new Date();
@@ -91,8 +93,12 @@ export function DelegationFlowChart() {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {state.kind === 'loading' ? (
           <ChartSkeleton height="400px" />
+        ) : isUnavailable(state) ? (
+          <div className="h-[300px] flex items-center justify-center">
+            <p className="text-sm text-[var(--text-faint)]">{unavailableReason(state)}</p>
+          </div>
         ) : !hasData ? (
           <div className="h-[300px] flex items-center justify-center">
             <p className="text-sm text-[var(--text-faint)]">No delegation flow data available</p>

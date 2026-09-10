@@ -9,14 +9,15 @@
 //   2. Transfer ownership        — GNS.safeTransferFrom(address,address,uint256)
 //   3. Deprecate                 — GNS.deprecateSubgraph(uint256)
 //
-// Mirrors the PublishWizard's tx-status UX (upload → wallet → mining → done,
-// with Arbiscan links and a red error state). Persists best-effort to the same
-// PATCH route the publish flow uses. Deliberately self-contained so it can't
-// disturb the existing publish path.
+// The transaction ceremony is `useContractStep`, same as the other three write flows. The record
+// of it goes to the PATCH route the publish flow uses, and a failure there is reported rather than
+// swallowed: the chain and Lodestar's copy of it can disagree, and the reader has to be told which
+// of the two went wrong.
 // ---------------------------------------------------------------------------
 
-import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useState } from 'react';
+import { useAccount } from 'wagmi';
+import { useContractStep } from '@/hooks/useContractStep';
 import { isAddress, getAddress } from 'viem';
 import { CONTRACTS } from '@/lib/wallet';
 import { cn } from '@/lib/utils';
@@ -56,13 +57,26 @@ const GNS_LIFECYCLE_ABI = [
   },
 ] as const;
 
+/**
+ * Throws when the record does not land, which used to be swallowed.
+ *
+ * The transaction is on chain by the time this runs, so a failure here is not the action failing:
+ * it is Lodestar's copy going out of date, and the message has to say which of the two happened or
+ * the reader will assume the transfer reverted.
+ */
 async function apiPatch(id: number, body: Record<string, unknown>): Promise<void> {
-  await fetch(`/api/studio/subgraphs/${id}`, {
+  const res = await fetch(`/api/studio/subgraphs/${id}`, {
     method: 'PATCH',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    throw new Error(
+      `The transaction went through, but Lodestar could not record it (HTTP ${res.status}). ` +
+        'The chain is the source of truth; this panel may show stale details until it refreshes.',
+    );
+  }
 }
 
 type ActionKind = 'metadata' | 'transfer' | 'deprecate';
@@ -103,56 +117,77 @@ function LifecycleModal({
   onUpdated: (sg: StudioSubgraph) => void;
 }) {
   const { address } = useAccount();
-  const [step, setStep] = useState<Step>('idle');
-  const [errMsg, setErrMsg] = useState('');
-  const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   // Typed confirmation for the irreversible transfer flow.
   const [recipient, setRecipient] = useState('');
   const [recipientConfirm, setRecipientConfirm] = useState('');
   // Typed confirmation for deprecation.
   const [deprecateConfirm, setDeprecateConfirm] = useState('');
 
-  const { writeContract, isPending: walletPending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => {
-        setTxHash(hash);
-        setStep('mining');
-      },
-      onError: (e) => {
-        setErrMsg(e.message.slice(0, 300));
-        setStep('error');
-      },
+  /**
+   * The ceremony, which this panel used to spell out itself.
+   *
+   * Three things it was getting wrong. It moved to `done` the moment the receipt landed, so a
+   * transaction that reverted on chain showed "Ownership transferred" - and for a transfer it also
+   * cleared `published_subgraph_id`, dropping the publish link for a transfer that never happened.
+   * The persist was fire-and-forget behind a `.catch(() => {})`, so a failed PATCH looked identical
+   * to a successful one. And the effect was keyed on a boolean, which is why it carried two
+   * `eslint-disable` lines.
+   */
+  const tx = useContractStep({
+    onMined: async () => {
+      if (kind === 'metadata') {
+        const patch = { display_name: displayName || null, description: description || null };
+        await apiPatch(sg.id, patch);
+        onUpdated({ ...sg, ...patch });
+      } else if (kind === 'transfer') {
+        // The NFT belongs to someone else now, so the local publish link goes and the subgraph
+        // reverts to a draft in the Dock. There is no dedicated "transferred" column.
+        await apiPatch(sg.id, {
+          published_subgraph_id: '',
+          version_label: null,
+          last_published_deployment_id: null,
+        });
+        onUpdated({
+          ...sg,
+          published_subgraph_id: null,
+          version_label: null,
+          last_published_deployment_id: null,
+        });
+      }
+      // `deprecate` has no schema field to flag: on-chain state is the source of truth.
     },
   });
 
-  const { isSuccess: txConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+  // Derived rather than mirrored, so there is no effect keeping two copies of this in step. The
+  // wallet and the chain outrank the upload: once the prompt is open, `uploading` is history.
+  const step: Step =
+    uploadError || tx.status === 'error'
+      ? 'error'
+      : tx.status === 'done'
+        ? 'done'
+        : tx.status === 'mining'
+          ? 'mining'
+          : tx.status === 'wallet'
+            ? 'wallet'
+            : uploading
+              ? 'uploading'
+              : 'idle';
 
-  useEffect(() => {
-    if (!txConfirmed) return;
-    // Persist best-effort, matching the existing PATCH field shapes.
-    if (kind === 'metadata') {
-      apiPatch(sg.id, { display_name: displayName || null, description: description || null })
-        .then(() => onUpdated({ ...sg, display_name: displayName || null, description: description || null }))
-        .catch(() => {});
-    } else if (kind === 'transfer') {
-      // The NFT now belongs to someone else — drop our local publish link so the
-      // subgraph reverts to a draft in the Dock. (No dedicated "transferred"
-      // column exists; see report.)
-      apiPatch(sg.id, { published_subgraph_id: '', version_label: null, last_published_deployment_id: null })
-        .then(() => onUpdated({ ...sg, published_subgraph_id: null, version_label: null, last_published_deployment_id: null }))
-        .catch(() => {});
-    }
-    // For 'deprecate' there is no schema field to flag; on-chain state is the
-    // source of truth. We leave the DB row as-is and surface the deprecation
-    // via the success screen only.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt — intentional
-    setStep('done');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txConfirmed]);
+  const errMsg = uploadError || tx.error?.message.slice(0, 300) || '';
+  const txHash = tx.txHash;
+
+  const retry = () => {
+    setUploading(false);
+    setUploadError('');
+    tx.reset();
+  };
 
   // --- metadata: upload to IPFS first, then write ---
   const runMetadata = async () => {
-    setStep('uploading');
+    setUploadError('');
+    setUploading(true);
     try {
       const res = await fetch('/api/studio/metadata', {
         method: 'POST',
@@ -164,23 +199,20 @@ function LifecycleModal({
       if (!res.ok || !data.subgraphMetaBytes32) {
         throw new Error(data.error ?? 'IPFS upload failed');
       }
-      setStep('wallet');
-      writeContract({
+      tx.write({
         address: CONTRACTS.gns,
         abi: GNS_LIFECYCLE_ABI,
         functionName: 'updateSubgraphMetadata',
         args: [BigInt(nftId), data.subgraphMetaBytes32 as `0x${string}`],
       });
     } catch (err) {
-      setErrMsg(err instanceof Error ? err.message : 'IPFS upload failed');
-      setStep('error');
+      setUploadError(err instanceof Error ? err.message : 'IPFS upload failed');
     }
   };
 
   const runTransfer = () => {
     if (!address || !isAddress(recipient)) return;
-    setStep('wallet');
-    writeContract({
+    tx.write({
       address: CONTRACTS.gns,
       abi: GNS_LIFECYCLE_ABI,
       functionName: 'safeTransferFrom',
@@ -189,8 +221,7 @@ function LifecycleModal({
   };
 
   const runDeprecate = () => {
-    setStep('wallet');
-    writeContract({
+    tx.write({
       address: CONTRACTS.gns,
       abi: GNS_LIFECYCLE_ABI,
       functionName: 'deprecateSubgraph',
@@ -393,7 +424,7 @@ function LifecycleModal({
             <div className="flex flex-col items-center py-8 gap-3">
               <div className="w-10 h-10 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
               <p className="text-sm text-[var(--text-muted)]">
-                {walletPending ? 'Confirm the transaction in your wallet...' : 'Waiting for wallet...'}
+                Confirm the transaction in your wallet...
               </p>
             </div>
           )}
@@ -454,7 +485,7 @@ function LifecycleModal({
             <div className="space-y-4">
               <p className="text-sm text-[var(--red-text)] whitespace-pre-wrap break-all">{errMsg || 'Something went wrong.'}</p>
               <button
-                onClick={() => setStep('idle')}
+                onClick={retry}
                 className="w-full px-4 py-2 text-sm rounded-[var(--radius-button)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
               >
                 Try Again

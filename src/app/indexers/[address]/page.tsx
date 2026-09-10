@@ -28,6 +28,7 @@ import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { DelegationCalculator } from '@/components/ui/DelegationCalculator';
 import { ProvisionsPanel } from '@/components/ui/ProvisionsPanel';
+import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
 import { DelegationFeed } from '@/components/feed/DelegationFeed';
 import { AprProvenancePanel } from '@/components/indexer/AprProvenancePanel';
 import dynamic from 'next/dynamic';
@@ -120,8 +121,8 @@ export default function IndexerDetailPage({
   const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
-  const provisionsQuery = useIndexerProvisions(address);
-  const { data: provisionsData } = provisionsQuery;
+  const provisions = useQueryState(useIndexerProvisions(address));
+  const provisionsData = provisions.kind === 'ready' ? provisions.data : undefined;
   const { data: reoData } = useREOStatus(address);
   const { data: foghornAllocQos } = useIndexerAllocationsQos(address);
   const { data: recentDelegations } = useRecentDelegations(address);
@@ -1065,11 +1066,8 @@ export default function IndexerDetailPage({
       {/* Service Provisions */}
       <ProvisionsPanel
         provisions={provisionsData?.provisions ?? []}
-        isLoading={provisionsQuery.isPending && provisionsQuery.fetchStatus !== 'paused'}
-        unavailable={
-          provisionsQuery.isError ||
-          (provisionsQuery.isPending && provisionsQuery.fetchStatus === 'paused')
-        }
+        isLoading={provisions.kind === 'loading'}
+        unavailable={isUnavailable(provisions)}
         selfStakeGRT={selfStake}
       />
 

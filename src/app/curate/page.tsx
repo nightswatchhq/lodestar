@@ -15,6 +15,8 @@ import { CONTRACTS } from '@/lib/wallet';
 import { weiToGRT, formatGRT, formatNumber, shortenAddress, cn } from '@/lib/utils';
 import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
 import type { Signal } from '@/lib/queries';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 
 // ---------------------------------------------------------------------------
 // ABIs
@@ -361,14 +363,20 @@ function PositionRow({ signal }: { signal: Signal }) {
 // ---------------------------------------------------------------------------
 
 function MyPositionsTab({ address }: { address: string }) {
-  const { data, isLoading } = useCuratorPortfolio(address);
-  const curator = data?.curator ?? null;
+  const portfolio = useQueryState(useCuratorPortfolio(address));
+  const curator = portfolio.kind === 'ready' ? (portfolio.data.curator ?? null) : null;
 
   const totalSignalled = weiToGRT(curator?.totalSignalledTokens ?? '0');
   const totalRealized = weiToGRT(curator?.realizedRewards ?? '0');
   const returnPct = totalSignalled > 0 ? (totalRealized / totalSignalled) * 100 : 0;
 
-  if (isLoading) {
+  // "No signal positions" is a claim about this address, so it waits for an answer rather than
+  // standing in for one that never came.
+  if (isUnavailable(portfolio)) {
+    return <SourceUnavailable what="Your curation positions" detail={unavailableReason(portfolio)} />;
+  }
+
+  if (portfolio.kind !== 'ready') {
     return (
       <div className="space-y-2">
         {[1, 2, 3].map((i) => <div key={i} className="h-16 rounded-lg shimmer" />)}

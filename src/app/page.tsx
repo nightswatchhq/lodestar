@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useNetworkStats, useGRTPrice, useTVL, useEpochInfo, useEpochHistory, useSubgraphDeployments30d } from '@/hooks/useNetworkStats';
+import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { EpochTable } from '@/components/EpochTable';
 import { annualIssuancePercent } from '@/lib/network-math';
 import { CIRCULATING_SUPPLY_APPROX } from '@/lib/grt-flow-data';
@@ -31,7 +32,9 @@ export default function ProtocolOverview() {
   const { data: networkData, isLoading: networkLoading } = useNetworkStats();
   const { data: priceData, isLoading: priceLoading } = useGRTPrice();
   const { data: tvlData, isLoading: tvlLoading } = useTVL();
-  const { data: subgraphs30d, isLoading: subgraphsLoading } = useSubgraphDeployments30d();
+  const subgraphs30dState = useQueryState(useSubgraphDeployments30d());
+  const subgraphs30d = subgraphs30dState.kind === 'ready' ? subgraphs30dState.data : undefined;
+  const subgraphsLoading = subgraphs30dState.kind === 'loading';
 
   const network = networkData?.graphNetwork;
 
@@ -355,6 +358,10 @@ export default function ProtocolOverview() {
                 <div key={i} className="h-10 shimmer rounded" />
               ))}
             </div>
+          ) : subgraphs30dState.kind !== 'ready' ? (
+            <p className="text-sm text-[var(--text-faint)]">
+              {unavailableReason(subgraphs30dState) ?? 'No data available'}
+            </p>
           ) : topSubgraphs.length === 0 ? (
             <p className="text-sm text-[var(--text-faint)]">No data available</p>
           ) : (

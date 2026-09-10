@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, Suspense } from 'react';
+import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { useSearchParams } from 'next/navigation';
 import { useIndexers, useEnrichedIndexers, useNetworkStats } from '@/hooks/useNetworkStats';
@@ -123,13 +124,22 @@ function formatMetric(value: unknown, format: MetricDef['format']): string {
 
 interface IndexerSearchProps {
   indexers: Indexer[];
+  /** Why the list is empty, when it is empty for a reason other than there being no indexers. */
+  unavailable?: string;
   nameMap?: Map<string, string>;
   selected: string | null;
   onSelect: (id: string) => void;
   placeholder?: string;
 }
 
-function IndexerSearch({ indexers, nameMap, selected, onSelect, placeholder }: IndexerSearchProps) {
+function IndexerSearch({
+  indexers,
+  nameMap,
+  selected,
+  onSelect,
+  placeholder,
+  unavailable,
+}: IndexerSearchProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
@@ -207,7 +217,9 @@ function IndexerSearch({ indexers, nameMap, selected, onSelect, placeholder }: I
               );
             })}
             {filtered.length === 0 && (
-              <p className="px-3 py-4 text-sm text-[var(--text-faint)] text-center">No indexers found</p>
+              <p className="px-3 py-4 text-sm text-[var(--text-faint)] text-center">
+                {unavailable ?? 'No indexers found'}
+              </p>
             )}
           </div>
         </div>
@@ -238,11 +250,11 @@ function CompareContent() {
     return init;
   });
 
-  const { data: indexersData, isLoading: indexersLoading } = useIndexers({
-    first: 100,
-    orderBy: 'stakedTokens',
-    orderDirection: 'desc',
-  });
+  const indexersState = useQueryState(
+    useIndexers({ first: 100, orderBy: 'stakedTokens', orderDirection: 'desc' }),
+  );
+  const indexersData = indexersState.kind === 'ready' ? indexersState.data : undefined;
+  const indexersLoading = indexersState.kind === 'loading';
   const { data: enrichedData } = useEnrichedIndexers();
   const { data: networkData } = useNetworkStats();
 
@@ -339,6 +351,7 @@ function CompareContent() {
               nameMap={nameMap}
               selected={sel}
               onSelect={(id) => setSlot(idx, id)}
+              unavailable={unavailableReason(indexersState)}
             />
           </div>
         ))}

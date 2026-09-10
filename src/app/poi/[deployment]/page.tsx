@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { formatGRT, formatPercent, formatNumber, cn } from '@/lib/utils';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 
 export default function POIDeploymentPage({
   params,
@@ -16,9 +18,21 @@ export default function POIDeploymentPage({
   params: Promise<{ deployment: string }>;
 }) {
   const { deployment } = use(params);
-  const { data: detail, isLoading, error } = usePOIDeployment(deployment);
+  const query = useQueryState(usePOIDeployment(deployment));
+  const detail = query.kind === 'ready' ? query.data : undefined;
 
-  if (isLoading) {
+  // A read that failed or never went out is not "no POIs for this deployment", which is what the
+  // branch below says. It used to be reached by `error || !detail`, so both of those states landed
+  // on it.
+  if (isUnavailable(query)) {
+    return (
+      <div className="py-12">
+        <SourceUnavailable what="This deployment's POIs" detail={unavailableReason(query)} />
+      </div>
+    );
+  }
+
+  if (query.kind !== 'ready') {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
@@ -26,7 +40,7 @@ export default function POIDeploymentPage({
     );
   }
 
-  if (error || !detail) {
+  if (!detail) {
     return (
       <div className="text-center py-24">
         <h2 className="text-xl font-semibold text-[var(--text)] mb-2">No POI Data</h2>

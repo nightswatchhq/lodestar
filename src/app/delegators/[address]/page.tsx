@@ -22,6 +22,8 @@ import {
   deriveDelegationStatus,
 } from '@/lib/rewards';
 import { useAccount } from 'wagmi';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { DelegationStatusBadge } from '@/components/ui/DelegationStatusBadge';
@@ -42,12 +44,14 @@ export default function DelegatorPortfolioPage({
   const { address: connectedAddress } = useAccount();
   const isOwnPortfolio = connectedAddress?.toLowerCase() === address.toLowerCase();
   const [managingPosition, setManagingPosition] = useState<string | null>(null);
-  const { data: portfolioData, isLoading, error } = useDelegatorPortfolio(address);
+  const portfolio = useQueryState(useDelegatorPortfolio(address));
+  const portfolioData = portfolio.kind === 'ready' ? portfolio.data : undefined;
   const delegator = portfolioData?.delegator ?? null;
   const { data: priceData } = useGRTPrice();
   const { data: indexersData } = useIndexers({ first: 100, orderBy: 'stakedTokens', orderDirection: 'desc' });
   const { data: enrichedData } = useEnrichedIndexers();
-  const { data: rewardsHistoryData, isLoading: rewardsHistoryLoading } = useRewardsHistory(address);
+  const rewardsHistory = useQueryState(useRewardsHistory(address));
+  const rewardsHistoryData = rewardsHistory.kind === 'ready' ? rewardsHistory.data : undefined;
 
   const grtPrice = priceData?.price ?? 0;
   const allIndexers = indexersData?.indexers ?? [];
@@ -161,24 +165,26 @@ export default function DelegatorPortfolioPage({
     };
   }, [delegator, positions, grtPrice]);
 
-  // Loading state
-  if (isLoading) {
+  // A failed or paused read is not an absence. "No Delegations Found" below is reachable only once
+  // the request has succeeded, which on this page matters more than most: the address is often the
+  // reader's own, and telling somebody they have no positions when the truth is that we could not
+  // ask is the worst version of this mistake.
+  if (isUnavailable(portfolio)) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      <div className="py-12">
+        <SourceUnavailable
+          what={`Delegator ${shortenAddress(address)}`}
+          detail={unavailableReason(portfolio)}
+        />
       </div>
     );
   }
 
-  // Error state
-  if (error) {
+  if (portfolio.kind !== 'ready') {
     return (
-      <Card className="max-w-lg mx-auto mt-12">
-        <CardContent className="py-8 text-center">
-          <p className="text-[var(--red-text)] mb-2">Failed to load delegator data</p>
-          <p className="text-[11px] text-[var(--text-faint)] font-mono">{(error as Error).message}</p>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-24">
+        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
     );
   }
 
@@ -270,7 +276,8 @@ export default function DelegatorPortfolioPage({
       <PortfolioChart
         data={rewardsHistoryData?.history ?? []}
         grtPrice={grtPrice}
-        isLoading={rewardsHistoryLoading}
+        isLoading={rewardsHistory.kind === 'loading'}
+        unavailable={unavailableReason(rewardsHistory)}
         showUSD={false}
       />
 

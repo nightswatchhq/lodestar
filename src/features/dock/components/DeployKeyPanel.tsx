@@ -4,15 +4,16 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { useDeployKey, useRotateDeployKey } from '../api';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { useDialog } from '@/hooks/useDialog';
 
 export function DeployKeyPanel() {
   const [plainKey, setPlainKey] = useState<string | null>(null);
 
   const { confirm, dialog } = useDialog();
-  const deployKey = useDeployKey();
+  const key = useQueryState(useDeployKey());
   const rotate = useRotateDeployKey();
-  const keyInfo = deployKey.data ?? null;
+  const keyInfo = key.kind === 'ready' ? key.data : null;
   const loading = rotate.isPending;
 
   const generate = async () => {
@@ -49,6 +50,10 @@ export function DeployKeyPanel() {
         <div className="p-3 bg-[var(--bg-elevated)] rounded-lg border border-[var(--border)] overflow-hidden">
           <code className="block text-xs font-mono text-[var(--text-faint)] truncate">{'•'.repeat(64)}</code>
         </div>
+      ) : isUnavailable(key) ? (
+        <p className="text-xs text-[var(--text-muted)]">{unavailableReason(key)}</p>
+      ) : key.kind !== 'ready' ? (
+        <p className="text-xs text-[var(--text-faint)]">Checking…</p>
       ) : (
         <p className="text-xs text-[var(--text-muted)]">No deploy key yet.</p>
       )}

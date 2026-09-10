@@ -244,6 +244,18 @@ const UNMIGRATED: readonly RouteRecord[] = [
     note: 'judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker.',
   },
   {
+    path: '/api/file-issue',
+    state: 'staying',
+    workstream: 'the long tail',
+    note: 'holds GRAPH_SUPPORT_ISSUE_TOKEN, which writes to a public repository. It sits outside /api/support because everything under that prefix is proxied; moving it to kittiwake would move the credential onto the box that serves the archive it writes to.',
+  },
+  {
+    path: '/api/issue-forms',
+    state: 'staying',
+    workstream: 'the long tail',
+    note: 'the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does.',
+  },
+  {
     path: '/api/provider-liveness',
     state: 'staying',
     workstream: 'the long tail',

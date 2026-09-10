@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useWriteContract } from 'wagmi';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { cn, shortenAddress } from '@/lib/utils';
 import { CONTRACTS } from '@/lib/wallet';
@@ -9,21 +9,25 @@ import { BOUNTY_BOARD_ABI } from '@/lib/bountyBoard';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { BOUNTY_BOARD_DEPLOYED } from '../constants';
 import { ClaimModal } from './ClaimModal';
-import { useBounties } from '../api';
+import { dockKeys, useBounties } from '../api';
 import type { SyncBounty } from '../types';
 import { useDialog } from '@/hooks/useDialog';
+import { useContractStep, type ContractStep } from '@/hooks/useContractStep';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { explainWriteError } from '@/lib/horizon-revert';
 
 export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
-  const { confirm, notify, dialog } = useDialog();
+  const { confirm, dialog } = useDialog();
+  const queryClient = useQueryClient();
   // The whole board, sharing a cache with the per-deployment read in the detail modal.
-  const { data: bountiesData, isLoading, isError } = useBounties();
+  const board = useQueryState(useBounties());
+  const bountiesData = board.kind === 'ready' ? board.data : undefined;
   const [claimTarget, setClaimTarget] = useState<SyncBounty | null>(null);
-  const [cancelHashes, setCancelHashes] = useState<Record<string, `0x${string}`>>({});
+
   const [howToOpen, setHowToOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [refundingId, setRefundingId] = useState<string | null>(null);
-  const [refundHashes, setRefundHashes] = useState<Record<string, `0x${string}`>>({});
+
   const [queryOpenIds, setQueryOpenIds] = useState<Set<number>>(new Set());
   // Mount-stable "now" (ms) — keeps render pure (no Date.now() during render).
   const [nowMs] = useState(() => Date.now());
@@ -35,17 +39,14 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
       return next;
     });
 
-  const { writeContract: writeCancel } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => {
-        if (cancellingId) setCancelHashes((prev) => ({ ...prev, [cancellingId]: hash }));
-        setCancellingId(null);
-      },
-      onError: (e) => {
-        setCancellingId(null);
-        void notify(explainWriteError(e), { title: 'Could not cancel the bounty' });
-      },
-    },
+  // Both of these used to end at the wallet: the hash was recorded on broadcast and the row said
+  // "Cancelling..." from then on, whatever the chain did with it. A reverted cancel looked exactly
+  // like one that worked, while the GRT stayed locked.
+  const cancelStep = useContractStep({
+    onMined: () => queryClient.invalidateQueries({ queryKey: dockKeys.allBounties }),
+  });
+  const refundStep = useContractStep({
+    onMined: () => queryClient.invalidateQueries({ queryKey: dockKeys.allBounties }),
   });
 
   const handleCancel = async (bounty: SyncBounty) => {
@@ -59,27 +60,15 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
     ) {
       return;
     }
+    cancelStep.reset();
     setCancellingId(bounty.chain_bounty_id);
-    writeCancel({
+    cancelStep.write({
       address: CONTRACTS.bountyBoard,
       abi: BOUNTY_BOARD_ABI,
       functionName: 'cancel',
       args: [BigInt(bounty.chain_bounty_id)],
     });
   };
-
-  const { writeContract: writeRefund } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => {
-        if (refundingId) setRefundHashes((prev) => ({ ...prev, [refundingId]: hash }));
-        setRefundingId(null);
-      },
-      onError: (e) => {
-        setRefundingId(null);
-        void notify(explainWriteError(e), { title: 'Could not refund the bounty' });
-      },
-    },
-  });
 
   const handleRefund = async (bounty: SyncBounty) => {
     if (!bounty.chain_bounty_id) return;
@@ -91,8 +80,9 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
     ) {
       return;
     }
+    refundStep.reset();
     setRefundingId(bounty.chain_bounty_id);
-    writeRefund({
+    refundStep.write({
       address: CONTRACTS.bountyBoard,
       abi: BOUNTY_BOARD_ABI,
       functionName: 'refundExpired',
@@ -178,12 +168,12 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
           )}
         </div>
 
-        {isLoading ? (
+        {board.kind === 'loading' ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-lg shimmer" />)}
           </div>
-        ) : isError ? (
-          <p className="text-sm text-[var(--red-text)] py-4">Failed to load bounties. Please refresh.</p>
+        ) : isUnavailable(board) ? (
+          <p className="text-sm text-[var(--red-text)] py-4">{unavailableReason(board)}</p>
         ) : bounties.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-[var(--text-muted)] text-sm">No bounties posted yet.</p>
@@ -202,12 +192,14 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
                 !isClaimed &&
                 (b.status === 'expired' ||
                   (!!b.expires_at && nowMs > new Date(b.expires_at).getTime()));
-              const cancelTxHash = b.chain_bounty_id ? cancelHashes[b.chain_bounty_id] : undefined;
-              const refundTxHash = b.chain_bounty_id ? refundHashes[b.chain_bounty_id] : undefined;
+              // Only the row a step is acting on reads that step's state. One transaction runs at
+              // a time, so this is the whole of the bookkeeping the old hash maps were doing.
+              const cancelling = cancellingId === b.chain_bounty_id ? cancelStep : null;
+              const refunding = refundingId === b.chain_bounty_id ? refundStep : null;
               const cancelUnlockAt = new Date(new Date(b.created_at).getTime() + 72 * 60 * 60 * 1000);
               const cancelUnlocked = nowMs >= cancelUnlockAt.getTime();
-              const isCancelling = cancellingId === b.chain_bounty_id;
-              const isRefunding = refundingId === b.chain_bounty_id;
+              const isCancelling = cancelling?.status === 'wallet' || cancelling?.status === 'mining';
+              const isRefunding = refunding?.status === 'wallet' || refunding?.status === 'mining';
               const queryOpen = queryOpenIds.has(b.id);
 
               return (
@@ -281,15 +273,13 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
                           {queryOpen ? 'Hide Query' : 'Query →'}
                         </button>
                       ) : isExpired && b.chain_bounty_id ? (
-                        refundTxHash ? (
-                          <a
-                            href={`https://arbiscan.io/tx/${refundTxHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-[var(--text-faint)] hover:underline"
-                          >
-                            Refunding...
-                          </a>
+                        refunding && refunding.status !== 'idle' ? (
+                          <StepCell
+                            step={refunding}
+                            pending="Refunding"
+                            done="Refunded"
+                            failed="Refund failed"
+                          />
                         ) : isOwn ? (
                           <button
                             onClick={() => handleRefund(b)}
@@ -303,15 +293,13 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
                           <span className="text-xs text-[var(--text-faint)]">Expired</span>
                         )
                       ) : isOwn && b.chain_bounty_id ? (
-                        cancelTxHash ? (
-                          <a
-                            href={`https://arbiscan.io/tx/${cancelTxHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-[var(--text-faint)] hover:underline"
-                          >
-                            Cancelling...
-                          </a>
+                        cancelling && cancelling.status !== 'idle' ? (
+                          <StepCell
+                            step={cancelling}
+                            pending="Cancelling"
+                            done="Cancelled"
+                            failed="Cancel failed"
+                          />
                         ) : cancelUnlocked ? (
                           <button
                             onClick={() => handleCancel(b)}
@@ -349,5 +337,49 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
 
       {claimTarget && <ClaimModal bounty={claimTarget} onClose={() => setClaimTarget(null)} />}
     </>
+  );
+}
+
+/**
+ * What one row's transaction is doing, including the two outcomes it used to have no way to show.
+ *
+ * `wallet` and `mining` were both "Cancelling..." before; `done` and `error` did not exist, so a
+ * transaction that reverted read as one still on its way.
+ */
+function StepCell({
+  step,
+  pending,
+  done,
+  failed,
+}: {
+  step: ContractStep;
+  pending: string;
+  done: string;
+  failed: string;
+}) {
+  if (step.status === 'error') {
+    return (
+      <span className="text-xs text-[var(--red-text)]" title={explainWriteError(step.error)}>
+        {failed}
+      </span>
+    );
+  }
+
+  if (step.status === 'done') {
+    return <span className="text-xs text-[var(--green)]">{done}</span>;
+  }
+
+  const label = step.status === 'wallet' ? 'Waiting for your wallet' : `${pending}\u2026`;
+  return step.txHash ? (
+    <a
+      href={`https://arbiscan.io/tx/${step.txHash}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs text-[var(--text-faint)] hover:underline"
+    >
+      {label}
+    </a>
+  ) : (
+    <span className="text-xs text-[var(--text-faint)]">{label}</span>
   );
 }

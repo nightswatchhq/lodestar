@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { Badge } from '@/components/ui/Badge';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { useGraphSupport } from '@/hooks/useGraphSupport';
 import {
   areaCounts,
@@ -117,7 +118,8 @@ function SkeletonRows() {
 }
 
 export default function SupportArchive() {
-  const { data, isLoading, error } = useGraphSupport();
+  const archive = useQueryState(useGraphSupport());
+  const data = archive.kind === 'ready' ? archive.data : undefined;
   const [tab, setTab] = useState<Tab>('open');
   const [query, setQuery] = useState('');
   const [area, setArea] = useState<string | null>(null);
@@ -153,15 +155,14 @@ export default function SupportArchive() {
     otherTab === 'open' ? i.state === 'open' : i.state === 'closed',
   ).length;
 
-  if (error) {
+  // Covers the offline case as well as the failed one. Only the error was handled before, so a
+  // browser that believed itself offline paused the retry, `isLoading` went false with no data, and
+  // thirty-odd worked answers rendered as "No open issues."
+  if (isUnavailable(archive)) {
     return (
       <SourceUnavailable
         what="The graph-support archive"
-        detail={
-          error instanceof Error
-            ? `${error.message}. Nothing is listed below rather than an empty archive being shown as though the repository were empty.`
-            : undefined
-        }
+        detail={`${unavailableReason(archive)} Nothing is listed below rather than an empty archive being shown as though the repository were empty.`}
       />
     );
   }
@@ -188,7 +189,9 @@ export default function SupportArchive() {
               )}
             >
               {label}
-              {!isLoading && <span className="ml-1.5 font-mono opacity-60">{count}</span>}
+              {archive.kind === 'ready' && (
+                <span className="ml-1.5 font-mono opacity-60">{count}</span>
+              )}
             </button>
           ))}
         </div>
@@ -247,7 +250,7 @@ export default function SupportArchive() {
         Each row says who can actually fix it.
       </p>
 
-      {isLoading ? (
+      {archive.kind !== 'ready' ? (
         <SkeletonRows />
       ) : shown === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">
