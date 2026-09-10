@@ -12,7 +12,6 @@ import { parseResponse } from './contract';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status';
-import type { VotesResponse, VoteMessage } from './voting';
 import type { DeveloperActivityResponse } from '@/app/api/developer-activity/route';
 
 /**
@@ -325,43 +324,6 @@ export async function fetchChainLag(): Promise<{
   // The envelope is returned whole here, and `data` is explicitly nullable in the declared type, so
   // this asserts the key exists rather than what is under it.
   return parseResponse('/api/chain-lag', await response.json(), { present: ['data'] });
-}
-
-/**
- * Fetch community votes for a period
- */
-export async function fetchVotes(period?: string, voter?: string): Promise<VotesResponse> {
-  const params = new URLSearchParams();
-  if (period) params.set('period', period);
-  if (voter) params.set('voter', voter);
-  const response = await fetch(`/api/vote?${params}`);
-  if (!response.ok) throw new Error('Failed to fetch votes');
-  // `userVote` is null for a caller who has not voted, and is only sent when `voter` was asked for,
-  // so it is not asserted. A period with no votes yet answers with two empty arrays.
-  return parseResponse('/api/vote', await response.json(), {
-    arrays: ['tallies', 'voters'],
-    present: ['period'],
-  });
-}
-
-/**
- * Submit a community vote
- */
-export async function submitVote(message: VoteMessage, signature: string): Promise<{
-  success: boolean;
-  vote: { voter: string; indexer: string; isDelegator: boolean; voteWeight: number; period: string };
-}> {
-  const response = await fetch('/api/vote', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, signature }),
-  });
-  const json = await response.json();
-  if (!response.ok) throw new Error(json.error || 'Failed to submit vote');
-  return parseResponse('/api/vote (POST)', json, {
-    objects: ['vote'],
-    present: ['success', 'vote.voter', 'vote.indexer', 'vote.voteWeight'],
-  });
 }
 
 /**

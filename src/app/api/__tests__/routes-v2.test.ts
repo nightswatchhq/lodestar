@@ -73,16 +73,6 @@ vi.mock('@/lib/db', () => ({
   hasDbAccess: () => mockHasDbAccess(),
 }));
 
-// @/lib/voting
-const mockRecoverVoteSigner = vi.fn();
-const mockGetCurrentPeriod = vi.fn(() => '2026-04');
-vi.mock('@/lib/voting', () => ({
-  recoverVoteSigner: (...args: unknown[]) => mockRecoverVoteSigner(...args),
-  getCurrentPeriod: () => mockGetCurrentPeriod(),
-  VOTE_DOMAIN: { name: 'CommunityVote', version: '1', chainId: 1 },
-  VOTE_TYPES: { Vote: [{ name: 'indexer', type: 'address' }] },
-}));
-
 // @/lib/refresh
 const mockRefreshIndexers = vi.fn();
 vi.mock('@/lib/refresh', () => ({
@@ -122,7 +112,6 @@ beforeEach(() => {
   mockHasDbAccess.mockReturnValue(false);
   mockCacheGet.mockResolvedValue(null);
   mockFetch.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
-  mockGetCurrentPeriod.mockReturnValue('2026-04');
   mockRefreshIndexers.mockResolvedValue({ count: 42, durationMs: 500 });
 });
 
