@@ -232,13 +232,12 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // it - through the hook, through the component, to a page that mounts it. Six did not, and five
   // of those have since been deleted rather than ported (kittiwake#20).
   //
-  // `/api/horizon/debug` is the one that stayed. Its only reference is its own auth test, but it is
-  // cron-authed, which is what an operator tool looks like rather than what dead code looks like -
-  // and "no in-repo consumer" is not "nobody reads it" for a public path on a public host. It wants
-  // confirming with a person before it goes.
+  // `/api/horizon/debug` was the one that stayed, on the grounds that "no in-repo consumer" is not
+  // "nobody reads it" for a public path on a public host. Confirmed with a person on 2026-09-10 and
+  // deleted: a TCP-and-TLS probe against ampd is an operator tool, and an operator tool belongs on
+  // the box it probes from rather than in the frontend.
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
   { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
-  { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
   { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },
 
   // ── Staying on Next by decision ───────────────────────────────────────────

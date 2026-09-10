@@ -35,7 +35,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/grt-flow',
   '/api/health',
   '/api/horizon/activity',
-  '/api/horizon/debug',
   '/api/indexer-disputes/[address]',
   '/api/indexer-node-health',
   '/api/indexer-stake-history/[address]',
