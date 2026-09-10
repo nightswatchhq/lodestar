@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 
 interface SignalWithMetrics extends Signal {
   signalledGRT: number;
@@ -60,7 +61,8 @@ export default function CuratorProfilePage({
   params: Promise<{ address: string }>;
 }) {
   const { address } = use(params);
-  const { data: portfolioData, isPending, fetchStatus, isError, error } = useCuratorPortfolio(address);
+  const portfolio = useQueryState(useCuratorPortfolio(address));
+  const portfolioData = portfolio.kind === 'ready' ? portfolio.data : undefined;
   const curator = portfolioData?.curator ?? null;
 
   const { totalSignalled, totalRealized, activeCount, signalMetrics, opportunities } = useMemo(() => {
@@ -93,24 +95,21 @@ export default function CuratorProfilePage({
     return totalSig > 0 ? ((totalReal / totalSig) * 100) : 0;
   }, [curator]);
 
-  // Same fault as the indexer page: a paused retry is not fetching, so `isLoading` went false with
-  // no data and this fell through to "Curator Not Found" for an address that may curate plenty.
-  if (isError || (isPending && fetchStatus === 'paused')) {
+  // The three states that are not an answer, told apart by `useQueryState` rather than by getting
+  // `isLoading` and `fetchStatus` right here. "Curator Not Found" below is only reachable once the
+  // request has actually succeeded.
+  if (isUnavailable(portfolio)) {
     return (
       <div className="py-12">
         <SourceUnavailable
           what={`Curator ${shortenAddress(address)}`}
-          detail={
-            isError && error instanceof Error
-              ? error.message
-              : 'The connection appears to be down, so this could not be looked up.'
-          }
+          detail={unavailableReason(portfolio)}
         />
       </div>
     );
   }
 
-  if (isPending) {
+  if (portfolio.kind !== 'ready') {
     return (
       <div className="flex items-center justify-center py-24">
         <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
