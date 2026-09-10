@@ -6,11 +6,10 @@ import type { SupportArchive, SupportIssue } from '@/lib/graph-support';
 
 const REPO = 'nightswatchhq/graph-support';
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const GH_HEADERS: Record<string, string> = {
-  Accept: 'application/vnd.github.v3+json',
-  ...(GITHUB_TOKEN ? { Authorization: `Bearer ${GITHUB_TOKEN}` } : {}),
-};
+// No credential. This route is the rollback path for an archive kittiwake now serves, and the
+// token it used to carry was removed from the project after it expired unnoticed; naming it here
+// only sent the next reader looking for something that does not exist.
+const GH_HEADERS: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
 
 /**
  * Fifteen minutes. Unauthenticated GitHub allows sixty requests an hour against a shared
@@ -59,11 +58,10 @@ async function fetchAllIssues(): Promise<SupportIssue[]> {
         {
           status: res.status,
           page,
-          hasToken: Boolean(GITHUB_TOKEN),
           // 403 with no quota left is rate limiting rather than a bad credential.
           rateLimitRemaining: res.headers.get('x-ratelimit-remaining'),
         },
-        'GitHub rejected a graph-support request; check GITHUB_TOKEN validity and rate limit',
+        'GitHub rejected a graph-support request; unauthenticated reads share a per-IP hourly budget',
       );
       throw new UpstreamError(`GitHub answered ${res.status}`);
     }
