@@ -20,6 +20,8 @@ interface PortfolioChartProps {
   data: PortfolioDataPoint[];
   grtPrice: number;
   isLoading?: boolean;
+  /** Why there is no data, when the reason is not that there is no history. */
+  unavailable?: string;
   showUSD?: boolean;
 }
 
@@ -27,6 +29,7 @@ export function PortfolioChart({
   data,
   grtPrice,
   isLoading = false,
+  unavailable,
   showUSD = false,
 }: PortfolioChartProps) {
   const chartData = useMemo(() => {
@@ -58,6 +61,10 @@ export function PortfolioChart({
       <CardContent>
         {isLoading ? (
           <ChartSkeleton height="300px" />
+        ) : unavailable ? (
+          <div className="h-[300px] flex items-center justify-center text-[var(--text-muted)]">
+            {unavailable}
+          </div>
         ) : data.length === 0 ? (
           <div className="h-[300px] flex items-center justify-center text-[var(--text-muted)]">
             No historical data available

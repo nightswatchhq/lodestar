@@ -18,9 +18,11 @@ import type { SubgraphHistoryPoint } from '@/hooks/useNetworkStats';
 interface Props {
   data: SubgraphHistoryPoint[];
   isLoading: boolean;
+  /** Why there is no data, when the reason is not that the deployment has no history. */
+  unavailable?: string;
 }
 
-export function SubgraphHistoryChart({ data, isLoading }: Props) {
+export function SubgraphHistoryChart({ data, isLoading, unavailable }: Props) {
   return (
     <Card>
       <CardHeader>
@@ -29,6 +31,10 @@ export function SubgraphHistoryChart({ data, isLoading }: Props) {
       <CardContent>
         {isLoading ? (
           <ChartSkeleton height="280px" />
+        ) : unavailable ? (
+          <div className="h-[280px] flex items-center justify-center">
+            <p className="text-sm text-[var(--text-muted)]">{unavailable}</p>
+          </div>
         ) : data.length === 0 ? (
           <div className="h-[280px] flex items-center justify-center">
             <p className="text-sm text-[var(--text-muted)]">No historical data available for this deployment.</p>
