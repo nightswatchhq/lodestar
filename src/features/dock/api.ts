@@ -50,10 +50,16 @@ import type {
 export async function studioFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, credentials: 'include' });
   if (!res.ok) {
-    // The handlers answer `{ error }`; anything else is a proxy or a crash, so fall back to the
-    // status rather than reporting `undefined`.
+    // Two envelopes, because these routes are mid-migration. The Next handlers answer
+    // `{ error: "<what went wrong>" }`; kittiwake answers `{ error: "<code>", message: "<what went
+    // wrong>" }`, where the code is a machine token like `bad_request`. Reading `error` first
+    // would show a user the word "bad_request" for every failure the moment a route is proxied,
+    // and the Dock's nine all pass through here, so the whole of its error reporting would have
+    // gone to codes at cutover with every happy path still working.
+    //
+    // Anything else is a proxy or a crash, so the status is the fallback rather than `undefined`.
     const body = await res.json().catch(() => null);
-    throw new Error(body?.error ?? `${res.status} ${res.statusText}`);
+    throw new Error(body?.message ?? body?.error ?? `${res.status} ${res.statusText}`);
   }
   // 204 on DELETE has no body to parse.
   if (res.status === 204) return undefined as T;
