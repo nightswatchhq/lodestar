@@ -4,7 +4,7 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**52 of 77 routes** on kittiwake, **68%**. 25 left.
+**53 of 77 routes** on kittiwake, **69%**. 24 left.
 
 The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 6 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
@@ -14,10 +14,10 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 |---|---|---|
 | the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
-| the long tail | 0/6 | 6 |
+| the long tail | 0/5 | 5 |
 | the disassembler | 0/3 | 3 |
 | the SQL upper tier | 0/1 | 1 |
-| data plane | 52/52 | 0 |
+| data plane | 53/53 | 0 |
 
 ## On kittiwake
 
@@ -33,6 +33,7 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 - `/api/dropped-chains`
 - `/api/ens`
 - `/api/epochs`
+- `/api/foghorn/[...path]`
 - `/api/grt-flow`
 - `/api/horizon/activity`
 - `/api/indexer-disputes/[address]`
@@ -82,7 +83,6 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 - `/api/disassembly`
 - `/api/disassembly/diff`
 - `/api/disassembly/verify`
-- `/api/foghorn/[...path]`
 - `/api/horizon/debug`
 - `/api/indexer/present-poi`
 - `/api/scuttlebutt/admin/login`
