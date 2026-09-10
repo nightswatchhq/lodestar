@@ -62,6 +62,7 @@ export const MIGRATED: readonly string[] = [
   '/api/subgraph-names',
   '/api/subgraph-search',
   '/api/support',
+  '/api/support/',
   '/api/token-metrics',
   '/api/tvl',
   '/api/whoami',
@@ -135,10 +136,12 @@ export interface RouteRecord {
 /**
  * Routes not served by a `route.ts` in this repo.
  *
- * `/api/whoami` only ever existed in kittiwake. Listed so the counts describe the surface the
+ * `/api/whoami` only ever existed in kittiwake, and `/api/support/[number]` was built there from
+ * the start: it reads a mirror of graph-support that has no equivalent here, so a Next handler for
+ * it could only be a second, worse implementation. Listed so the counts describe the surface the
  * public sees rather than the surface this repo happens to contain.
  */
-const BACKEND_ONLY: readonly string[] = ['/api/whoami'];
+const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[number]'];
 
 /**
  * Everything that is not migrated, and what it is waiting on.
