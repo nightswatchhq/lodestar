@@ -33,6 +33,7 @@ import { ExportButton } from '@/components/ui/ExportButton';
 import { WalletManager } from '@/components/ui/WalletManager';
 import dynamic from 'next/dynamic';
 import { generateMockPortfolioHistory } from '@/lib/portfolio-utils';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 const PortfolioChart = dynamic(() => import('@/components/charts/PortfolioChart').then(m => ({ default: m.PortfolioChart })), { ssr: false });
 
@@ -184,13 +185,25 @@ export default function ProfilePage() {
   const [selectedWallet, setSelectedWallet] = useState<string | undefined>(undefined);
   const activeWallet = selectedWallet || connectedAddress;
 
-  const { data: delegatorData, isLoading: delegatorLoading } = useDelegatorPortfolio(activeWallet);
-  const { data: curatorData, isLoading: curatorLoading } = useCuratorPortfolio(activeWallet);
+  const delegatorQuery = useDelegatorPortfolio(activeWallet);
+  const curatorQuery = useCuratorPortfolio(activeWallet);
+  const { data: delegatorData } = delegatorQuery;
+  const { data: curatorData } = curatorQuery;
   const delegator = delegatorData?.delegator ?? null;
   const curator = curatorData?.curator ?? null;
 
   const grtPrice = priceData?.price ?? 0;
-  const isLoading = delegatorLoading || curatorLoading;
+  // `isPending` rather than `isLoading`: react-query pauses retries when it thinks the connection
+  // is gone, and a paused query is not fetching, so `isLoading` goes false while there is still no
+  // data. That turned the badge below into "No Positions" on somebody's own portfolio because we
+  // could not reach our own backend, which is the worst version of this mistake in the repo: it is
+  // a statement about their money.
+  const isLoading = delegatorQuery.isPending || curatorQuery.isPending;
+  const portfolioUnavailable =
+    delegatorQuery.isError ||
+    curatorQuery.isError ||
+    (delegatorQuery.isPending && delegatorQuery.fetchStatus === 'paused') ||
+    (curatorQuery.isPending && curatorQuery.fetchStatus === 'paused');
 
   // Calculate totals
   const { totalStaked, totalThawing, totalRealized, totalUnrealized, delegationData } = useMemo(() => {
@@ -279,9 +292,10 @@ export default function ProfilePage() {
         <div className="flex items-center gap-2">
           {isDelegator && <Badge variant="accent">Delegator</Badge>}
           {isCurator && <Badge variant="warning">Curator</Badge>}
-          {!isDelegator && !isCurator && !isLoading && (
+          {!isDelegator && !isCurator && !isLoading && !portfolioUnavailable && (
             <Badge variant="default">No Positions</Badge>
           )}
+          {portfolioUnavailable && <Badge variant="error">Positions unavailable</Badge>}
         </div>
       </div>
 
@@ -422,8 +436,18 @@ export default function ProfilePage() {
             </>
           )}
 
+          {/* Could not be read. Said out loud rather than folded into the empty state below: "this
+              wallet has no delegations" is a claim about somebody's holdings, and it must not be
+              made out of our own outage. */}
+          {portfolioUnavailable && (
+            <SourceUnavailable
+              what="This wallet's positions"
+              detail="Nothing below is a statement about what this wallet holds."
+            />
+          )}
+
           {/* Empty state */}
-          {!isLoading && !isDelegator && !isCurator && (
+          {!isLoading && !portfolioUnavailable && !isDelegator && !isCurator && (
             <Card>
               <CardContent className="py-12 text-center">
                 <div className="w-16 h-16 rounded-full bg-[var(--bg-elevated)] flex items-center justify-center mx-auto mb-4">
