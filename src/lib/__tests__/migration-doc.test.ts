@@ -24,6 +24,7 @@ describe('docs/MIGRATION.md', () => {
     const committed = readFileSync(join(process.cwd(), 'docs', 'MIGRATION.md'), 'utf8');
     expect(committed).toMatch(/\d+ route files left in this repo/);
     expect(committed).toMatch(/\d+ of \d+/);
-    expect(committed).toMatch(/\d+ to go/);
+    expect(committed).toMatch(/\d+\*\* have still to be ported/);
+    expect(committed).toMatch(/\d+ are written and answering on kittiwake already\*\*/);
   });
 });

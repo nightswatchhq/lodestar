@@ -6,7 +6,7 @@
 
 **30 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **68%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **53 of 75** are across, **71%**, with 22 to go.
+Of the port itself, **53 of 75** are across, **71%**. Of the rest, **20 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -80,27 +80,7 @@ That second denominator is routes meant to move that have not yet, and it exclud
 ## Still on Next
 
 - `/api/analytics/clickthrough`
-- `/api/data-services/query`
-- `/api/disassembly`
-- `/api/disassembly/diff`
 - `/api/disassembly/verify`
-- `/api/indexer/present-poi`
-- `/api/scuttlebutt/admin/login`
-- `/api/scuttlebutt/admin/messages`
-- `/api/scuttlebutt/bans`
-- `/api/scuttlebutt/messages`
-- `/api/scuttlebutt/messages/[id]`
-- `/api/scuttlebutt/stream`
-- `/api/sql/receipt`
-- `/api/studio/auth`
-- `/api/studio/bounties`
-- `/api/studio/bounties/[id]`
-- `/api/studio/deploy-key`
-- `/api/studio/ipfs/[...path]`
-- `/api/studio/metadata`
-- `/api/studio/node`
-- `/api/studio/subgraphs`
-- `/api/studio/subgraphs/[id]`
 
 ## Staying on Next by decision
 
@@ -114,4 +94,29 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | `/api/issue-forms` | the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does. |
 | `/api/migration` | reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did. |
 | `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
+
+## Written on kittiwake, still routed here
+
+| Route | Why |
+|---|---|
+| `/api/data-services/query` | answering. Probed with slug=dispatch on 2026-09-10: it reached the upstream RPC and reported the failure honestly, so the handler works. Ready for MIGRATED. |
+| `/api/disassembly` | answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED. |
+| `/api/disassembly/diff` | answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED. |
+| `/api/indexer/present-poi` | answering. Probed with an empty body: it validated and returned a precise 400, so the handler works. Wants INDEXER_AGENT_URL on the box for the server-configured path; callers supplying their own agentUrl work without it. |
+| `/api/scuttlebutt/admin/login` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
+| `/api/scuttlebutt/admin/messages` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
+| `/api/scuttlebutt/bans` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
+| `/api/scuttlebutt/messages` | answers "Scuttlebutt is not configured" in production, so it wants a config section on the box. It reads the same scuttlebutt_messages table and the same room, so cutting over keeps the history. |
+| `/api/scuttlebutt/messages/[id]` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
+| `/api/scuttlebutt/stream` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
+| `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
+| `/api/studio/auth` | answers {address:null} in production today, which is the right answer signed out. The block is session_secret in kittiwake config on Nuremberg matching Vercel SESSION_SECRET, then one run of the verify-session binary with a live cookie: the session is stateless and signed, so a secret differing by a byte signs every logged-in user out with nothing erroring. |
+| `/api/studio/bounties` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/bounties/[id]` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/deploy-key` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/ipfs/[...path]` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/metadata` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/node` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/subgraphs` | part of the Dock cutover; see /api/studio/auth. |
+| `/api/studio/subgraphs/[id]` | part of the Dock cutover; see /api/studio/auth. |
 

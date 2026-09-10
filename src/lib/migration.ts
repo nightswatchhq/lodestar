@@ -155,6 +155,20 @@ export type RouteState =
   | 'kittiwake'
   /** Still Next, and there is work to do. */
   | 'next'
+  /**
+   * Implemented on kittiwake and answering, but the edge still sends this here.
+   *
+   * The distinction this adds is the one the table was getting wrong. On 2026-09-10 twenty of the
+   * twenty-two routes listed as "still on Next" were already written, registered in kittiwake's
+   * router and answering correctly in production - the port had been done and the inventory had
+   * not been told. Counting them as outstanding work overstated what was left many times over and
+   * would have pointed the next session at writing code that already existed.
+   *
+   * What is actually left for these is a cutover: a line in `MIGRATED`, and for most of them a
+   * piece of configuration on the box that only a person with the credentials can supply. The
+   * `note` says which.
+   */
+  | 'ready'
   /** Still Next by decision rather than by backlog, with a reason. */
   | 'staying'
   /** Agreed for deletion rather than porting. Counting these as outstanding work overstates it. */
@@ -200,31 +214,121 @@ export const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[nu
  */
 const UNMIGRATED: readonly RouteRecord[] = [
   // ── The Dock: nightswatchhq/kittiwake#16 ──────────────────────────────────
-  { path: '/api/studio/auth', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/bounties', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/bounties/[id]', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/deploy-key', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/ipfs/[...path]', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/metadata', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/node', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/subgraphs', state: 'next', workstream: 'the Dock' },
-  { path: '/api/studio/subgraphs/[id]', state: 'next', workstream: 'the Dock' },
+  {
+    path: '/api/studio/auth',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'answers {address:null} in production today, which is the right answer signed out. The block is session_secret in kittiwake config on Nuremberg matching Vercel SESSION_SECRET, then one run of the verify-session binary with a live cookie: the session is stateless and signed, so a secret differing by a byte signs every logged-in user out with nothing erroring.',
+  },
+  {
+    path: '/api/studio/bounties',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/bounties/[id]',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/deploy-key',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/ipfs/[...path]',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/metadata',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/node',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/subgraphs',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
+  {
+    path: '/api/studio/subgraphs/[id]',
+    state: 'ready',
+    workstream: 'the Dock',
+    note: 'part of the Dock cutover; see /api/studio/auth.',
+  },
 
   // ── Scuttlebutt: a rewrite rather than a port, kittiwake#17 ───────────────
-  { path: '/api/scuttlebutt/admin/login', state: 'next', workstream: 'Scuttlebutt' },
-  { path: '/api/scuttlebutt/admin/messages', state: 'next', workstream: 'Scuttlebutt' },
-  { path: '/api/scuttlebutt/bans', state: 'next', workstream: 'Scuttlebutt' },
-  { path: '/api/scuttlebutt/messages', state: 'next', workstream: 'Scuttlebutt' },
-  { path: '/api/scuttlebutt/messages/[id]', state: 'next', workstream: 'Scuttlebutt' },
-  { path: '/api/scuttlebutt/stream', state: 'next', workstream: 'Scuttlebutt' },
+  {
+    path: '/api/scuttlebutt/admin/login',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
+  },
+  {
+    path: '/api/scuttlebutt/admin/messages',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
+  },
+  {
+    path: '/api/scuttlebutt/bans',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
+  },
+  {
+    path: '/api/scuttlebutt/messages',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'answers "Scuttlebutt is not configured" in production, so it wants a config section on the box. It reads the same scuttlebutt_messages table and the same room, so cutting over keeps the history.',
+  },
+  {
+    path: '/api/scuttlebutt/messages/[id]',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
+  },
+  {
+    path: '/api/scuttlebutt/stream',
+    state: 'ready',
+    workstream: 'Scuttlebutt',
+    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
+  },
 
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
-  { path: '/api/disassembly', state: 'next', workstream: 'the disassembler' },
-  { path: '/api/disassembly/diff', state: 'next', workstream: 'the disassembler' },
+  {
+    path: '/api/disassembly',
+    state: 'ready',
+    workstream: 'the disassembler',
+    note: 'answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED.',
+  },
+  {
+    path: '/api/disassembly/diff',
+    state: 'ready',
+    workstream: 'the disassembler',
+    note: 'answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED.',
+  },
   { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
 
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─
-  { path: '/api/sql/receipt', state: 'next', workstream: 'the SQL upper tier' },
+  {
+    path: '/api/sql/receipt',
+    state: 'ready',
+    workstream: 'the SQL upper tier',
+    note: 'answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision.',
+  },
 
   // ── The long tail: kittiwake#20, to be triaged rather than worked through ──
   //
@@ -237,8 +341,18 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // deleted: a TCP-and-TLS probe against ampd is an operator tool, and an operator tool belongs on
   // the box it probes from rather than in the frontend.
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
-  { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
-  { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },
+  {
+    path: '/api/data-services/query',
+    state: 'ready',
+    workstream: 'the long tail',
+    note: 'answering. Probed with slug=dispatch on 2026-09-10: it reached the upstream RPC and reported the failure honestly, so the handler works. Ready for MIGRATED.',
+  },
+  {
+    path: '/api/indexer/present-poi',
+    state: 'ready',
+    workstream: 'the long tail',
+    note: 'answering. Probed with an empty body: it validated and returned a precise 400, so the handler works. Wants INDEXER_AGENT_URL on the box for the server-configured path; callers supplying their own agentUrl work without it.',
+  },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
@@ -342,6 +456,13 @@ export interface MigrationSummary {
   stayingOnNext: number;
   /** Of the in-scope surface, the share kittiwake serves, 0-100 and rounded. */
   percent: number;
+  /**
+   * Written, answering on kittiwake, and still routed here.
+   *
+   * Reported apart from `onNext` because the two ask different things of a reader: one is work to
+   * do, the other is a switch to throw and, usually, a credential only a person has.
+   */
+  readyToCutOver: number;
   /** Not counted in `inScope`, reported separately so the denominator is honest. */
   doomed: number;
   scheduled: number;
@@ -364,11 +485,14 @@ export function summarise(inventory: readonly RouteRecord[]): MigrationSummary {
   // still a route this repo serves, and the target counts it.
   const remaining = inventory.filter((r) => r.state !== 'kittiwake').length;
   const public_ = inventory.filter((r) => r.state !== 'cron' && r.workstream !== 'scheduled');
-  const inScopeRecords = public_.filter((r) => r.state === 'kittiwake' || r.state === 'next');
+  const inScopeRecords = public_.filter(
+    (r) => r.state === 'kittiwake' || r.state === 'next' || r.state === 'ready',
+  );
 
   const onKittiwake = inScopeRecords.filter((r) => r.state === 'kittiwake').length;
   const onNext = inScopeRecords.filter((r) => r.state === 'next').length;
-  const inScope = onKittiwake + onNext;
+  const readyToCutOver = inScopeRecords.filter((r) => r.state === 'ready').length;
+  const inScope = onKittiwake + onNext + readyToCutOver;
 
   const streams = new Map<Workstream, { total: number; onKittiwake: number; onNext: number }>();
   for (const r of inScopeRecords) {
@@ -385,6 +509,7 @@ export function summarise(inventory: readonly RouteRecord[]): MigrationSummary {
     onNext,
     stayingOnNext: public_.filter((r) => r.state === 'staying').length,
     percent: inScope === 0 ? 0 : Math.round((onKittiwake / inScope) * 100),
+    readyToCutOver,
     doomed: public_.filter((r) => r.state === 'doomed').length,
     scheduled: inventory.filter((r) => r.workstream === 'scheduled').length,
     remaining,
