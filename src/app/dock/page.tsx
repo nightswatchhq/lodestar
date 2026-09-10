@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAccount, useSignMessage, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
 import { arbitrum } from 'wagmi/chains';
 import { parseEther } from 'viem';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/Badge';
 import { cn, shortenAddress } from '@/lib/utils';
@@ -15,7 +15,24 @@ import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
 import { CONTRACTS } from '@/lib/wallet';
 import { BOUNTY_BOARD_ABI, GRT_ABI, SUBGRAPH_SERVICE_ABI, extractBountyId } from '@/lib/bountyBoard';
 import { SubgraphLifecyclePanel } from '@/components/studio/SubgraphLifecyclePanel';
-import type { StudioSubgraph, SyncBounty } from '@/lib/studio/db';
+import {
+  dockKeys,
+  useBounties,
+  useCreateSubgraph,
+  useDeleteSubgraph,
+  useDeployKey,
+  useMarkBountyClaimed,
+  useMySubgraphs,
+  usePresentPoi,
+  useRecordBounty,
+  useRotateDeployKey,
+  useSession,
+  useSignIn,
+  useSignOut,
+  useUpdateSubgraph,
+  useUploadMetadata,
+} from '@/features/dock/api';
+import type { StudioSubgraph, SyncBounty } from '@/features/dock/types';
 
 // ---------------------------------------------------------------------------
 // GNS ABI (minimal — publishNewSubgraph / publishNewVersion)
@@ -74,15 +91,6 @@ const BOUNTY_BOARD_DEPLOYED =
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, credentials: 'include' });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? 'Request failed');
-  }
-  return res.json();
-}
 
 function CopyButton({ text, className }: { text: string; className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -151,16 +159,15 @@ function ConnectGate({ children }: { children: React.ReactNode }) {
 function useStudioSession() {
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
-  const [sessionAddress, setSessionAddress] = useState<string | null>(null);
   const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/studio/auth', { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => setSessionAddress(d.address ?? null))
-      .catch(() => setSessionAddress(null));
-  }, []);
+  // Was a raw fetch in a mount effect with `.catch(() => setSessionAddress(null))`, which reported
+  // a broken session endpoint as "signed out" and put the sign-in prompt in front of somebody who
+  // already had a session.
+  const session = useSession();
+  const signInMutation = useSignIn();
+  const signOutMutation = useSignOut();
 
   const signIn = useCallback(async () => {
     if (!address) return;
@@ -170,25 +177,28 @@ function useStudioSession() {
       const timestamp = Math.floor(Date.now() / 1000);
       const message = buildSignInMessage(address, timestamp);
       const signature = await signMessageAsync({ message });
-      const data = await apiFetch<{ address: string }>('/api/studio/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, message, signature }),
-      });
-      setSessionAddress(data.address);
+      await signInMutation.mutateAsync({ address, message, signature });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed');
     } finally {
       setSigning(false);
     }
-  }, [address, signMessageAsync]);
+  }, [address, signMessageAsync, signInMutation]);
 
   const signOut = useCallback(async () => {
-    await fetch('/api/studio/auth', { method: 'DELETE', credentials: 'include' });
-    setSessionAddress(null);
-  }, []);
+    await signOutMutation.mutateAsync();
+  }, [signOutMutation]);
 
-  return { sessionAddress, signing, error, signIn, signOut };
+  return {
+    sessionAddress: session.data?.address ?? null,
+    // A session that has not loaded is not a session that is absent. Rendering the sign-in prompt
+    // during the first read is what made the Dock flash it on every navigation.
+    sessionLoading: session.isPending,
+    signing,
+    error,
+    signIn,
+    signOut,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +251,7 @@ function SubgraphCard({ sg, onClick }: { sg: StudioSubgraph; onClick: () => void
 // ---------------------------------------------------------------------------
 
 function RegisterModal({ onClose, onCreated }: { onClose: () => void; onCreated: (sg: StudioSubgraph) => void }) {
+  const createSubgraph = useCreateSubgraph();
   const [slug, setSlug] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
@@ -251,10 +262,9 @@ function RegisterModal({ onClose, onCreated }: { onClose: () => void; onCreated:
     setError('');
     setLoading(true);
     try {
-      const data = await apiFetch<{ subgraph: StudioSubgraph }>('/api/studio/subgraphs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: slug.trim().toLowerCase(), displayName: displayName.trim() || undefined }),
+      const data = await createSubgraph.mutateAsync({
+        slug: slug.trim().toLowerCase(),
+        displayName: displayName.trim() || undefined,
       });
       onCreated(data.subgraph);
       onClose();
@@ -349,6 +359,7 @@ function PublishWizard({
   onClose: () => void;
   onPublished: (txHash: string, versionLabel: string) => void;
 }) {
+  const uploadMetadata = useUploadMetadata();
   const [step, setStep] = useState<PublishStep>('confirm');
   const [errMsg, setErrMsg] = useState('');
   const [metaHashes, setMetaHashes] = useState<{
@@ -389,18 +400,14 @@ function PublishWizard({
   const handleUpload = async () => {
     setStep('uploading');
     try {
-      const data = await apiFetch<{
+      const data = (await uploadMetadata.mutateAsync({
+        displayName: sg.display_name ?? '',
+        description: sg.description ?? undefined,
+        versionLabel: versionLabel.trim() || undefined,
+      })) as {
         subgraphMetaBytes32: `0x${string}`;
         versionMetaBytes32: `0x${string}`;
-      }>('/api/studio/metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          displayName: sg.display_name,
-          description: sg.description,
-          versionLabel: versionLabel.trim() || undefined,
-        }),
-      });
+      };
       setMetaHashes(data);
       setStep('wallet');
     } catch (err) {
@@ -623,31 +630,20 @@ function PublishWizard({
 // ---------------------------------------------------------------------------
 
 function DeployKeyPanel() {
-  const [keyInfo, setKeyInfo] = useState<{
-    hasKey: boolean;
-    createdAt: string | null;
-    lastUsedAt: string | null;
-  } | null>(null);
   const [plainKey, setPlainKey] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/studio/deploy-key', { credentials: 'include' })
-      .then((r) => r.json())
-      .then(setKeyInfo)
-      .catch(() => {});
-  }, []);
+  const deployKey = useDeployKey();
+  const rotate = useRotateDeployKey();
+  const keyInfo = deployKey.data ?? null;
+  const loading = rotate.isPending;
 
   const generate = async () => {
     if (keyInfo?.hasKey && !confirm('This will invalidate your existing deploy key. Continue?')) return;
-    setLoading(true);
-    try {
-      const data = await apiFetch<{ key: string }>('/api/studio/deploy-key', { method: 'POST' });
-      setPlainKey(data.key);
-      setKeyInfo({ hasKey: true, createdAt: new Date().toISOString(), lastUsedAt: null });
-    } finally {
-      setLoading(false);
-    }
+    // The key is in clear exactly once, in this response, and the server keeps only a hash. It
+    // goes to local state rather than the query cache for that reason: a refetch would replace the
+    // only copy anybody has with `{ hasKey: true }`.
+    const data = await rotate.mutateAsync();
+    if (data.key) setPlainKey(data.key);
   };
 
   return (
@@ -706,6 +702,7 @@ function PostBountyWizard({
 }) {
   const { address } = useAccount();
   const qc = useQueryClient();
+  const recordBounty = useRecordBounty();
   const [step, setStep] = useState<BountyWizardStep>('form');
   const [amountGrt, setAmountGrt] = useState('');
   const [expiresInDays, setExpiresInDays] = useState('30');
@@ -760,18 +757,14 @@ function PostBountyWizard({
       const expiresAt = expiresInDays
         ? new Date(Date.now() + parseInt(expiresInDays) * 86_400_000).toISOString()
         : null;
-      apiFetch('/api/studio/bounties', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deployment_id: sg.deployment_id,
-          slug: sg.slug,
-          amount_grt: amountGrt,
-          message: message || null,
-          expires_at: expiresAt,
-          chain_bounty_id: id?.toString() ?? null,
-          post_tx_hash: postTxHash ?? null,
-        }),
+      recordBounty.mutateAsync({
+        deployment_id: sg.deployment_id,
+        slug: sg.slug,
+        amount_grt: amountGrt,
+        message: message || null,
+        expires_at: expiresAt,
+        chain_bounty_id: id?.toString() ?? null,
+        post_tx_hash: postTxHash ?? null,
       }).then(() => {
         qc.invalidateQueries({ queryKey: ['studio-bounties-public'] });
       }).catch(() => {});
@@ -1026,6 +1019,8 @@ function PostBountyWizard({
 // ---------------------------------------------------------------------------
 
 function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => void }) {
+  const presentPoi = usePresentPoi();
+  const { mutate: markClaimed } = useMarkBountyClaimed();
   const [allocationId, setAllocationId] = useState('');
   const [step, setStep] = useState<'form' | 'claiming' | 'done' | 'error'>('form');
   const [claimTxHash, setClaimTxHash] = useState<`0x${string}` | undefined>();
@@ -1046,19 +1041,16 @@ function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => vo
     setPoiQueueError('');
     setPoiQueued(false);
     try {
-      const res = await fetch('/api/indexer/present-poi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deploymentId: bounty.deployment_id,
-          allocationId,
-          agentUrl: agentUrl.trim(),
-          agentToken: agentToken.trim() || undefined,
-        }),
+      const data = await presentPoi.mutateAsync({
+        deploymentId: bounty.deployment_id,
+        allocationId,
+        agentUrl: agentUrl.trim(),
+        agentToken: agentToken.trim() || undefined,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Request failed');
-      if (data.errors?.length) throw new Error(data.errors[0].message);
+      // A 200 can still carry an indexer-agent error, so this check is not the same as the
+      // status check `studioFetch` now does.
+      const errors = (data as { errors?: { message: string }[] }).errors;
+      if (errors?.length) throw new Error(errors[0].message);
       setPoiQueued(true);
     } catch (e) {
       setPoiQueueError((e as Error).message);
@@ -1108,14 +1100,11 @@ function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => vo
     if (!claimConfirmed) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt confirmation — intentional
     setStep('done');
-    // Best-effort DB update — fire and forget
-    fetch(`/api/studio/bounties/${bounty.id}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'claim' }),
-    }).catch(() => {});
-  }, [claimConfirmed, bounty.id]);
+    // Best-effort, and deliberately so: the chain is the source of truth for a claim and this row
+    // is a convenience. The decision to ignore the failure is made here, once and visibly, rather
+    // than by a bare `.catch(() => {})` around a raw fetch.
+    markClaimed(bounty.id);
+  }, [claimConfirmed, bounty.id, markClaimed]);
 
   const handleClaim = () => {
     if (!bounty.chain_bounty_id || !validAddress) return;
@@ -1385,18 +1374,16 @@ function SubgraphDetailModal({
   const [showPublish, setShowPublish] = useState(false);
   const [showBountyWizard, setShowBountyWizard] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const updateSubgraph = useUpdateSubgraph();
 
-  const { data: activeBounties } = useQuery<SyncBounty[]>({
-    queryKey: ['bounties', sg.deployment_id],
-    queryFn: async () => {
-      if (!sg.deployment_id) return [];
-      const res = await fetch(`/api/studio/bounties?deployment=${sg.deployment_id}`);
-      const json = await res.json();
-      return (json.bounties ?? []).filter((b: SyncBounty) => b.status === 'open');
-    },
+  // Shares the board's cache rather than reading the same table separately, which is how the two
+  // could show different bounties for the same deployment at the same moment.
+  const { data: bountiesForDeployment } = useBounties({
+    deployment: sg.deployment_id ?? undefined,
     enabled: Boolean(sg.deployment_id),
-    staleTime: 30_000,
   });
+  const activeBounties = bountiesForDeployment?.filter((b) => b.status === 'open');
 
   // Auto-resolve legacy tx hash → on-chain subgraph NFT ID
   const legacyTxHash = (
@@ -1407,11 +1394,7 @@ function SubgraphDetailModal({
     if (!legacyReceipt) return;
     const nftId = extractSubgraphId(legacyReceipt.logs, CONTRACTS.gns);
     if (!nftId) return;
-    apiFetch(`/api/studio/subgraphs/${sg.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ published_subgraph_id: nftId }),
-    }).then(() => {
+    updateSubgraph.mutateAsync({ id: sg.id, patch: { published_subgraph_id: nftId } }).then(() => {
       const updated = { ...sg, published_subgraph_id: nftId };
       setSg(updated);
       onUpdated(updated);
@@ -1432,10 +1415,9 @@ function SubgraphDetailModal({
     setSaving(true);
     setSaveOk(false);
     try {
-      await apiFetch(`/api/studio/subgraphs/${sg.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ display_name: displayName || null, description: description || null }),
+      await updateSubgraph.mutateAsync({
+        id: sg.id,
+        patch: { display_name: displayName || null, description: description || null },
       });
       const updated = { ...sg, display_name: displayName || null, description: description || null };
       setSg(updated);
@@ -1449,31 +1431,43 @@ function SubgraphDetailModal({
     }
   };
 
+  const deleteSubgraph = useDeleteSubgraph();
+
   const handleDelete = async () => {
     if (!confirm(`Remove "${sg.slug}"? This does not affect on-chain data.`)) return;
     setDeleting(true);
-    await fetch(`/api/studio/subgraphs/${sg.id}`, { method: 'DELETE', credentials: 'include' });
-    onDelete(sg.id);
-    onClose();
+    setDeleteError(null);
+    try {
+      // Previously the response was not looked at and `onDelete` ran regardless, so a refused
+      // delete removed the row from the list and the subgraph reappeared on the next load.
+      await deleteSubgraph.mutateAsync(sg.id);
+      onDelete(sg.id);
+      onClose();
+    } catch (e) {
+      setDeleting(false);
+      setDeleteError(e instanceof Error ? e.message : 'Could not remove the subgraph');
+    }
   };
 
   const handlePublished = async (result: string, versionLabel: string) => {
     const trimLabel = versionLabel.trim() || null;
     if (subgraphNftId === null) {
-      await apiFetch(`/api/studio/subgraphs/${sg.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ published_subgraph_id: result, version_label: trimLabel, last_published_deployment_id: sg.deployment_id }),
+      await updateSubgraph.mutateAsync({
+        id: sg.id,
+        patch: {
+          published_subgraph_id: result,
+          version_label: trimLabel,
+          last_published_deployment_id: sg.deployment_id,
+        },
       });
       const updated = { ...sg, published_subgraph_id: result, version_label: trimLabel, last_published_deployment_id: sg.deployment_id };
       setSg(updated);
       onUpdated(updated);
       onPublished(sg.id, result);
     } else {
-      await apiFetch(`/api/studio/subgraphs/${sg.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version_label: trimLabel, last_published_deployment_id: sg.deployment_id }),
+      await updateSubgraph.mutateAsync({
+        id: sg.id,
+        patch: { version_label: trimLabel, last_published_deployment_id: sg.deployment_id },
       });
       const updated = { ...sg, version_label: trimLabel, last_published_deployment_id: sg.deployment_id };
       setSg(updated);
@@ -1664,6 +1658,11 @@ function SubgraphDetailModal({
                   >
                     {deleting ? 'Removing...' : 'Remove subgraph'}
                   </button>
+                  {deleteError && (
+                    <p className="mt-2 text-xs text-[var(--red-text)]">
+                      {deleteError}. The subgraph is still here.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1731,37 +1730,30 @@ function MySubgraphsTab({ sessionAddress }: { sessionAddress: string }) {
   const [showRegister, setShowRegister] = useState(false);
   const [activeSubgraph, setActiveSubgraph] = useState<StudioSubgraph | null>(null);
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['studio-subgraphs', sessionAddress],
-    queryFn: () => apiFetch<{ subgraphs: StudioSubgraph[] }>('/api/studio/subgraphs'),
-    retry: 1,
-  });
-
-  const subgraphs = data?.subgraphs ?? [];
+  const { data: subgraphs = [], isLoading, isError } = useMySubgraphs();
 
   const handleCreated = (sg: StudioSubgraph) => {
-    qc.setQueryData(['studio-subgraphs', sessionAddress], (old: typeof data) => ({
-      subgraphs: [sg, ...(old?.subgraphs ?? [])],
-    }));
+    // `useCreateSubgraph` already invalidates the list; this keeps the new row on screen without
+    // waiting for the refetch to land.
+    qc.setQueryData(dockKeys.subgraphs, (old: StudioSubgraph[] | undefined) => [sg, ...(old ?? [])]);
   };
 
   const handleUpdated = (sg: StudioSubgraph) => {
-    qc.setQueryData(['studio-subgraphs', sessionAddress], (old: typeof data) => ({
-      subgraphs: old?.subgraphs.map((s) => (s.id === sg.id ? sg : s)) ?? [],
-    }));
+    qc.setQueryData(dockKeys.subgraphs, (old: StudioSubgraph[] | undefined) =>
+      (old ?? []).map((s) => (s.id === sg.id ? sg : s)),
+    );
   };
 
   const handleDeleted = (id: number) => {
-    qc.setQueryData(['studio-subgraphs', sessionAddress], (old: typeof data) => ({
-      subgraphs: old?.subgraphs.filter((s) => s.id !== id) ?? [],
-    }));
+    qc.setQueryData(dockKeys.subgraphs, (old: StudioSubgraph[] | undefined) =>
+      (old ?? []).filter((s) => s.id !== id),
+    );
   };
 
   const handlePublished = (id: number, txHash: string) => {
-    qc.setQueryData(['studio-subgraphs', sessionAddress], (old: typeof data) => ({
-      subgraphs:
-        old?.subgraphs.map((s) => (s.id === id ? { ...s, published_subgraph_id: txHash } : s)) ?? [],
-    }));
+    qc.setQueryData(dockKeys.subgraphs, (old: StudioSubgraph[] | undefined) =>
+      (old ?? []).map((s) => (s.id === id ? { ...s, published_subgraph_id: txHash } : s)),
+    );
     setActiveSubgraph((prev) =>
       prev?.id === id ? { ...prev, published_subgraph_id: txHash } : prev,
     );
@@ -1849,11 +1841,8 @@ function MySubgraphsTab({ sessionAddress }: { sessionAddress: string }) {
 // ---------------------------------------------------------------------------
 
 function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['studio-bounties-public'],
-    queryFn: () => apiFetch<{ bounties: SyncBounty[] }>('/api/studio/bounties'),
-    retry: 1,
-  });
+  // The whole board, sharing a cache with the per-deployment read in the detail modal.
+  const { data: bountiesData, isLoading, isError } = useBounties();
   const [claimTarget, setClaimTarget] = useState<SyncBounty | null>(null);
   const [cancelHashes, setCancelHashes] = useState<Record<string, `0x${string}`>>({});
   const [howToOpen, setHowToOpen] = useState(false);
@@ -1921,7 +1910,7 @@ function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
     });
   };
 
-  const bounties = data?.bounties ?? [];
+  const bounties = bountiesData ?? [];
 
   if (!BOUNTY_BOARD_DEPLOYED) {
     return (
@@ -2179,7 +2168,8 @@ function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
 type Tab = 'subgraphs' | 'bounties';
 
 export default function StudioPage() {
-  const { sessionAddress, signing, error: authError, signIn, signOut } = useStudioSession();
+  const { sessionAddress, sessionLoading, signing, error: authError, signIn, signOut } =
+    useStudioSession();
   const [tab, setTab] = useState<Tab>('subgraphs');
 
   const TABS: { id: Tab; label: string }[] = [
@@ -2219,8 +2209,10 @@ export default function StudioPage() {
       </div>
 
       <ConnectGate>
-        {/* Sign-in prompt */}
-        {!sessionAddress && (
+        {/* Sign-in prompt. Withheld while the session is still being read: "not loaded yet" and
+            "signed out" are different answers, and showing this during the first read put the
+            prompt in front of people who were already signed in. */}
+        {!sessionLoading && !sessionAddress && (
           <div className="flex flex-col items-center py-16 text-center gap-4">
             <div className="w-14 h-14 rounded-2xl bg-[var(--accent-dim)] flex items-center justify-center">
               <svg className="w-7 h-7 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
