@@ -50,10 +50,8 @@ function IssueRow({ issue, area }: { issue: SupportIssue; area: string }) {
   const alsoIn = areasOf(issue).filter((a) => a !== area);
 
   return (
-    <a
-      href={issue.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={`/support/${issue.number}`}
       className="group flex flex-col gap-2 border-t border-[var(--border)] py-3 first:border-t-0 sm:flex-row sm:items-baseline sm:gap-4"
     >
       <span className="shrink-0 font-mono text-xs text-[var(--text-faint)] sm:w-12 sm:text-right">
@@ -80,7 +78,7 @@ function IssueRow({ issue, area }: { issue: SupportIssue; area: string }) {
           )}
         </span>
       </span>
-    </a>
+    </Link>
   );
 }
 

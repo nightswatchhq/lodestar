@@ -61,7 +61,7 @@ describe('the route inventory', () => {
   it('claims no route that does not exist', () => {
     // Backend-only routes are the deliberate exception and are declared as such.
     const backendOnly = inventory.filter((r) => !onDisk.includes(r.path)).map((r) => r.path);
-    expect(backendOnly).toEqual(['/api/whoami']);
+    expect(backendOnly.sort()).toEqual(['/api/support/[number]', '/api/whoami']);
   });
 
   it('agrees with the proxy about which routes the edge sends to kittiwake', () => {
