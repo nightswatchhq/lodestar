@@ -7,7 +7,7 @@ import { useSubgraphDeployments } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn, weiToGRT, formatGRT, shortenAddress } from '@/lib/utils';
-import type { ChainLagData } from '@/app/api/cron/refresh-chain-health/route';
+import type { ChainLagData } from '@/lib/chain-lag';
 import { formatStallDuration, type ChainLiveness } from '@/lib/chain-liveness';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 

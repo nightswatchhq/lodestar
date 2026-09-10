@@ -18,9 +18,12 @@ describe('docs/MIGRATION.md', () => {
     expect(committed).toBe(renderDoc());
   });
 
-  it('states a percentage and a remainder rather than only a percentage', () => {
+  it('states counts beside every percentage, never a percentage alone', () => {
+    // A share on its own can be improved by narrowing what it is a share of. Both figures here
+    // carry the absolute number they came from, so neither can be flattered quietly.
     const committed = readFileSync(join(process.cwd(), 'docs', 'MIGRATION.md'), 'utf8');
-    expect(committed).toMatch(/\d+ of \d+ routes/);
-    expect(committed).toMatch(/\d+ left/);
+    expect(committed).toMatch(/\d+ route files left in this repo/);
+    expect(committed).toMatch(/\d+ of \d+/);
+    expect(committed).toMatch(/\d+ to go/);
   });
 });

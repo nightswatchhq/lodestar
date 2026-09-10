@@ -4,9 +4,11 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**53 of 77 routes** on kittiwake, **69%**. 24 left.
+**32 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **66%** of the way from 93 on 10 September 2026.
 
-The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 6 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
+Of the port itself, **53 of 77** are across, **69%**, with 24 to go.
+
+That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
 ## By block of work
 
@@ -114,17 +116,4 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 | `/api/issue-forms` | the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does. |
 | `/api/migration` | reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did. |
 | `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
-
-## Descheduled crons, handlers kept as the rollback
-
-- `/api/cron/ingest-allocations`
-- `/api/cron/ingest-delegations`
-- `/api/cron/ingest-disputes`
-- `/api/cron/ingest-epochs`
-- `/api/cron/ingest-horizon-activity`
-- `/api/cron/ingest-rav`
-- `/api/cron/refresh`
-- `/api/cron/refresh-chain-health`
-- `/api/cron/snapshot-network`
-- `/api/cron/warm-ipfs`
 

@@ -9,7 +9,7 @@ describe('rateLimit — tier limits', () => {
   it.each([
     ['/api/feed', 20],
     ['/api/disassembly/verify', 4],
-    ['/api/cron/refresh', 20],
+    ['/api/cron/tap-provision', 20],
     ['/api/portfolio', 30],
     ['/api/scuttlebutt/messages', 60],
     ['/api/indexer-status/0xabc', 20],

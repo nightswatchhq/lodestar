@@ -4,7 +4,7 @@
  * Covers all routes not tested in routes.test.ts:
  * portfolio, provisions, indexer-status, payments,
  * feed, networks, parameter-history, vote, token-metrics,
- * rewards-history, health, cron/refresh
+ * rewards-history, health
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -73,12 +73,6 @@ vi.mock('@/lib/db', () => ({
   hasDbAccess: () => mockHasDbAccess(),
 }));
 
-// @/lib/refresh
-const mockRefreshIndexers = vi.fn();
-vi.mock('@/lib/refresh', () => ({
-  refreshIndexers: (...args: unknown[]) => mockRefreshIndexers(...args),
-}));
-
 // @/lib/cron-runs
 vi.mock('@/lib/cron-runs', () => ({
   recordCronRun: vi.fn().mockResolvedValue(undefined),
@@ -112,7 +106,6 @@ beforeEach(() => {
   mockHasDbAccess.mockReturnValue(false);
   mockCacheGet.mockResolvedValue(null);
   mockFetch.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
-  mockRefreshIndexers.mockResolvedValue({ count: 42, durationMs: 500 });
 });
 
 // ---------- Helpers ----------
@@ -571,41 +564,3 @@ describe('/api/health', () => {
 // /api/cron/refresh
 // ============================================================
 
-describe('/api/cron/refresh', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/cron/refresh/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  it('returns 401 when CRON_SECRET is set and request is missing auth header', async () => {
-    vi.stubEnv('CRON_SECRET', 'super-secret');
-    const req = makeRequest('/api/cron/refresh');
-    const res = await GET(req);
-    expect(res.status).toBe(401);
-    vi.unstubAllEnvs();
-  });
-
-  it('proceeds when CRON_SECRET is set and auth header matches', async () => {
-    vi.stubEnv('CRON_SECRET', 'super-secret');
-    const req = makeRequest('/api/cron/refresh', {
-      headers: { Authorization: 'Bearer super-secret' },
-    });
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json).toHaveProperty('count');
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 401 when CRON_SECRET not set (fail-closed)', async () => {
-    vi.unstubAllEnvs();
-    const req = makeRequest('/api/cron/refresh');
-    const res = await GET(req);
-
-    expect(res.status).toBe(401);
-  });
-});
