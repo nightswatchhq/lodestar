@@ -107,7 +107,13 @@ describe('the owner badge', () => {
     // more useful half, and the badge has room for one.
     const i = issue({ number: 19, labels: ['owner/reporter', 'owner/edge-and-node'] });
     expect(primaryOwner(i)).toBe('owner/edge-and-node');
-    expect(ownerLabel(primaryOwner(i)!)).toBe('Edge & Node');
+    expect(ownerLabel(primaryOwner(i)!)).toBe('Edge & Node / The Graph Foundation');
+  });
+
+  it('shows the two core teams under one badge', () => {
+    // Which of them owns a fault is usually not knowable from outside, so the page does not claim
+    // it. The labels stay distinct in the repository.
+    expect(ownerLabel('owner/foundation')).toBe(ownerLabel('owner/edge-and-node'));
   });
 
   it('is absent rather than wrong when nothing says who owns it', () => {
