@@ -15,6 +15,7 @@ import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
 import { CONTRACTS } from '@/lib/wallet';
 import { BOUNTY_BOARD_ABI, GRT_ABI, SUBGRAPH_SERVICE_ABI, extractBountyId } from '@/lib/bountyBoard';
 import { SubgraphLifecyclePanel } from '@/components/studio/SubgraphLifecyclePanel';
+import { useContractStep } from '@/hooks/useContractStep';
 import {
   dockKeys,
   useBounties,
@@ -360,42 +361,44 @@ function PublishWizard({
   onPublished: (txHash: string, versionLabel: string) => void;
 }) {
   const uploadMetadata = useUploadMetadata();
-  const [step, setStep] = useState<PublishStep>('confirm');
-  const [errMsg, setErrMsg] = useState('');
+  // Only the phases before the transaction are state. Everything from the wallet prompt onwards is
+  // derived from `publishTx.status` below, because keeping a second copy of it in `step` means an
+  // effect to mirror one into the other, and an effect that sets state during render is the
+  // cascade the linter is right to object to.
+  const [localStep, setLocalStep] = useState<PublishStep>('confirm');
+  const [localErr, setLocalErr] = useState('');
   const [metaHashes, setMetaHashes] = useState<{
     subgraphMetaBytes32: `0x${string}`;
     versionMetaBytes32: `0x${string}`;
   } | null>(null);
-  const [minedTxHash, setMinedTxHash] = useState<`0x${string}` | undefined>();
   const [versionLabel, setVersionLabel] = useState('');
-
-  const { writeContract, isPending: walletPending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => {
-        setMinedTxHash(hash);
-        setStep('mining');
-      },
-      onError: (e) => {
-        setErrMsg(explainWriteError(e));
-        setStep('error');
-      },
-    },
-  });
 
   const isNewVersion = Boolean(sg.published_subgraph_id && !sg.published_subgraph_id.startsWith('0x'));
 
-  const { isSuccess: txConfirmed, data: receipt } = useWaitForTransactionReceipt({ hash: minedTxHash });
-
-  useEffect(() => {
-    if (txConfirmed && receipt) {
+  // `onPublished` PATCHes the subgraph row, so running it twice writes twice. The effect it
+  // replaces was keyed on a boolean and did not list `versionLabel` among its dependencies, so it
+  // could both re-run and, when it did, publish under a label the user had since changed.
+  const publishTx = useContractStep({
+    onMined: (receipt) => {
+      const hash = receipt.transactionHash;
       const result = isNewVersion
-        ? (minedTxHash ?? '')
-        : (extractSubgraphId(receipt.logs, CONTRACTS.gns) ?? minedTxHash ?? '');
+        ? hash
+        : (extractSubgraphId(receipt.logs, CONTRACTS.gns) ?? hash);
       onPublished(result, versionLabel);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt confirmation — intentional
-      setStep('done');
-    }
-  }, [txConfirmed, receipt, minedTxHash, onPublished, isNewVersion]);
+    },
+  });
+
+  const walletPending = publishTx.status === 'wallet';
+  const minedTxHash = publishTx.txHash;
+
+  const step: PublishStep =
+    publishTx.status === 'error' ? 'error'
+    : publishTx.status === 'done' ? 'done'
+    : publishTx.status === 'mining' ? 'mining'
+    : localStep;
+  const errMsg = publishTx.error ? explainWriteError(publishTx.error) : localErr;
+  const setStep = setLocalStep;
+  const setErrMsg = setLocalErr;
 
   const handleUpload = async () => {
     setStep('uploading');
@@ -419,7 +422,7 @@ function PublishWizard({
   const handleWriteContract = () => {
     if (!metaHashes || !sg.deployment_id) return;
     if (isNewVersion && sg.published_subgraph_id) {
-      writeContract({
+      publishTx.write({
         address: CONTRACTS.gns,
         abi: GNS_ABI,
         functionName: 'publishNewVersion',
@@ -430,7 +433,7 @@ function PublishWizard({
         ],
       });
     } else {
-      writeContract({
+      publishTx.write({
         address: CONTRACTS.gns,
         abi: GNS_ABI,
         functionName: 'publishNewSubgraph',
@@ -701,16 +704,12 @@ function PostBountyWizard({
   onClose: () => void;
 }) {
   const { address } = useAccount();
-  const qc = useQueryClient();
   const recordBounty = useRecordBounty();
-  const [step, setStep] = useState<BountyWizardStep>('form');
+  const [localStep, setLocalStep] = useState<BountyWizardStep>('form');
   const [amountGrt, setAmountGrt] = useState('');
   const [expiresInDays, setExpiresInDays] = useState('30');
   const [message, setMessage] = useState('');
-  const [errMsg, setErrMsg] = useState('');
   const [bountyId, setBountyId] = useState<string | null>(null);
-  const [approveTxHash, setApproveTxHash] = useState<`0x${string}` | undefined>();
-  const [postTxHash, setPostTxHash] = useState<`0x${string}` | undefined>();
 
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- try/catch parse; intentionally hand-memoized
   const amountWei = useMemo(() => {
@@ -725,53 +724,57 @@ function PostBountyWizard({
     query: { enabled: BOUNTY_BOARD_DEPLOYED && !!address },
   });
 
-  const { writeContract: writeApprove, isPending: approvePending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => { setApproveTxHash(hash); setStep('approving'); },
-      onError: (e) => { setErrMsg(explainWriteError(e)); setStep('error'); },
+  const approveTx = useContractStep({
+    onMined: () => {
+      refetchAllowance();
+      setStep('post');
     },
   });
 
-  const { writeContract: writePost, isPending: postPending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => { setPostTxHash(hash); setStep('posting'); },
-      onError: (e) => { setErrMsg(explainWriteError(e)); setStep('error'); },
+  const postTx = useContractStep({
+    onMined: (receipt) => {
+      const id = extractBountyId(receipt.logs, CONTRACTS.bountyBoard);
+      setBountyId(id?.toString() ?? null);
+
+      // Recording the bounty is a POST, and the effect this replaces both suppressed
+      // `exhaustive-deps` and keyed on a boolean, so a re-render could write the row twice.
+      // `useContractStep` runs this once per transaction. Still best-effort: the bounty exists on
+      // chain either way and the row is for discoverability. `useRecordBounty` invalidates the
+      // board itself, so there is no second key to remember here.
+      if (sg.deployment_id) {
+        const expiresAt = expiresInDays
+          ? new Date(Date.now() + parseInt(expiresInDays) * 86_400_000).toISOString()
+          : null;
+        recordBounty
+          .mutateAsync({
+            deployment_id: sg.deployment_id,
+            slug: sg.slug,
+            amount_grt: amountGrt,
+            message: message || null,
+            expires_at: expiresAt,
+            chain_bounty_id: id?.toString() ?? null,
+            post_tx_hash: receipt.transactionHash,
+          })
+          .catch(() => {});
+      }
     },
   });
 
-  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTxHash });
-  const { isSuccess: postConfirmed, data: postReceipt } = useWaitForTransactionReceipt({ hash: postTxHash });
+  const approvePending = approveTx.status === 'wallet';
+  const postPending = postTx.status === 'wallet';
+  const postTxHash = postTx.txHash;
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt confirmation — intentional
-    if (approveConfirmed) { refetchAllowance(); setStep('post'); }
-  }, [approveConfirmed, refetchAllowance]);
-
-  useEffect(() => {
-    if (!postConfirmed || !postReceipt) return;
-    const id = extractBountyId(postReceipt.logs, CONTRACTS.bountyBoard);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt confirmation — intentional
-    setBountyId(id?.toString() ?? null);
-    // Save to DB for discoverability (best-effort)
-    if (sg.deployment_id) {
-      const expiresAt = expiresInDays
-        ? new Date(Date.now() + parseInt(expiresInDays) * 86_400_000).toISOString()
-        : null;
-      recordBounty.mutateAsync({
-        deployment_id: sg.deployment_id,
-        slug: sg.slug,
-        amount_grt: amountGrt,
-        message: message || null,
-        expires_at: expiresAt,
-        chain_bounty_id: id?.toString() ?? null,
-        post_tx_hash: postTxHash ?? null,
-      }).then(() => {
-        qc.invalidateQueries({ queryKey: ['studio-bounties-public'] });
-      }).catch(() => {});
-    }
-    setStep('done');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [postConfirmed, postReceipt]);
+  // Derived, not mirrored. The post transaction outranks the approval: once posting has started,
+  // the approval being 'done' is history rather than the current state of the wizard.
+  const txError = postTx.error ?? approveTx.error;
+  const step: BountyWizardStep =
+    txError ? 'error'
+    : postTx.status === 'done' ? 'done'
+    : postTx.status === 'mining' ? 'posting'
+    : approveTx.status === 'mining' ? 'approving'
+    : localStep;
+  const errMsg = txError ? explainWriteError(txError) : '';
+  const setStep = setLocalStep;
 
   const handleContinue = () => {
     if (!amountGrt || parseFloat(amountGrt) <= 0) return;
@@ -780,7 +783,7 @@ function PostBountyWizard({
   };
 
   const handleApprove = () => {
-    writeApprove({
+    approveTx.write({
       address: CONTRACTS.grt,
       abi: GRT_ABI,
       functionName: 'approve',
@@ -794,7 +797,7 @@ function PostBountyWizard({
     const expiresAt = expiresInDays
       ? BigInt(Math.floor(Date.now() / 1000) + parseInt(expiresInDays) * 86400)
       : 0n;
-    writePost({
+    postTx.write({
       address: CONTRACTS.bountyBoard,
       abi: BOUNTY_BOARD_ABI,
       functionName: 'post',
@@ -921,10 +924,10 @@ function PostBountyWizard({
             <div className="flex flex-col items-center py-8 gap-3">
               <div className="w-10 h-10 rounded-full border-2 border-[var(--accent)] border-t-transparent animate-spin" />
               <p className="text-sm text-[var(--text-muted)]">Waiting for approval confirmation...</p>
-              {approveTxHash && (
-                <a href={`https://arbiscan.io/tx/${approveTxHash}`} target="_blank" rel="noopener noreferrer"
+              {approveTx.txHash && (
+                <a href={`https://arbiscan.io/tx/${approveTx.txHash}`} target="_blank" rel="noopener noreferrer"
                   className="text-xs text-[var(--accent-text)] hover:underline font-mono">
-                  {approveTxHash.slice(0, 20)}...
+                  {approveTx.txHash.slice(0, 20)}...
                 </a>
               )}
             </div>
@@ -1022,9 +1025,29 @@ function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => vo
   const presentPoi = usePresentPoi();
   const { mutate: markClaimed } = useMarkBountyClaimed();
   const [allocationId, setAllocationId] = useState('');
-  const [step, setStep] = useState<'form' | 'claiming' | 'done' | 'error'>('form');
-  const [claimTxHash, setClaimTxHash] = useState<`0x${string}` | undefined>();
-  const [errMsg, setErrMsg] = useState('');
+  const [localStep, setLocalStep] = useState<'form' | 'claiming' | 'done' | 'error'>('form');
+
+  const claimTx = useContractStep({
+    onMined: () => {
+      // Best-effort, and deliberately so: the chain is the source of truth for a claim and this
+      // row is a convenience. The decision to ignore the failure is made here, once and visibly.
+      markClaimed(bounty.id);
+    },
+  });
+
+  // The wizard's own step machine still drives the rendering; these three lines are all that is
+  // left of translating a transaction into it, and `useContractStep` guarantees `onMined` runs
+  // once rather than on every render that happens to touch the effect's dependencies.
+  const isPending = claimTx.status === 'wallet';
+  const claimTxHash = claimTx.txHash;
+
+  const step =
+    claimTx.status === 'error' ? 'error'
+    : claimTx.status === 'done' ? 'done'
+    : claimTx.status === 'mining' ? 'claiming'
+    : localStep;
+  const errMsg = claimTx.error ? explainWriteError(claimTx.error) : '';
+  const setStep = setLocalStep;
 
   const validAddress = allocationId.startsWith('0x') && allocationId.length === 42;
 
@@ -1088,27 +1111,10 @@ function ClaimModal({ bounty, onClose }: { bounty: SyncBounty; onClose: () => vo
   );
   const allocationClosed = allocState ? allocState.closedAt > 0n : false;
 
-  const { writeContract, isPending } = useWriteContract({
-    mutation: {
-      onSuccess: (hash) => { setClaimTxHash(hash); setStep('claiming'); },
-      onError: (e) => { setErrMsg(explainWriteError(e)); setStep('error'); },
-    },
-  });
-
-  const { isSuccess: claimConfirmed } = useWaitForTransactionReceipt({ hash: claimTxHash });
-  useEffect(() => {
-    if (!claimConfirmed) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt confirmation — intentional
-    setStep('done');
-    // Best-effort, and deliberately so: the chain is the source of truth for a claim and this row
-    // is a convenience. The decision to ignore the failure is made here, once and visibly, rather
-    // than by a bare `.catch(() => {})` around a raw fetch.
-    markClaimed(bounty.id);
-  }, [claimConfirmed, bounty.id, markClaimed]);
 
   const handleClaim = () => {
     if (!bounty.chain_bounty_id || !validAddress) return;
-    writeContract({
+    claimTx.write({
       address: CONTRACTS.bountyBoard,
       abi: BOUNTY_BOARD_ABI,
       functionName: 'claim',
