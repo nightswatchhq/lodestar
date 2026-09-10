@@ -171,7 +171,7 @@ export interface RouteRecord {
  * it could only be a second, worse implementation. Listed so the counts describe the surface the
  * public sees rather than the surface this repo happens to contain.
  */
-const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[number]'];
+export const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[number]'];
 
 /**
  * Everything that is not migrated, and what it is waiting on.

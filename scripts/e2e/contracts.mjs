@@ -130,7 +130,6 @@ export const CONTRACTS = [
   { path: '/api/subgraph-curation/{hash}', name: 'subgraph curation', required: ['data.totalSignalledTokens', 'data.signals'] },
   { path: '/api/subgraph-schema/{hash}', name: 'subgraph schema', required: ['data.schemaText'] },
   { path: '/api/manifest?hash={hash}', name: 'manifest analysis', required: ['data.dataSources', 'data.network'] },
-  { path: '/api/vote', name: 'vote tallies', required: ['tallies', 'period'] },
   { path: '/api/developer-activity', name: 'developer activity weeks', required: ['data.weeks', 'data.totalInWindow'] },
   { path: '/api/dips', name: 'DIPS detail', required: ['data.live', 'data.allocations'] },
   { path: '/api/grt-flow', name: 'GRT flow detail', required: ['data.allocated', 'data.delegated'] },

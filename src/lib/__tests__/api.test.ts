@@ -10,8 +10,6 @@ import {
   fetchCuratorPortfolio,
   fetchSubgraphDeployments,
   fetchManifestAnalysis,
-  fetchVotes,
-  submitVote,
   fetchTokenMetrics,
   fetchDelegationFlows,
   fetchWithRetry,
@@ -30,7 +28,6 @@ import {
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
 } from '@/lib/api';
-import type { VoteMessage } from '@/lib/voting';
 
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -64,7 +61,6 @@ const OK = {
   indexers: { data: { indexers: [] } },
   provisions: { data: { provisions: [] } },
   portfolio: { data: { delegator: null, curator: null } },
-  votes: { period: '2026-05', tallies: [], voters: [], userVote: null },
   poiOverview: { data: { summary: { overallConsensusRate: 1 }, deployments: [] } },
   poiDeployment: { data: { deploymentId: 'Qm1', ipfsHash: 'Qm1', epochs: [] } },
   indexingStatus: { data: { deploymentId: 'Qm1', indexers: [] } },
@@ -141,14 +137,6 @@ describe('api: URL building', () => {
     expect(url).not.toContain('skip=');
   });
 
-  it('builds vote URL with period and voter', async () => {
-    mockFetch.mockResolvedValue(jsonResponse(OK.votes));
-    await fetchVotes('2026-05', '0xvoter');
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('period=2026-05');
-    expect(url).toContain('voter=0xvoter');
-  });
-
   it('builds delegation-flows URL with compare flag', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
     await fetchDelegationFlows(7, true);
@@ -221,34 +209,6 @@ describe('api: error handling (4xx vs 5xx)', () => {
   });
 });
 
-describe('api: submitVote', () => {
-  const message = { voter: '0x1', indexer: '0x2' } as unknown as VoteMessage;
-
-  it('POSTs JSON body with content-type header', async () => {
-    mockFetch.mockResolvedValue(
-      jsonResponse({
-        success: true,
-        vote: { voter: '0x1', indexer: '0x2', isDelegator: true, voteWeight: 1, period: '2026-05' },
-      }),
-    );
-    await submitVote(message, '0xsig');
-    const [url, init] = mockFetch.mock.calls[0];
-    expect(url).toBe('/api/vote');
-    expect(init.method).toBe('POST');
-    expect(init.headers['Content-Type']).toBe('application/json');
-    expect(JSON.parse(init.body)).toEqual({ message, signature: '0xsig' });
-  });
-
-  it('throws the server error message on failure', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ error: 'duplicate vote' }, 409));
-    await expect(submitVote(message, '0xsig')).rejects.toThrow('duplicate vote');
-  });
-
-  it('falls back to generic message when server omits error', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({}, 400));
-    await expect(submitVote(message, '0xsig')).rejects.toThrow('Failed to submit vote');
-  });
-});
 
 describe('api: raw-json (no envelope) endpoints', () => {
   it('fetchTVL returns the raw json on success', async () => {
