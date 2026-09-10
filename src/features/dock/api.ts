@@ -71,6 +71,8 @@ export const dockKeys = {
   session: ['dock', 'session'] as const,
   subgraphs: ['dock', 'subgraphs'] as const,
   deployKey: ['dock', 'deploy-key'] as const,
+  /** Every bounty query regardless of deployment, for invalidating after a write. */
+  allBounties: ['dock', 'bounties'] as const,
   bounties: (deployment?: string) => ['dock', 'bounties', deployment ?? 'all'] as const,
 };
 

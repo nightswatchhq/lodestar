@@ -136,11 +136,29 @@ describe('failure', () => {
     expect(result.current.error?.message).toContain('rejected');
   });
 
-  it('surfaces a reverted transaction rather than sitting on mining for ever', () => {
+  it('surfaces a failed wait rather than sitting on mining for ever', () => {
     writeState.data = '0xabc';
-    waitState.error = new Error('reverted');
+    waitState.error = new Error('timed out');
     const { result } = renderHook(() => useContractStep());
     expect(result.current.status).toBe('error');
+  });
+
+  it('calls a reverted transaction a failure, though the wait succeeded', async () => {
+    // The case this test used to claim to cover and did not: it set `waitState.error`, which is a
+    // wait that failed. A revert is a wait that *worked* and returned `status: 'reverted'`, so
+    // `isSuccess` is true and every check on it reads the transaction as done.
+    const onMined = vi.fn();
+    writeState.data = '0xabc';
+    waitState.data = { ...RECEIPT, status: 'reverted' };
+    waitState.isSuccess = true;
+
+    const { result } = renderHook(() => useContractStep({ onMined }));
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error?.message).toContain('reverted on chain');
+    // The bookkeeping POST at three call sites would otherwise record a transaction that did
+    // nothing but burn gas.
+    expect(onMined).not.toHaveBeenCalled();
   });
 
   it('surfaces a throw from onMined, so failed bookkeeping is not silent', async () => {
