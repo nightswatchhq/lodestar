@@ -20,6 +20,7 @@
 import { createPublicClient, http, parseAbiItem, type PublicClient } from 'viem';
 import { arbitrum } from 'viem/chains';
 import { readRequirements, toJson, type RequirementsJson } from './operator-requirements';
+import { isSafeUrlResolved } from './ssrf';
 
 /**
  * The Subgraph Service, carried as a benchmark rather than as a census row: it has no registry of
@@ -146,7 +147,14 @@ export type ProbeVerdict =
   | 'unreachable'
   | 'timeout'
   /** The provider registered without advertising anywhere to call. */
-  | 'no_endpoint';
+  | 'no_endpoint'
+  /**
+   * The endpoint points somewhere we will not fetch: a private range, loopback, or the cloud
+   * metadata address. Registered on chain by anybody who can hold a provision, so it is an
+   * attacker-supplied string, and a census that fetched it would be an SSRF with a status code
+   * and a latency for an oracle.
+   */
+  | 'refused';
 
 export interface ProviderProbe extends CensusProvider {
   verdict: ProbeVerdict;
@@ -156,17 +164,31 @@ export interface ProviderProbe extends CensusProvider {
 
 /** `true` when a provider is telling consumers to call something that does not answer. */
 export function isLying(p: ProviderProbe): boolean {
-  return p.verdict !== 'serving' && p.verdict !== 'paywalled' && p.verdict !== 'no_endpoint';
+  return (
+    p.verdict !== 'serving' &&
+    p.verdict !== 'paywalled' &&
+    p.verdict !== 'no_endpoint' &&
+    // We declined to call it, so we did not measure it. Counting that as a lie would report a
+    // number we did not take.
+    p.verdict !== 'refused'
+  );
 }
 
 export async function probe(
   p: CensusProvider,
   kind: ProbeKind,
   timeoutMs = 8000,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  isSafe: (url: string) => Promise<boolean> = isSafeUrlResolved
 ): Promise<ProviderProbe> {
   if (!p.endpoint) {
     return { ...p, verdict: 'no_endpoint', httpStatus: null, latencyMs: null };
+  }
+  // Before the fetch, not after. `indexing-status.ts` has guarded operator-supplied URLs since it
+  // was written; this reader was not given the same treatment, and its input comes from the same
+  // sort of place - a string somebody put on chain.
+  if (!(await isSafe(p.endpoint))) {
+    return { ...p, verdict: 'refused', httpStatus: null, latencyMs: null };
   }
   const started = Date.now();
   const controller = new AbortController();

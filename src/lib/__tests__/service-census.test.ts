@@ -85,9 +85,41 @@ describe('currentProviders', () => {
 const res = (status: number) =>
   (async () => new Response(null, { status })) as unknown as typeof fetch;
 
+/** These cases are about how an answer is read, not about whether we were willing to ask. */
+const allowed = async () => true;
+
 describe('probe', () => {
+  /**
+   * The endpoint comes out of a `ProviderRegistered` log, so it is a string somebody put on chain,
+   * and until now it went straight into `fetch`. `indexing-status.ts` has guarded operator-supplied
+   * URLs since it was written; this reader had not been given the same treatment, and the response
+   * carries a status code and a latency, which is an oracle.
+   */
+  it('will not call an endpoint pointing inward, and says so rather than calling it a lie', async () => {
+    let called = false;
+    const spy = (async () => {
+      called = true;
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof fetch;
+
+    for (const endpoint of [
+      'http://127.0.0.1:5432',
+      'http://169.254.169.254/latest/meta-data/',
+      'http://10.0.0.5/admin',
+      'http://localhost:8080',
+      'file:///etc/passwd',
+    ]) {
+      const p = await probe({ address: '0xa', endpoint }, 'http', 100, spy);
+      expect(p.verdict, endpoint).toBe('refused');
+      expect(p.httpStatus, endpoint).toBeNull();
+      // Not measured is not the same as measured and found wanting.
+      expect(isLying(p), endpoint).toBe(false);
+    }
+    expect(called, 'nothing was fetched').toBe(false);
+  });
+
   it('calls a 2xx serving', async () => {
-    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(200));
+    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(200), allowed);
     expect(p.verdict).toBe('serving');
     expect(p.httpStatus).toBe(200);
   });
@@ -99,16 +131,16 @@ describe('probe', () => {
    * 404 would read as merely unhealthy.
    */
   it('reads 402 as the paywall working, but only where there is a paywall', async () => {
-    const paid = await probe({ address: '0xa', endpoint: 'https://x' }, 'paywall', 100, res(402));
+    const paid = await probe({ address: '0xa', endpoint: 'https://x' }, 'paywall', 100, res(402), allowed);
     expect(paid.verdict).toBe('paywalled');
     expect(isLying(paid)).toBe(false);
 
-    const free = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(402));
+    const free = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(402), allowed);
     expect(free.verdict).toBe('http_error');
   });
 
   it('calls a 404 an http error rather than unreachable', async () => {
-    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(404));
+    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, res(404), allowed);
     expect(p.verdict).toBe('http_error');
     expect(isLying(p)).toBe(true);
   });
@@ -117,7 +149,7 @@ describe('probe', () => {
     const boom = (async () => {
       throw new Error('ECONNREFUSED');
     }) as unknown as typeof fetch;
-    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, boom);
+    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 100, boom, allowed);
     expect(p.verdict).toBe('unreachable');
     expect(p.httpStatus).toBeNull();
   });
@@ -128,9 +160,8 @@ describe('probe', () => {
       e.name = 'AbortError';
       throw e;
     }) as unknown as typeof fetch;
-    expect((await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 10, hang)).verdict).toBe(
-      'timeout'
-    );
+    const p = await probe({ address: '0xa', endpoint: 'https://x' }, 'http', 10, hang, allowed);
+    expect(p.verdict).toBe('timeout');
   });
 
   /**
@@ -138,7 +169,7 @@ describe('probe', () => {
    * nothing, which is a different failure from telling them to call a dead host.
    */
   it('does not call a provider with no endpoint a liar', async () => {
-    const p = await probe({ address: '0xa', endpoint: '' }, 'http', 100, res(200));
+    const p = await probe({ address: '0xa', endpoint: '' }, 'http', 100, res(200), allowed);
     expect(p.verdict).toBe('no_endpoint');
     expect(isLying(p)).toBe(false);
   });

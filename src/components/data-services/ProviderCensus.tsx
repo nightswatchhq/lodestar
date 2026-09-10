@@ -23,6 +23,7 @@ const VERDICT_LABEL: Record<ProbeVerdict, string> = {
   unreachable: 'registered, host unreachable',
   timeout: 'registered, timed out',
   no_endpoint: 'registered, advertises nothing',
+  refused: 'registered, advertises a private address',
 };
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
