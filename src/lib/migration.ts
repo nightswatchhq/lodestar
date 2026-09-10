@@ -46,6 +46,7 @@ export const MIGRATED: readonly string[] = [
   '/api/dropped-chains',
   '/api/ens',
   '/api/epochs',
+  '/api/foghorn/**',
   '/api/grt-flow',
   '/api/horizon/activity',
   '/api/indexer-disputes/',
@@ -114,12 +115,30 @@ const NEVER_FORWARD: readonly string[] = ['/api/indexer/present-poi'];
 export function isMigrated(path: string): boolean {
   if (NEVER_FORWARD.includes(path)) return false;
   return MIGRATED.some((p) => {
+    if (p.endsWith('/**')) return matchesCatchAll(p, path);
     if (p.includes('*')) return matchesWildcard(p, path);
     if (!p.endsWith('/')) return path === p;
     if (!path.startsWith(p)) return false;
     const rest = path.slice(p.length);
     return rest.length > 0 && !rest.includes('/');
   });
+}
+
+/**
+ * `prefix/**` matches one or more segments below `prefix`, which is what a Next `[...path]`
+ * catch-all route is.
+ *
+ * This is the "everything under it" rule the trailing slash deliberately is not, and it is only
+ * safe where the prefix owns every path below it. `/api/foghorn/` does: the whole subtree is one
+ * proxy. `/api/indexer/` does not, which is why `/api/indexer/<addr>/pnl` needed an entry of its
+ * own and why `present-poi` needed pinning in NEVER_FORWARD. Do not reach for this one to save
+ * typing.
+ */
+function matchesCatchAll(pattern: string, path: string): boolean {
+  const prefix = pattern.slice(0, -2);
+  if (!path.startsWith(prefix)) return false;
+  const rest = path.slice(prefix.length);
+  return rest.length > 0 && !rest.startsWith('/');
 }
 
 /** Segment by segment, with `*` standing for exactly one non-empty segment. */
@@ -220,7 +239,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
   { path: '/api/blog/search-index', state: 'next', workstream: 'the long tail' },
   { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
-  { path: '/api/foghorn/[...path]', state: 'next', workstream: 'the long tail', note: 'a proxy; check it still needs to be one now both services sit on the same box' },
   { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
   { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },
 

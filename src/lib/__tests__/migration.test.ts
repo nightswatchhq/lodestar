@@ -139,6 +139,24 @@ describe('isMigrated', () => {
     expect(isMigrated('/api/subgraph-history/')).toBe(false);
   });
 
+  it('matches a catch-all subtree, and only below its prefix', () => {
+    // The proxy owns everything under it, which is the only case this rule is for.
+    expect(isMigrated('/api/foghorn/qos/status')).toBe(true);
+    expect(isMigrated('/api/foghorn/indexer/0xabc/allocations-qos')).toBe(true);
+    expect(isMigrated('/api/foghorn/[...path]')).toBe(true);
+
+    // Not the prefix itself, and not a sibling that merely starts with the same letters.
+    expect(isMigrated('/api/foghorn')).toBe(false);
+    expect(isMigrated('/api/foghorn/')).toBe(false);
+    expect(isMigrated('/api/foghorn-admin/secrets')).toBe(false);
+  });
+
+  it('does not let the catch-all rule leak to the prefixes that must not have it', () => {
+    // `/api/indexer/` is one segment only, for the reason the three live faults recorded above.
+    expect(MIGRATED).not.toContain('/api/indexer/**');
+    expect(isMigrated('/api/indexer/0xabc/deeper/still')).toBe(false);
+  });
+
   it('leaves an unlisted route alone', () => {
     expect(isMigrated('/api/studio/auth')).toBe(false);
     expect(isMigrated('/api/scuttlebutt/stream')).toBe(false);
