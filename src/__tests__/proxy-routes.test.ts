@@ -45,8 +45,11 @@ describe('the migrated route list', () => {
    * and answered `400 not a valid address` on a POST that submits a PoI.
    */
   it('does not forward the sub-routes kittiwake has no handler for', () => {
-    expect(isMigrated('/api/indexer/0xabc/pnl')).toBe(false);
-    expect(isMigrated('/api/indexer/0xabc/revenue')).toBe(false);
+    // `pnl` and `revenue` are forwarded now, each by its own wildcard entry. `/api/indexer/` still
+    // must not reach anything else below an address, and `present-poi` stays pinned in
+    // NEVER_FORWARD: kittiwake has a handler, and the parity harness does not exercise a POST that
+    // queues an action on a live indexer agent.
+    expect(isMigrated('/api/indexer/0xabc/allocations')).toBe(false);
     expect(isMigrated('/api/indexer/present-poi')).toBe(false);
   });
 
@@ -87,6 +90,9 @@ describe('the migrated route list', () => {
   it('splits the sql routes rather than taking the prefix', () => {
     expect(isMigrated('/api/sql/query')).toBe(true);
     expect(isMigrated('/api/sql/catalog')).toBe(true);
-    expect(isMigrated('/api/sql/named')).toBe(false);
+    expect(isMigrated('/api/sql/named')).toBe(true);
+    // The upper tier is not one thing. `receipt` signs what it returns, so it moves on its own
+    // terms rather than on the prefix's.
+    expect(isMigrated('/api/sql/receipt')).toBe(false);
   });
 });

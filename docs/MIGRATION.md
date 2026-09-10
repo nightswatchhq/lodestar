@@ -4,7 +4,7 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**38 of 77 routes** on kittiwake, **49%**. 39 left.
+**52 of 77 routes** on kittiwake, **68%**. 25 left.
 
 The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 4 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
@@ -12,48 +12,62 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 
 | Block | Done | Left |
 |---|---|---|
-| the long tail | 0/19 | 19 |
 | the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
+| the long tail | 0/6 | 6 |
 | the disassembler | 0/3 | 3 |
-| the SQL upper tier | 0/2 | 2 |
-| data plane | 38/38 | 0 |
+| the SQL upper tier | 0/1 | 1 |
+| data plane | 52/52 | 0 |
 
 ## On kittiwake
 
 - `/api/apr-provenance/[address]`
 - `/api/chain-lag`
 - `/api/curators`
+- `/api/delegate/recommend`
 - `/api/delegation-events`
 - `/api/delegation-flows`
 - `/api/developer-activity`
 - `/api/dips`
+- `/api/dips/agreements`
 - `/api/dropped-chains`
+- `/api/ens`
 - `/api/epochs`
 - `/api/grt-flow`
 - `/api/horizon/activity`
+- `/api/indexer-disputes/[address]`
 - `/api/indexer-node-health`
 - `/api/indexer-stake-history/[address]`
 - `/api/indexer-status/[address]`
 - `/api/indexer/[address]`
+- `/api/indexer/[address]/pnl`
+- `/api/indexer/[address]/revenue`
 - `/api/indexers`
 - `/api/indexers-enriched`
+- `/api/manifest`
 - `/api/network-stats`
+- `/api/operator-preflight`
+- `/api/parameter-history/[address]`
 - `/api/payments`
 - `/api/poi`
 - `/api/portfolio`
 - `/api/price`
 - `/api/provisions`
+- `/api/qos/capture`
 - `/api/reo`
 - `/api/rewards-history`
+- `/api/service-census`
 - `/api/sql/catalog`
+- `/api/sql/named`
 - `/api/sql/query`
 - `/api/subgraph-curation/[hash]`
 - `/api/subgraph-deployments`
 - `/api/subgraph-fees-30d`
 - `/api/subgraph-history/[hash]`
 - `/api/subgraph-names`
+- `/api/subgraph-schema/[hash]`
 - `/api/subgraph-search`
+- `/api/subgraph-versions/[hash]`
 - `/api/support`
 - `/api/support/[number]`
 - `/api/token-metrics`
@@ -65,30 +79,18 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 - `/api/analytics/clickthrough`
 - `/api/blog/search-index`
 - `/api/data-services/query`
-- `/api/delegate/recommend`
-- `/api/dips/agreements`
 - `/api/disassembly`
 - `/api/disassembly/diff`
 - `/api/disassembly/verify`
-- `/api/ens`
 - `/api/foghorn/[...path]`
 - `/api/horizon/debug`
-- `/api/indexer-disputes/[address]`
-- `/api/indexer/[address]/pnl`
-- `/api/indexer/[address]/revenue`
 - `/api/indexer/present-poi`
-- `/api/manifest`
-- `/api/operator-preflight`
-- `/api/parameter-history/[address]`
-- `/api/qos/capture`
 - `/api/scuttlebutt/admin/login`
 - `/api/scuttlebutt/admin/messages`
 - `/api/scuttlebutt/bans`
 - `/api/scuttlebutt/messages`
 - `/api/scuttlebutt/messages/[id]`
 - `/api/scuttlebutt/stream`
-- `/api/service-census`
-- `/api/sql/named`
 - `/api/sql/receipt`
 - `/api/studio/auth`
 - `/api/studio/bounties`
@@ -99,8 +101,6 @@ The denominator is routes meant to move that have not yet. It excludes 0 agreed 
 - `/api/studio/node`
 - `/api/studio/subgraphs`
 - `/api/studio/subgraphs/[id]`
-- `/api/subgraph-schema/[hash]`
-- `/api/subgraph-versions/[hash]`
 
 ## Staying on Next by decision
 

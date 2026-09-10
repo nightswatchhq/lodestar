@@ -26,41 +26,61 @@
  *
  * Kept in step by hand, which is the honest weakness of it. What catches a drift is the parity
  * harness on the kittiwake side and the filesystem check on this one.
+ *
+ * A route answering in kittiwake is not on its own a reason to add it here. `indexing-status` is
+ * the standing example: it is served there and the parity harness compares it, and it stays on Next
+ * anyway, because kittiwake probes without a TAP receipt and so cannot tell a serving stack that
+ * wants payment from one that actually served. Its entry below records that. The bar for this list
+ * is that the harness compares the route **and** the answer is not weaker than the one it replaces.
  */
 export const MIGRATED: readonly string[] = [
   '/api/apr-provenance/',
   '/api/chain-lag',
   '/api/curators',
+  '/api/delegate/recommend',
   '/api/delegation-events',
   '/api/delegation-flows',
   '/api/developer-activity',
   '/api/dips',
+  '/api/dips/agreements',
   '/api/dropped-chains',
+  '/api/ens',
   '/api/epochs',
   '/api/grt-flow',
   '/api/horizon/activity',
+  '/api/indexer-disputes/',
   '/api/indexer-node-health',
   '/api/indexer-stake-history/',
   '/api/indexer-status/',
   '/api/indexer/',
+  '/api/indexer/*/pnl',
+  '/api/indexer/*/revenue',
   '/api/indexers',
   '/api/indexers-enriched',
+  '/api/manifest',
   '/api/network-stats',
+  '/api/operator-preflight',
+  '/api/parameter-history/',
   '/api/payments',
   '/api/poi',
   '/api/portfolio',
   '/api/price',
   '/api/provisions',
+  '/api/qos/capture',
   '/api/reo',
   '/api/rewards-history',
+  '/api/service-census',
   '/api/sql/catalog',
+  '/api/sql/named',
   '/api/sql/query',
   '/api/subgraph-curation/',
   '/api/subgraph-deployments',
   '/api/subgraph-fees-30d',
   '/api/subgraph-history/',
   '/api/subgraph-names',
+  '/api/subgraph-schema/',
   '/api/subgraph-search',
+  '/api/subgraph-versions/',
   '/api/support',
   '/api/support/',
   '/api/token-metrics',
@@ -86,18 +106,28 @@ const NEVER_FORWARD: readonly string[] = ['/api/indexer/present-poi'];
  * `/api/indexer/<addr>/revenue` to a backend with no handler for either, so both answered `404` in
  * production while the Next handlers that would have served them sat one rewrite away, unreached.
  *
- * Every parameterised entry in the list takes a single parameter, so one segment is the rule the
- * routes actually have. If a genuinely nested route is migrated later it needs its own entry, and
- * that is the right amount of friction for something this easy to get wrong.
+ * A `*` segment is the nested form the comment above used to say would need its own entry, and now
+ * does: `/api/indexer/*\/pnl` matches one segment in that position and nothing else. It matches
+ * `/api/indexer/0xabc/pnl` for the proxy and `/api/indexer/[address]/pnl` for the inventory check,
+ * which are the two callers, and it deliberately cannot match a deeper path.
  */
 export function isMigrated(path: string): boolean {
   if (NEVER_FORWARD.includes(path)) return false;
   return MIGRATED.some((p) => {
+    if (p.includes('*')) return matchesWildcard(p, path);
     if (!p.endsWith('/')) return path === p;
     if (!path.startsWith(p)) return false;
     const rest = path.slice(p.length);
     return rest.length > 0 && !rest.includes('/');
   });
+}
+
+/** Segment by segment, with `*` standing for exactly one non-empty segment. */
+function matchesWildcard(pattern: string, path: string): boolean {
+  const want = pattern.split('/');
+  const got = path.split('/');
+  if (want.length !== got.length) return false;
+  return want.every((seg, i) => (seg === '*' ? got[i].length > 0 : seg === got[i]));
 }
 
 /** Where a route is served from today, which is a different question from where it should end up. */
@@ -175,7 +205,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
 
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─
-  { path: '/api/sql/named', state: 'next', workstream: 'the SQL upper tier' },
   { path: '/api/sql/receipt', state: 'next', workstream: 'the SQL upper tier' },
 
   // ── The long tail: kittiwake#20, to be triaged rather than worked through ──
@@ -191,22 +220,9 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
   { path: '/api/blog/search-index', state: 'next', workstream: 'the long tail' },
   { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
-  { path: '/api/delegate/recommend', state: 'next', workstream: 'the long tail' },
-  { path: '/api/dips/agreements', state: 'next', workstream: 'the long tail' },
-  { path: '/api/ens', state: 'next', workstream: 'the long tail' },
   { path: '/api/foghorn/[...path]', state: 'next', workstream: 'the long tail', note: 'a proxy; check it still needs to be one now both services sit on the same box' },
   { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
-  { path: '/api/indexer-disputes/[address]', state: 'next', workstream: 'the long tail' },
   { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },
-  { path: '/api/indexer/[address]/pnl', state: 'next', workstream: 'the long tail' },
-  { path: '/api/indexer/[address]/revenue', state: 'next', workstream: 'the long tail' },
-  { path: '/api/manifest', state: 'next', workstream: 'the long tail' },
-  { path: '/api/operator-preflight', state: 'next', workstream: 'the long tail' },
-  { path: '/api/parameter-history/[address]', state: 'next', workstream: 'the long tail' },
-  { path: '/api/qos/capture', state: 'next', workstream: 'the long tail' },
-  { path: '/api/service-census', state: 'next', workstream: 'the long tail' },
-  { path: '/api/subgraph-schema/[hash]', state: 'next', workstream: 'the long tail' },
-  { path: '/api/subgraph-versions/[hash]', state: 'next', workstream: 'the long tail' },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
