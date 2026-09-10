@@ -131,12 +131,27 @@ describe('summarise', () => {
   const summary = summarise(inventory);
 
   it('excludes crons and deletions from the denominator', () => {
-    // A percentage is only honest if the denominator is. Counting six routes we have agreed to
-    // delete as outstanding work would understate progress; counting them as done would overstate
-    // it. They are reported on their own line instead.
+    // A percentage is only honest if the denominator is. Counting routes we have agreed to delete
+    // as outstanding work would understate progress; counting them as done would overstate it.
+    // They are reported on their own line instead.
     expect(summary.inScope).toBe(summary.onKittiwake + summary.onNext);
-    expect(summary.doomed).toBeGreaterThan(0);
     expect(summary.scheduled).toBeGreaterThan(0);
+  });
+
+  it('excludes a doomed route from the denominator, whether or not one exists today', () => {
+    // Asserted against a fixture rather than the live inventory. This used to read
+    // `summary.doomed > 0`, which meant the suite failed the moment the deletions list emptied -
+    // and an empty deletions list is the state we want, not a fault. A test that only passes while
+    // there is work outstanding cannot tell you the work is finished.
+    const withDoomed: RouteRecord[] = [
+      { path: '/api/a', state: 'kittiwake', workstream: 'the long tail' },
+      { path: '/api/b', state: 'next', workstream: 'the long tail' },
+      { path: '/api/c', state: 'doomed', workstream: 'deletions' },
+    ];
+    const s = summarise(withDoomed);
+    expect(s.doomed).toBe(1);
+    expect(s.inScope).toBe(2);
+    expect(s.percent).toBe(50);
   });
 
   it('reports a percentage consistent with its own counts', () => {
