@@ -67,6 +67,11 @@ const nextConfig: NextConfig = {
       // gateway telemetry while /qos ranked them off our own measurements — two pages disagreeing
       // about the same operators, with nothing on either saying which instrument it used. One
       // oracle, one ranking, one page. /network-health was this page's name before that.
+      // The Dock's tabs became routes on 2026-09-10, so /dock has no content of its own. Done here
+      // rather than with `redirect()` in a page: inside a streaming render that resolves through
+      // the RSC payload, so a crawler or a curl sees a 200 and the page it was redirected away
+      // from. This is a 308 before anything renders.
+      { source: '/dock', destination: '/dock/subgraphs', permanent: true },
       { source: '/network-health', destination: '/qos', permanent: true },
       { source: '/indexer-qos', destination: '/qos', permanent: true },
       // The Intel Feed moved to The Graph Academy on 2026-08-30 and became its
