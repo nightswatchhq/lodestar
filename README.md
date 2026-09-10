@@ -239,7 +239,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NUTHATCH_URL` | Base URL of the nuthatch host fronting every nest. Without it, every protocol route returns 503 | Yes |
 | `NUTHATCH_USER` / `NUTHATCH_PASSWORD` | Basic-auth credential for that host | Yes |
 | `NUTHATCH_*_BASE_PATH` | Per-surface overrides to point one route at a different nest. Defaults are `/alloc`, except `/gns` and `/dips` (see [Data from nuthatch](#data-from-nuthatch)) | No |
-| `GITHUB_TOKEN` | GitHub PAT for the Intel Feed (forum/GIP data) and the `/support` archive. Unauthenticated GitHub allows 60 requests an hour per IP, which both routes exhaust on a busy day. An **expired** token is worse than none: it 401s rather than falling back. `/support` then serves `src/data/graph-support.json` and says so; the Intel Feed silently drops its GitHub categories | Yes |
+| `GITHUB_TOKEN` | GitHub PAT for the Intel Feed (forum/GIP data). An **expired** token is worse than none: it 401s rather than falling back to the unauthenticated 60/hour, and the feed then answers 200 with its GitHub categories silently missing. If it has expired, **remove the variable** rather than leaving it set | Yes |
 | `NEXT_PUBLIC_SITE_URL` | Production URL e.g. `https://lodestar-dashboard.com` | Yes |
 | `SESSION_SECRET` | Secret for Studio session HMAC | No |
 | `TAP_SIGNER_PRIVATE_KEY` | Private key for TAP receipt signing | No |
@@ -315,8 +315,7 @@ src/
     sql/         # Public read-only SQL surface over the nests
     subgraphs/   # Subgraph directory
     support/     # graph-support archive: worked answers, grouped by area of the stack
-                 #   live from GitHub, falling back to src/data/graph-support.json
-                 #   (refresh with `pnpm support:snapshot`)
+                 #   served by kittiwake's twice-daily mirror; the Next handler is the rollback
   components/    # UI components, layout, charts, tables, feed
   content/       # Blog posts (Markdown)
   hooks/         # React Query hooks
