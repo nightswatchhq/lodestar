@@ -11,8 +11,11 @@ import { BOUNTY_BOARD_DEPLOYED } from '../constants';
 import { ClaimModal } from './ClaimModal';
 import { useBounties } from '../api';
 import type { SyncBounty } from '../types';
+import { useDialog } from '@/hooks/useDialog';
+import { explainWriteError } from '@/lib/horizon-revert';
 
 export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
+  const { confirm, notify, dialog } = useDialog();
   // The whole board, sharing a cache with the per-deployment read in the detail modal.
   const { data: bountiesData, isLoading, isError } = useBounties();
   const [claimTarget, setClaimTarget] = useState<SyncBounty | null>(null);
@@ -40,14 +43,22 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
       },
       onError: (e) => {
         setCancellingId(null);
-        alert(e.message.slice(0, 200));
+        void notify(explainWriteError(e), { title: 'Could not cancel the bounty' });
       },
     },
   });
 
-  const handleCancel = (bounty: SyncBounty) => {
+  const handleCancel = async (bounty: SyncBounty) => {
     if (!bounty.chain_bounty_id) return;
-    if (!confirm(`Cancel bounty #${bounty.chain_bounty_id}? GRT will be returned to your wallet.`)) return;
+    if (
+      !(await confirm(`The GRT locked in bounty #${bounty.chain_bounty_id} returns to your wallet, and the bounty stops being claimable.`, {
+        title: 'Cancel this bounty?',
+        confirmLabel: 'Cancel the bounty',
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setCancellingId(bounty.chain_bounty_id);
     writeCancel({
       address: CONTRACTS.bountyBoard,
@@ -65,14 +76,21 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
       },
       onError: (e) => {
         setRefundingId(null);
-        alert(e.message.slice(0, 200));
+        void notify(explainWriteError(e), { title: 'Could not refund the bounty' });
       },
     },
   });
 
-  const handleRefund = (bounty: SyncBounty) => {
+  const handleRefund = async (bounty: SyncBounty) => {
     if (!bounty.chain_bounty_id) return;
-    if (!confirm(`Refund expired bounty #${bounty.chain_bounty_id}? The locked GRT returns to the developer.`)) return;
+    if (
+      !(await confirm(`Bounty #${bounty.chain_bounty_id} has expired unclaimed. The locked GRT returns to the developer who posted it.`, {
+        title: 'Refund this expired bounty?',
+        confirmLabel: 'Refund it',
+      }))
+    ) {
+      return;
+    }
     setRefundingId(bounty.chain_bounty_id);
     writeRefund({
       address: CONTRACTS.bountyBoard,
@@ -95,6 +113,7 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
 
   return (
     <>
+      {dialog}
       <div className="space-y-4">
         <div className="p-4 rounded-lg border border-amber-500/20 bg-amber-500/5">
           <p className="text-sm text-amber-600 dark:text-amber-400">

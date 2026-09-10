@@ -16,6 +16,7 @@ import { DeployKeyPanel } from './DeployKeyPanel';
 import { PostBountyWizard } from './PostBountyWizard';
 import { useBounties, useDeleteSubgraph, useUpdateSubgraph } from '../api';
 import type { StudioSubgraph } from '../types';
+import { useDialog } from '@/hooks/useDialog';
 
 export function SubgraphDetailModal({
   sg: initialSg,
@@ -97,10 +98,19 @@ export function SubgraphDetailModal({
     }
   };
 
+  const { confirm, dialog } = useDialog();
   const deleteSubgraph = useDeleteSubgraph();
 
   const handleDelete = async () => {
-    if (!confirm(`Remove "${sg.slug}"? This does not affect on-chain data.`)) return;
+    if (
+      !(await confirm(`Removing "${sg.slug}" only affects this Dock. Anything already published on chain stays published.`, {
+        title: 'Remove this subgraph?',
+        confirmLabel: 'Remove it',
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -143,6 +153,7 @@ export function SubgraphDetailModal({
 
   return (
     <>
+      {dialog}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
         <div className="w-full max-w-3xl bg-[var(--bg-surface)] rounded-xl border border-[var(--border)] shadow-2xl max-h-[90vh] flex flex-col">
           {/* Header */}

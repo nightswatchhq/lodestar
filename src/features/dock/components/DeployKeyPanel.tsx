@@ -4,17 +4,28 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { useDeployKey, useRotateDeployKey } from '../api';
+import { useDialog } from '@/hooks/useDialog';
 
 export function DeployKeyPanel() {
   const [plainKey, setPlainKey] = useState<string | null>(null);
 
+  const { confirm, dialog } = useDialog();
   const deployKey = useDeployKey();
   const rotate = useRotateDeployKey();
   const keyInfo = deployKey.data ?? null;
   const loading = rotate.isPending;
 
   const generate = async () => {
-    if (keyInfo?.hasKey && !confirm('This will invalidate your existing deploy key. Continue?')) return;
+    if (
+      keyInfo?.hasKey &&
+      !(await confirm('Your existing deploy key stops working immediately, and anything using it will start failing.', {
+        title: 'Replace the deploy key?',
+        confirmLabel: 'Replace it',
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     // The key is in clear exactly once, in this response, and the server keeps only a hash. It
     // goes to local state rather than the query cache for that reason: a refetch would replace the
     // only copy anybody has with `{ hasKey: true }`.
@@ -24,6 +35,7 @@ export function DeployKeyPanel() {
 
   return (
     <div className="space-y-2">
+      {dialog}
       <p className="text-xs font-medium text-[var(--text-muted)]">Deploy Key</p>
       {plainKey ? (
         <div>
