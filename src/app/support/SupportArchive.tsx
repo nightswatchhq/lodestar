@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 
 import { Badge } from '@/components/ui/Badge';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
@@ -19,7 +20,6 @@ import {
 } from '@/lib/graph-support';
 import { cn } from '@/lib/utils';
 
-const REPO_URL = 'https://github.com/nightswatchhq/graph-support';
 const DISCORD_URL = 'https://discord.gg/CQewvyJ69Y';
 
 type Tab = 'open' | 'resolved';
@@ -272,14 +272,12 @@ export default function SupportArchive() {
               .{' '}
             </>
           )}
-          <a
-            href={`${REPO_URL}/issues/new/choose`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={`/support/new${query.trim() ? `?title=${encodeURIComponent(query.trim())}` : ''}`}
             className="text-[var(--accent-text)] hover:underline"
           >
             File a new one
-          </a>{' '}
+          </Link>{' '}
           or ask in{' '}
           <a
             href={DISCORD_URL}

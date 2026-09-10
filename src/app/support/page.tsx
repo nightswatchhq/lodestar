@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 import SupportArchive from './SupportArchive';
 
@@ -38,14 +39,9 @@ export default function SupportPage() {
       <div className="mt-10 border-t border-[var(--border)] pt-6 text-sm text-[var(--text-muted)]">
         <p className="max-w-2xl">
           Not here?{' '}
-          <a
-            href={`${REPO_URL}/issues/new/choose`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[var(--accent-text)] hover:underline"
-          >
+          <Link href="/support/new" className="text-[var(--accent-text)] hover:underline">
             Open an issue
-          </a>{' '}
+          </Link>{' '}
           so the answer ends up permanent and searchable, or come to{' '}
           <a
             href={DISCORD_URL}
