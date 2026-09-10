@@ -7,7 +7,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Footer } from '@/components/layout/Footer';
 import { StarPrompt } from '@/components/StarPrompt';
-import { RedstartBanner } from '@/components/RedstartBanner';
+import { NuthatchBanner } from '@/components/NuthatchBanner';
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
@@ -84,7 +84,7 @@ export default function RootLayout({
             <BottomNav />
             <main className="md:pl-[var(--sidebar-width)] pt-[calc(var(--safe-top)+var(--topbar-height))] pb-[calc(var(--bottom-nav-height)+var(--safe-bottom))] md:pb-0 transition-[padding] duration-200">
               <div className="p-4 md:p-6 max-w-[1440px] mx-auto">
-                <RedstartBanner />
+                <NuthatchBanner />
                 {children}
               </div>
             </main>
