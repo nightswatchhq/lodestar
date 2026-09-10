@@ -317,7 +317,7 @@ export async function fetchIndexerStatus(address: string): Promise<{
  * advancing at all. See lib/chain-liveness.
  */
 export async function fetchChainLag(): Promise<{
-  data: import('@/app/api/cron/refresh-chain-health/route').ChainLagData | null;
+  data: import('@/lib/chain-lag').ChainLagData | null;
 }> {
   const response = await fetch('/api/chain-lag');
   if (!response.ok) throw new Error('Failed to fetch chain lag');

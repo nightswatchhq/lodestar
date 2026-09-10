@@ -1,14 +1,16 @@
 /**
- * Cron Route Auth Tests
+ * `CRON_SECRET` auth, for what still uses it.
  *
- * Verifies that every cron endpoint:
- *  1. Returns 401 when CRON_SECRET is not set (fail-closed)
- *  2. Returns 401 when an incorrect token is supplied
- *  3. Returns 401 when no Authorization header is present (even if secret is set)
- *  4. Returns 503 (not 200) when auth passes but required services are unavailable
+ * Eight ingest crons used to be checked here. They were descheduled when kittiwake took the jobs
+ * over and their handlers have now been deleted, so what is left is the one endpoint that is
+ * cron-authed without being a cron: `/api/horizon/debug`, an operator tool that borrows the secret
+ * because it needs some gate and that one already existed.
  *
- * The success path for /api/cron/refresh is covered in routes-v2.test.ts.
- * This file covers the remaining cron routes plus /api/horizon/debug.
+ * The two surviving crons are covered where they live: `tap-provision` in `routes-api-b.test.ts`
+ * and its own directory, `reconcile-bounties` in `bounty-reconcile-routes.test.ts`.
+ *
+ * The properties are unchanged: 401 with no secret set, 401 on a wrong token, 401 with no header,
+ * and 503 rather than 200 when auth passes but the services behind it are not there.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
@@ -132,273 +134,15 @@ async function assertCronAuth(
   vi.unstubAllEnvs();
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 
-describe('/api/cron/ingest-epochs', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-epochs', () => import('@/app/api/cron/ingest-epochs/route'));
-  });
 
-  it('returns 503 when DB not configured (auth passes)', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-epochs/route');
-    const res = await GET(authedRequest('/api/cron/ingest-epochs'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
 
-  it('returns 200 when fully configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    const { GET } = await import('@/app/api/cron/ingest-epochs/route');
-    const res = await GET(authedRequest('/api/cron/ingest-epochs'));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.ok).toBe(true);
-    vi.unstubAllEnvs();
-  });
-});
+
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('/api/cron/ingest-allocations', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-allocations', () => import('@/app/api/cron/ingest-allocations/route'));
-  });
-
-  it('returns 503 when DB not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-allocations/route');
-    const res = await GET(authedRequest('/api/cron/ingest-allocations'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 200 when fully configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    const { GET } = await import('@/app/api/cron/ingest-allocations/route');
-    const res = await GET(authedRequest('/api/cron/ingest-allocations'));
-    expect(res.status).toBe(200);
-    vi.unstubAllEnvs();
-  });
-  it('starts without a gateway key when NUTHATCH_ALLOCATIONS points it at a nest (lodestar#49)', async () => {
-    // `@/lib/nuthatch` reads its origin from the environment at import, so the registry is reset
-    // and the origin stubbed before the route (and the real `nuthatchEnabled`) load.
-    vi.resetModules();
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    vi.stubEnv('NUTHATCH_URL', 'http://nest.test');
-    vi.stubEnv('NUTHATCH_ALLOCATIONS', 'true');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(false);
-    const { GET } = await import('@/app/api/cron/ingest-allocations/route');
-    const res = await GET(authedRequest('/api/cron/ingest-allocations'));
-    expect(res.status).not.toBe(503);
-    expect(mockIngestAllocations).toHaveBeenCalled();
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/ingest-delegations', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-delegations', () => import('@/app/api/cron/ingest-delegations/route'));
-  });
-
-  it('returns 503 when DB not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-delegations/route');
-    const res = await GET(authedRequest('/api/cron/ingest-delegations'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 200 when DB configured (no subgraph needed)', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    const { GET } = await import('@/app/api/cron/ingest-delegations/route');
-    const res = await GET(authedRequest('/api/cron/ingest-delegations'));
-    expect(res.status).toBe(200);
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/ingest-disputes', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-disputes', () => import('@/app/api/cron/ingest-disputes/route'));
-  });
-
-  it('returns 503 when DB not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-disputes/route');
-    const res = await GET(authedRequest('/api/cron/ingest-disputes'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 200 when fully configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    const { GET } = await import('@/app/api/cron/ingest-disputes/route');
-    const res = await GET(authedRequest('/api/cron/ingest-disputes'));
-    expect(res.status).toBe(200);
-    vi.unstubAllEnvs();
-  });
-  it('starts without a gateway key when NUTHATCH_DISPUTES points it at a nest (lodestar#49)', async () => {
-    // `@/lib/nuthatch` reads its origin from the environment at import, so the registry is reset
-    // and the origin stubbed before the route (and the real `nuthatchEnabled`) load.
-    vi.resetModules();
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    vi.stubEnv('NUTHATCH_URL', 'http://nest.test');
-    vi.stubEnv('NUTHATCH_DISPUTES', 'true');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(false);
-    const { GET } = await import('@/app/api/cron/ingest-disputes/route');
-    const res = await GET(authedRequest('/api/cron/ingest-disputes'));
-    expect(res.status).not.toBe(503);
-    expect(mockIngestDisputes).toHaveBeenCalled();
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/ingest-horizon-activity', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-horizon-activity', () => import('@/app/api/cron/ingest-horizon-activity/route'));
-  });
-
-  it('returns 503 when Amp not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-horizon-activity/route');
-    const res = await GET(authedRequest('/api/cron/ingest-horizon-activity'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/snapshot-network', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/snapshot-network', () => import('@/app/api/cron/snapshot-network/route'));
-  });
-
-  it('returns 503 when DB not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/snapshot-network/route');
-    const res = await GET(authedRequest('/api/cron/snapshot-network'));
-    expect(res.status).toBe(503);
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 200 when fully configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    mockDb.mockResolvedValue([]);
-    const { GET } = await import('@/app/api/cron/snapshot-network/route');
-    const res = await GET(authedRequest('/api/cron/snapshot-network'));
-    expect(res.status).toBe(200);
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/refresh-chain-health', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/refresh-chain-health', () => import('@/app/api/cron/refresh-chain-health/route'));
-  });
-
-  it('returns 200 with no-op message when no enriched indexers cached', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    // cacheGet returns null → no enriched indexers → short-circuit
-    const { GET } = await import('@/app/api/cron/refresh-chain-health/route');
-    const res = await GET(authedRequest('/api/cron/refresh-chain-health'));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    vi.unstubAllEnvs();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('/api/cron/ingest-rav', () => {
-  it('enforces CRON_SECRET auth', async () => {
-    await assertCronAuth('/api/cron/ingest-rav', () => import('@/app/api/cron/ingest-rav/route'));
-  });
-
-  it('returns 503 when DB not configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    const { GET } = await import('@/app/api/cron/ingest-rav/route');
-    const res = await GET(authedRequest('/api/cron/ingest-rav'));
-    expect(res.status).toBe(503);
-    expect(mockIngestRav).not.toHaveBeenCalled();
-    vi.unstubAllEnvs();
-  });
-
-  it('returns 200 and the ingest count when fully configured', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    mockIngestRav.mockResolvedValue({ ingested: 3, durationMs: 11 });
-
-    const { GET } = await import('@/app/api/cron/ingest-rav/route');
-    const res = await GET(authedRequest('/api/cron/ingest-rav'));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, ingested: 3 });
-    expect(mockIngestRav).toHaveBeenCalledWith(expect.anything(), { backfill: false });
-    vi.unstubAllEnvs();
-  });
-
-  it('passes ?backfill=1 through to the resumable historical pull', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    const { GET } = await import('@/app/api/cron/ingest-rav/route');
-    await GET(authedRequest('/api/cron/ingest-rav?backfill=1'));
-    expect(mockIngestRav).toHaveBeenCalledWith(expect.anything(), { backfill: true });
-    vi.unstubAllEnvs();
-  });
-
-  it('500s when the ingest throws', async () => {
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(true);
-    mockIngestRav.mockRejectedValue(new Error('escrow subgraph down'));
-
-    const { GET } = await import('@/app/api/cron/ingest-rav/route');
-    const res = await GET(authedRequest('/api/cron/ingest-rav'));
-    expect(res.status).toBe(500);
-    expect((await res.json()).error).toMatch(/RAV ingestion failed/);
-    vi.unstubAllEnvs();
-  });
-  it('starts without a gateway key when NUTHATCH_RAV points it at a nest (lodestar#49)', async () => {
-    // `@/lib/nuthatch` reads its origin from the environment at import, so the registry is reset
-    // and the origin stubbed before the route (and the real `nuthatchEnabled`) load.
-    vi.resetModules();
-    vi.stubEnv('CRON_SECRET', 'test-secret');
-    vi.stubEnv('NUTHATCH_URL', 'http://nest.test');
-    vi.stubEnv('NUTHATCH_RAV', 'true');
-    mockHasDbAccess.mockReturnValue(true);
-    mockHasSubgraphAccess.mockReturnValue(false);
-    const { GET } = await import('@/app/api/cron/ingest-rav/route');
-    const res = await GET(authedRequest('/api/cron/ingest-rav'));
-    expect(res.status).not.toBe(503);
-    expect(mockIngestRav).toHaveBeenCalled();
-    vi.unstubAllEnvs();
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 

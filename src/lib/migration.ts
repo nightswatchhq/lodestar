@@ -303,25 +303,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   },
 ];
 
-/**
- * Cron routes whose schedule moved to kittiwake on 7 September.
- *
- * The handlers still exist and are deliberately no longer scheduled: they are the rollback. If
- * kittiwake's scheduler has to be turned off, putting these back in `vercel.json` restores the old
- * behaviour without a revert. Delete them only once that is no longer wanted.
- */
-const DESCHEDULED_CRONS: readonly string[] = [
-  '/api/cron/ingest-allocations',
-  '/api/cron/ingest-delegations',
-  '/api/cron/ingest-disputes',
-  '/api/cron/ingest-epochs',
-  '/api/cron/ingest-horizon-activity',
-  '/api/cron/ingest-rav',
-  '/api/cron/refresh',
-  '/api/cron/refresh-chain-health',
-  '/api/cron/snapshot-network',
-  '/api/cron/warm-ipfs',
-];
 
 /**
  * Every route the public surface has, with its state.
@@ -339,20 +320,21 @@ export function buildInventory(routeFilePaths: readonly string[]): RouteRecord[]
       out.push(explicit);
       continue;
     }
-    if (DESCHEDULED_CRONS.includes(path)) {
-      out.push({
-        path,
-        state: 'cron',
-        workstream: 'scheduled',
-        note: 'descheduled on 7 September; kittiwake runs it. Handler kept as the rollback.',
-      });
-      continue;
-    }
     out.push({ path, state: 'kittiwake', workstream: 'data plane' });
   }
 
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
+
+/**
+ * Route files in this repo when the goal became "Lodestar is a frontend and nothing else".
+ *
+ * A percentage needs a fixed denominator, and every other candidate shrinks as work lands: a share
+ * of what is left is always 100%. This is the count on 2026-09-10, the day the ten descheduled cron
+ * handlers were deleted, and it is a constant on purpose. It says how far we have come from a fixed
+ * point rather than how much of the current backlog is done, which is the question that flatters.
+ */
+export const ROUTES_AT_BASELINE = 93;
 
 export interface MigrationSummary {
   /** Public read surface: everything except crons and routes already agreed for deletion. */
@@ -365,6 +347,10 @@ export interface MigrationSummary {
   /** Not counted in `inScope`, reported separately so the denominator is honest. */
   doomed: number;
   scheduled: number;
+  /** Route files still in this repo. The goal is zero: everything here is a thing a frontend holds. */
+  remaining: number;
+  /** How far from [`ROUTES_AT_BASELINE`] to zero, 0-100 and rounded. */
+  percentToFrontend: number;
   byWorkstream: { workstream: Workstream; total: number; onKittiwake: number; onNext: number }[];
 }
 
@@ -376,6 +362,9 @@ export interface MigrationSummary {
  * reported on its own so the reader can see what the denominator excludes.
  */
 export function summarise(inventory: readonly RouteRecord[]): MigrationSummary {
+  // Everything with a handler in this repo, whatever its state. A route that stays by decision is
+  // still a route this repo serves, and the target counts it.
+  const remaining = inventory.filter((r) => r.state !== 'kittiwake').length;
   const public_ = inventory.filter((r) => r.state !== 'cron' && r.workstream !== 'scheduled');
   const inScopeRecords = public_.filter((r) => r.state === 'kittiwake' || r.state === 'next');
 
@@ -400,6 +389,10 @@ export function summarise(inventory: readonly RouteRecord[]): MigrationSummary {
     percent: inScope === 0 ? 0 : Math.round((onKittiwake / inScope) * 100),
     doomed: public_.filter((r) => r.state === 'doomed').length,
     scheduled: inventory.filter((r) => r.workstream === 'scheduled').length,
+    remaining,
+    percentToFrontend: Math.round(
+      ((ROUTES_AT_BASELINE - remaining) / ROUTES_AT_BASELINE) * 100,
+    ),
     byWorkstream: [...streams.entries()]
       .map(([workstream, s]) => ({ workstream, ...s }))
       .sort((a, b) => b.onNext - a.onNext || a.workstream.localeCompare(b.workstream)),

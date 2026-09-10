@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const { buildInventory, summarise } = await import('../src/lib/migration.ts');
+const { buildInventory, summarise, ROUTES_AT_BASELINE } = await import('../src/lib/migration.ts');
 const { ROUTE_FILES } = await import('../src/lib/route-files.generated.ts');
 
 export function renderDoc() {
@@ -16,11 +16,16 @@ export function renderDoc() {
   L.push('     run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what');
   L.push('     the edge routes from and what /migration renders. -->');
   L.push('');
-  L.push(`**${s.onKittiwake} of ${s.inScope} routes** on kittiwake, **${s.percent}%**. ${s.onNext} left.`);
+  L.push(`**${s.remaining} route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. ` +
+    `That is **${s.percentToFrontend}%** of the way from ${ROUTES_AT_BASELINE} on 10 September 2026.`);
   L.push('');
-  L.push('The denominator is routes meant to move that have not yet. It excludes ' +
+  L.push(`Of the port itself, **${s.onKittiwake} of ${s.inScope}** are across, **${s.percent}%**, with ${s.onNext} to go.`);
+  L.push('');
+  L.push(`That second denominator is routes meant to move that have not yet, and it excludes ` +
     `${s.doomed} agreed for deletion, ${s.stayingOnNext} staying on Next by decision, and ` +
-    `${s.scheduled} scheduled endpoints. Each is listed below rather than quietly improving the figure.`);
+    `${s.scheduled} scheduled endpoints. The first counts all of them, because a route that stays ` +
+    `by decision is still a route this repo serves. Each is listed below rather than quietly ` +
+    `improving either figure.`);
   L.push('');
   L.push('## By block of work');
   L.push('');
@@ -47,7 +52,6 @@ export function renderDoc() {
   section('Still on Next', inv.filter((r) => r.state === 'next'), false);
   section('Staying on Next by decision', inv.filter((r) => r.state === 'staying'), true);
   section('To be deleted rather than ported', inv.filter((r) => r.state === 'doomed'), true);
-  section('Descheduled crons, handlers kept as the rollback', inv.filter((r) => r.state === 'cron'), false);
 
   return L.join('\n') + '\n';
 }
