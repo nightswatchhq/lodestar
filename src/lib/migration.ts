@@ -237,7 +237,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // and "no in-repo consumer" is not "nobody reads it" for a public path on a public host. It wants
   // confirming with a person before it goes.
   { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
-  { path: '/api/blog/search-index', state: 'next', workstream: 'the long tail' },
   { path: '/api/data-services/query', state: 'next', workstream: 'the long tail' },
   { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
   { path: '/api/indexer/present-poi', state: 'next', workstream: 'the long tail' },

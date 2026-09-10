@@ -93,7 +93,7 @@ export default function BlogIndex({ posts }: { posts: PostMeta[] }) {
   const loadBodies = useCallback(() => {
     setBodies((current) => {
       if (current) return current;
-      fetch('/api/blog/search-index')
+      fetch('/blog-search-index.json')
         .then((r) => (r.ok ? r.json() : null))
         // A failed fetch is not worth surfacing: search keeps working on
         // titles, excerpts and tags, it just doesn't reach into post bodies.
