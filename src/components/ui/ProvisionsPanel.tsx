@@ -6,6 +6,7 @@ import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
 import { weiToGRT, formatGRT, shortenAddress, cn } from '@/lib/utils';
 import type { Provision } from '@/lib/queries';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 // Known data service addresses → friendly names
 const SERVICE_NAMES: Record<string, string> = {
@@ -31,10 +32,15 @@ function resolveServiceName(id: string): string {
 interface ProvisionsPanelProps {
   provisions: Provision[];
   isLoading?: boolean;
+  /**
+   * The provisions could not be read. Distinct from an empty list, because "has not provisioned
+   * stake to any data service" is a claim about an operator and must not be made out of an outage.
+   */
+  unavailable?: boolean;
   selfStakeGRT?: number;
 }
 
-export function ProvisionsPanel({ provisions, isLoading, selfStakeGRT }: ProvisionsPanelProps) {
+export function ProvisionsPanel({ provisions, isLoading, unavailable, selfStakeGRT }: ProvisionsPanelProps) {
   const serviceBreakdown = useMemo(() => {
     if (!provisions.length) return [];
 
@@ -74,6 +80,22 @@ export function ProvisionsPanel({ provisions, isLoading, selfStakeGRT }: Provisi
       { provisioned: 0, allocated: 0, thawing: 0, available: 0 }
     );
   }, [provisions]);
+
+  if (unavailable) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Provisions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SourceUnavailable
+            what="Service provisions"
+            detail="Nothing here is a statement about what this indexer has provisioned."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isLoading) {
     return (

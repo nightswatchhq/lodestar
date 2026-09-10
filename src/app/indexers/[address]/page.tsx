@@ -120,7 +120,8 @@ export default function IndexerDetailPage({
   const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
-  const { data: provisionsData, isLoading: provisionsLoading } = useIndexerProvisions(address);
+  const provisionsQuery = useIndexerProvisions(address);
+  const { data: provisionsData } = provisionsQuery;
   const { data: reoData } = useREOStatus(address);
   const { data: foghornAllocQos } = useIndexerAllocationsQos(address);
   const { data: recentDelegations } = useRecentDelegations(address);
@@ -1064,7 +1065,11 @@ export default function IndexerDetailPage({
       {/* Service Provisions */}
       <ProvisionsPanel
         provisions={provisionsData?.provisions ?? []}
-        isLoading={provisionsLoading}
+        isLoading={provisionsQuery.isPending && provisionsQuery.fetchStatus !== 'paused'}
+        unavailable={
+          provisionsQuery.isError ||
+          (provisionsQuery.isPending && provisionsQuery.fetchStatus === 'paused')
+        }
         selfStakeGRT={selfStake}
       />
 

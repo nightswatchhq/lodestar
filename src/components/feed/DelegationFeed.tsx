@@ -6,6 +6,7 @@ import { useNetworkDelegations, useEnrichedIndexers } from '@/hooks/useNetworkSt
 import { NuthatchBadge } from '@/components/ui/NuthatchBadge';
 import { weiToGRT, formatGRT, formatRelativeTime, cn } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 const EVENT_CONFIG: Record<string, { label: string; color: string; sign: '+' | '-' | '' }> = {
   StakeDelegated: { label: 'Delegated', color: 'var(--green)', sign: '+' },
@@ -55,7 +56,14 @@ export function DelegationFeed({ indexerAddress: initialFilter }: DelegationFeed
   }, [activeFilter, nameToAddress]);
 
   const isValidAddress = /^0x[a-fA-F0-9]{40}$/.test(resolvedFilter);
-  const { data: delegations, isLoading } = useNetworkDelegations(isValidAddress ? resolvedFilter : undefined);
+  const delegationsQuery = useNetworkDelegations(isValidAddress ? resolvedFilter : undefined);
+  const { data: delegations } = delegationsQuery;
+  // A paused retry is not an empty feed. "No delegation events found" for an indexer that has
+  // plenty is the same mistake as the indexer page's "not found", one panel down.
+  const isLoading = delegationsQuery.isPending && delegationsQuery.fetchStatus !== 'paused';
+  const unavailable =
+    delegationsQuery.isError ||
+    (delegationsQuery.isPending && delegationsQuery.fetchStatus === 'paused');
   const events = delegations?.events;
   const nuthatchBacked = delegations?.source === 'nuthatch';
 
@@ -148,6 +156,11 @@ export function DelegationFeed({ indexerAddress: initialFilter }: DelegationFeed
               <div key={i} className="h-14 shimmer rounded-lg" />
             ))}
           </div>
+        ) : unavailable ? (
+          <SourceUnavailable
+            what="Delegation events"
+            detail="Nothing here is a statement about what has been delegated."
+          />
         ) : !events?.length ? (
           <p className="text-sm text-[var(--text-muted)] text-center py-8">
             {activeFilter ? 'No delegation events found' : 'No recent delegation events'}

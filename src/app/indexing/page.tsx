@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { cn, weiToGRT, formatGRT, shortenAddress } from '@/lib/utils';
 import type { ChainLagData } from '@/app/api/cron/refresh-chain-health/route';
 import { formatStallDuration, type ChainLiveness } from '@/lib/chain-liveness';
+import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
 // ---------------------------------------------------------------------------
 // Types for subgraph name search
@@ -259,11 +260,18 @@ export default function IndexingStatusPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const { results: searchResults, isSearching } = useSubgraphSearch(search);
-  const { data: deployments, isLoading } = useSubgraphDeployments({
+  const deploymentsQuery = useSubgraphDeployments({
     first: 20,
     orderBy: 'stakedTokens',
     orderDirection: 'desc',
   });
+  const { data: deployments } = deploymentsQuery;
+  const isLoading = deploymentsQuery.isPending && deploymentsQuery.fetchStatus !== 'paused';
+  // A paused retry is not an empty network. "No subgraphs found" would be a claim about what is
+  // deployed, made because we could not reach our own backend.
+  const deploymentsUnavailable =
+    deploymentsQuery.isError ||
+    (deploymentsQuery.isPending && deploymentsQuery.fetchStatus === 'paused');
 
   const isHash = search.trim().startsWith('Qm') || search.trim().startsWith('bafy');
 
@@ -394,7 +402,12 @@ export default function IndexingStatusPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {deploymentsUnavailable ? (
+            <SourceUnavailable
+              what="Subgraph deployments"
+              detail="Nothing below is a statement about what is deployed on the network."
+            />
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
             </div>
