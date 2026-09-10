@@ -268,54 +268,6 @@ describe('/api/payments', () => {
 });
 
 // ============================================================
-// /api/feed
-// ============================================================
-
-describe('/api/feed', () => {
-  let GET: () => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/feed/route');
-    GET = mod.GET;
-  });
-
-  it('returns { items } array when all external sources fail gracefully', async () => {
-    // All fetch calls return non-ok or empty — route should still return 200
-    mockFetch.mockResolvedValue(new Response('', { status: 404 }));
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('items');
-    expect(Array.isArray(json.items)).toBe(true);
-  });
-
-  it('returns items when forum API succeeds', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          topic_list: {
-            topics: [
-              { id: 1, title: 'GIP-0001', slug: 'gip-0001', pinned: false, views: 100, reply_count: 5, bumped_at: '2026-04-01T00:00:00Z', tags: ['gip'], excerpt: 'A proposal' },
-            ],
-          },
-        }),
-        { status: 200 },
-      ),
-    );
-    // Remaining fetch calls fail gracefully
-    mockFetch.mockResolvedValue(new Response('', { status: 404 }));
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(json.items)).toBe(true);
-  });
-});
-
-// ============================================================
 // /api/parameter-history/[address]
 // ============================================================
 

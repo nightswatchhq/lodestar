@@ -41,7 +41,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/dropped-chains',
   '/api/ens',
   '/api/epochs',
-  '/api/feed',
   '/api/foghorn/[...path]',
   '/api/grt-flow',
   '/api/health',
