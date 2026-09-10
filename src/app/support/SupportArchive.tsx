@@ -8,9 +8,12 @@ import { useGraphSupport } from '@/hooks/useGraphSupport';
 import {
   areaCounts,
   areasOf,
+  dispositionLabel,
   filterIssues,
-  groupClosedByDisposition,
-  groupOpenByOwner,
+  groupByArea,
+  ownerLabel,
+  primaryDisposition,
+  primaryOwner,
   type IssueGroup,
   type SupportIssue,
 } from '@/lib/graph-support';
@@ -32,8 +35,19 @@ function relativeDate(iso: string): string {
   return months === 1 ? 'a month ago' : `${months} months ago`;
 }
 
-function IssueRow({ issue }: { issue: SupportIssue }) {
-  const areas = areasOf(issue);
+/** A disposition's badge colour: repaired reads differently from merely diagnosed. */
+function dispositionVariant(key: string): 'success' | 'warning' | 'default' {
+  if (key === 'fixed') return 'success';
+  if (key === 'handed-off') return 'warning';
+  return 'default';
+}
+
+function IssueRow({ issue, area }: { issue: SupportIssue; area: string }) {
+  const owner = primaryOwner(issue);
+  const disposition = primaryDisposition(issue);
+  // The heading already says this area, so only the ones it also spans are worth the space, and
+  // as plain text rather than badges: the badges carry the judgements, not the filing.
+  const alsoIn = areasOf(issue).filter((a) => a !== area);
 
   return (
     <a
@@ -48,16 +62,16 @@ function IssueRow({ issue }: { issue: SupportIssue }) {
 
       <span className="min-w-0 flex-1">
         {/* Titles carry the literal error text and run to 229 characters at the longest, so they
-            clamp rather than pushing the areas and dates off the row. */}
+            clamp rather than pushing the badges and dates off the row. */}
         <span className="block break-words text-sm leading-snug text-[var(--text)] transition-colors group-hover:text-[var(--accent-text)] line-clamp-3">
           {issue.title}
         </span>
         <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--text-faint)]">
-          {areas.map((area) => (
-            <Badge key={area} variant="default">
-              {area}
-            </Badge>
-          ))}
+          {owner && <Badge variant="accent">{ownerLabel(owner)}</Badge>}
+          {issue.state === 'closed' && disposition && (
+            <Badge variant={dispositionVariant(disposition)}>{dispositionLabel(disposition)}</Badge>
+          )}
+          {alsoIn.length > 0 && <span>also {alsoIn.join(', ')}</span>}
           <span>updated {relativeDate(issue.updatedAt)}</span>
           {issue.comments > 0 && (
             <span>
@@ -84,7 +98,7 @@ function GroupSection({ group }: { group: IssueGroup }) {
       )}
       <div className="rounded-[var(--radius-card)] border-[0.5px] border-[var(--border)] bg-[var(--bg-surface)] px-4">
         {group.issues.map((issue) => (
-          <IssueRow key={issue.number} issue={issue} />
+          <IssueRow key={issue.number} issue={issue} area={group.key} />
         ))}
       </div>
     </section>
@@ -118,24 +132,28 @@ export default function SupportArchive() {
     return area === null ? searched : searched.filter((i) => areasOf(i).includes(area));
   }, [issues, query, area]);
 
-  const openGroups = useMemo(() => groupOpenByOwner(visible), [visible]);
-  const closedGroups = useMemo(() => groupClosedByDisposition(visible), [visible]);
-
   const areas = useMemo(() => areaCounts(issues), [issues]);
   const openCount = issues.filter((i) => i.state === 'open').length;
   const closedCount = issues.length - openCount;
 
-  const groups = tab === 'open' ? openGroups : closedGroups;
-  const shown = groups.reduce((n, g) => n + g.issues.length, 0);
+  const onTab = useMemo(
+    () => visible.filter((i) => (tab === 'open' ? i.state === 'open' : i.state === 'closed')),
+    [visible, tab],
+  );
+  const groups = useMemo(() => groupByArea(onTab), [onTab]);
+
+  // Nineteen of the thirty-three sit in more than one area and are listed under each, so the
+  // headings deliberately add up to more than this. Count the issues, not the rows.
+  const shown = onTab.length;
+  const listed = groups.reduce((n, g) => n + g.issues.length, 0);
   const filtering = query.trim() !== '' || area !== null;
 
   // A search that matches only on the other tab would otherwise render as "nothing matches",
   // which is the page telling a reader their error is not in an archive that in fact holds it.
   const otherTab: Tab = tab === 'open' ? 'resolved' : 'open';
-  const elsewhere = (otherTab === 'open' ? openGroups : closedGroups).reduce(
-    (n, g) => n + g.issues.length,
-    0,
-  );
+  const elsewhere = visible.filter((i) =>
+    otherTab === 'open' ? i.state === 'open' : i.state === 'closed',
+  ).length;
 
   if (error) {
     return (
@@ -239,9 +257,14 @@ export default function SupportArchive() {
       )}
 
       <p className="mb-5 max-w-2xl text-xs leading-relaxed text-[var(--text-muted)]">
-        {tab === 'open'
-          ? 'Grouped by who can actually fix it, because that is usually the thing worth knowing first.'
-          : 'Grouped by how each one ended. Every thread carries the mechanism, how it was checked, and what to do if you hit it.'}
+        Grouped by the part of the stack it is about, following the path a subgraph takes: publish,
+        index, serve, route, and the chain underneath.{' '}
+        {listed > shown && (
+          <>
+            {shown} issues across {groups.length} areas, listed under each area they touch.{' '}
+          </>
+        )}
+        Each row says who can actually fix it.
       </p>
 
       {isLoading ? (
