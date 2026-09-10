@@ -62,12 +62,65 @@ const OWNER_PREFIX = 'owner/';
 const AREA_PREFIX = 'area/';
 
 /**
- * Owners in the order the page shows them, which is roughly furthest from the reader first.
+ * Owner display names, in the order used to resolve an issue carrying more than one.
  *
- * A reader's first question is whether their problem is someone else's to fix, so the parties
- * they cannot escalate to lead. Fixed order rather than by count, so landing an issue does not
- * reshuffle the page under anyone reading it.
+ * Roughly furthest from the reader first: #19 is both `owner/edge-and-node` and `owner/reporter`,
+ * and "Edge & Node have to fix this" is the more useful half. Shown as a badge on the row rather
+ * than as a heading, because grouping by who owns a thing sorts the archive by organisation when
+ * a reader is looking for a symptom.
  */
+/**
+ * The areas, in the order the page shows them, which follows the path a subgraph takes rather
+ * than the alphabet or the issue count.
+ *
+ * Publish, index, serve, route, and the chain underneath all of it. A reader arrives with a
+ * symptom and a rough idea of where in that path they are standing, which is a better first cut
+ * than which organisation happens to own the fix. Fixed order, so landing an issue does not
+ * reshuffle the page under someone reading it.
+ */
+const AREA_ORDER: readonly { key: string; label: string; blurb: string }[] = [
+  {
+    key: 'studio',
+    label: 'Studio and publishing',
+    blurb: 'Deploying, publishing and versioning, before anything is being served.',
+  },
+  {
+    key: 'graph-node',
+    label: 'graph-node and indexing',
+    blurb: 'Handlers, determinism and the store: a subgraph that will not sync or has diverged.',
+  },
+  {
+    key: 'indexer',
+    label: 'Indexers',
+    blurb: 'A specific operator’s node and what it is actually serving, healthy or otherwise.',
+  },
+  {
+    key: 'gateway',
+    label: 'Gateway and routing',
+    blurb: 'How a query gets routed, and why yours reached the indexer it did or none at all.',
+  },
+  {
+    key: 'rpc',
+    label: 'RPC and chain data',
+    blurb: 'The chain underneath, and the providers serving it. Frequently the real cause.',
+  },
+  {
+    key: 'horizon',
+    label: 'Horizon',
+    blurb: 'Provisions, TAP and the new staking, where the upgrade behaves unlike the old one.',
+  },
+  {
+    key: 'governance',
+    label: 'Governance',
+    blurb: 'Protocol decisions and parameters rather than code.',
+  },
+  {
+    key: 'docs',
+    label: 'Documentation',
+    blurb: 'What the docs say, or do not.',
+  },
+];
+
 const OWNER_ORDER: readonly { key: string; label: string; blurb: string }[] = [
   {
     key: 'owner/edge-and-node',
@@ -184,68 +237,62 @@ function byRecency(a: SupportIssue, b: SupportIssue): number {
   return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
 }
 
+/** `owner/edge-and-node` as `Edge & Node`, for the badge on a row. */
+export function ownerLabel(key: string): string {
+  return OWNER_ORDER.find((o) => o.key === key)?.label ?? prettifyOwner(key);
+}
+
+/** `root-cause-found` as `Root cause found`, for the badge on a row. */
+export function dispositionLabel(key: string): string {
+  return (
+    DISPOSITION_ORDER.find((d) => d.key === key)?.label ??
+    key.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+  );
+}
+
 /**
- * Open issues grouped by who can fix them.
+ * Issues grouped by the part of the stack they are about.
  *
- * Empty groups are dropped, so a page rendering four headings is telling you there are only four
- * kinds of open problem rather than hiding the rest.
+ * An issue appears under **every** area it carries, not one primary area. Nineteen of the
+ * thirty-three carry more than one, and somebody whose gateway is misbehaving wants
+ * `bad indexers: BadResponse(400)` in front of them whether or not it is also filed under
+ * `area/indexer`. Picking a primary area would hide exactly the cross-cutting issues that are
+ * hardest to find by searching.
+ *
+ * The consequence is that the group counts sum to more than the number of issues, which the page
+ * says out loud rather than leaving a reader to add them up and wonder.
  */
-export function groupOpenByOwner(issues: readonly SupportIssue[]): IssueGroup[] {
-  const open = issues.filter((i) => i.state === 'open');
+export function groupByArea(issues: readonly SupportIssue[]): IssueGroup[] {
   const groups: IssueGroup[] = [];
 
-  for (const { key, label, blurb } of OWNER_ORDER) {
-    const matched = open.filter((i) => primaryOwner(i) === key).sort(byRecency);
+  for (const { key, label, blurb } of AREA_ORDER) {
+    const matched = issues.filter((i) => areasOf(i).includes(key)).sort(byRecency);
     if (matched.length > 0) groups.push({ key, label, blurb, issues: matched });
   }
 
-  // Owners gained since OWNER_ORDER was written, so a new label shows up rather than disappearing.
-  const known = new Set(OWNER_ORDER.map((o) => o.key));
-  const extra = new Map<string, SupportIssue[]>();
-  for (const issue of open) {
-    const owner = primaryOwner(issue);
-    if (owner && !known.has(owner)) {
-      const list = extra.get(owner) ?? [];
-      list.push(issue);
-      extra.set(owner, list);
-    }
+  // Areas the taxonomy has gained since this file was written. `area/governance` arrived without
+  // ever appearing in TRIAGE.md, so this path is not hypothetical.
+  const known = new Set(AREA_ORDER.map((a) => a.key));
+  const extra = new Set<string>();
+  for (const issue of issues) {
+    for (const area of areasOf(issue)) if (!known.has(area)) extra.add(area);
   }
-  for (const [key, list] of [...extra].sort(([a], [b]) => a.localeCompare(b))) {
-    groups.push({ key, label: prettifyOwner(key), issues: list.sort(byRecency) });
-  }
-
-  const unowned = open.filter((i) => primaryOwner(i) === null).sort(byRecency);
-  if (unowned.length > 0) {
+  for (const key of [...extra].sort()) {
     groups.push({
-      key: '',
-      label: 'Not yet assigned an owner',
-      blurb: 'Open, and nobody has yet said whose these are.',
-      issues: unowned,
+      key,
+      label: key.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase()),
+      issues: issues.filter((i) => areasOf(i).includes(key)).sort(byRecency),
     });
   }
 
-  return groups;
-}
-
-/** Closed issues grouped by how they ended. */
-export function groupClosedByDisposition(issues: readonly SupportIssue[]): IssueGroup[] {
-  const closed = issues.filter((i) => i.state === 'closed');
-  const groups: IssueGroup[] = [];
-
-  for (const { key, label, blurb } of DISPOSITION_ORDER) {
-    const matched = closed.filter((i) => primaryDisposition(i) === key).sort(byRecency);
-    if (matched.length > 0) groups.push({ key, label, blurb, issues: matched });
-  }
-
-  // The repo's own rule is that no issue closes silently. This group is that rule's alarm, and it
-  // renders as nothing at all while the rule is being kept.
-  const silent = closed.filter((i) => primaryDisposition(i) === null).sort(byRecency);
-  if (silent.length > 0) {
+  // An issue with no area label at all would otherwise be reachable only by search.
+  const unfiled = issues.filter((i) => areasOf(i).length === 0).sort(byRecency);
+  if (unfiled.length > 0) {
     groups.push({
       key: '',
-      label: 'Closed without a disposition',
-      blurb: 'Which the triage process says should not happen.',
-      issues: silent,
+      label: 'Not yet filed under an area',
+      blurb: 'Open, and nobody has yet said which part of the stack these are about.',
+      issues: unfiled,
     });
   }
 

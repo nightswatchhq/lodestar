@@ -314,7 +314,7 @@ src/
     profile/     # Connected wallet portfolio
     sql/         # Public read-only SQL surface over the nests
     subgraphs/   # Subgraph directory
-    support/     # graph-support archive: worked answers, grouped by who can fix them
+    support/     # graph-support archive: worked answers, grouped by area of the stack
                  #   live from GitHub, falling back to src/data/graph-support.json
                  #   (refresh with `pnpm support:snapshot`)
   components/    # UI components, layout, charts, tables, feed
