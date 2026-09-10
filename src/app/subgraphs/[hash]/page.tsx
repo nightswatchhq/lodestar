@@ -15,6 +15,7 @@ import {
   useChainLag,
 } from '@/hooks/useNetworkStats';
 import { useDeploymentQos } from '@/hooks/useFoghorn';
+import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
 import { VerdictAge } from '@/components/subgraph/VerdictAge';
 import { SubgraphHistoryChart } from '@/components/charts/SubgraphHistoryChart';
@@ -830,8 +831,14 @@ function CurationSection({ hash }: { hash: string }) {
 // ---------------------------------------------------------------------------
 
 function HistorySection({ hash }: { hash: string }) {
-  const { data, isLoading } = useSubgraphHistory(hash);
-  return <SubgraphHistoryChart data={data?.history ?? []} isLoading={isLoading} />;
+  const state = useQueryState(useSubgraphHistory(hash));
+  return (
+    <SubgraphHistoryChart
+      data={state.kind === 'ready' ? state.data.history : []}
+      isLoading={state.kind === 'loading'}
+      unavailable={unavailableReason(state)}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------

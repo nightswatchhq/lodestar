@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
 import type { PreflightStep, StepStatus } from '@/lib/operator-preflight';
+import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
 
 /**
  * Rehearse the operator sequence for an address, without a wallet.
@@ -47,7 +48,7 @@ export default function OperatePage() {
   const [service, setService] = useState(SERVICES[0].id);
 
   const valid = /^0x[0-9a-fA-F]{40}$/.test(address.trim());
-  const { data, isLoading, isError } = useQuery<Payload>({
+  const query = useQueryState(useQuery<Payload>({
     queryKey: ['operator-preflight', address.trim().toLowerCase(), service],
     queryFn: async () => {
       const r = await fetch(
@@ -59,7 +60,8 @@ export default function OperatePage() {
     enabled: valid,
     staleTime: 60_000,
     retry: 1,
-  });
+  }));
+  const data = query.kind === 'ready' ? query.data : undefined;
 
   return (
     <main className="max-w-[900px] mx-auto px-4 py-8">
@@ -112,13 +114,15 @@ export default function OperatePage() {
         )}
       </Card>
 
-      {valid && isLoading && (
+      {valid && query.kind === 'loading' && (
         <Card>
           <p className="text-[12px] text-[var(--text-muted)]">Reading Arbitrum One…</p>
         </Card>
       )}
 
-      {valid && isError && (
+      {/* A paused retry reached neither branch, so the panel rendered nothing at all and the reader
+          was left with a preflight that had simply gone quiet. */}
+      {valid && isUnavailable(query) && (
         <Card>
           <p className="text-[12px] text-[var(--amber)]">
             The preflight could not run, which is not the same as finding nothing wrong. Try again

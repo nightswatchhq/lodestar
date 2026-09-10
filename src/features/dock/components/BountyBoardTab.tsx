@@ -13,13 +13,15 @@ import { dockKeys, useBounties } from '../api';
 import type { SyncBounty } from '../types';
 import { useDialog } from '@/hooks/useDialog';
 import { useContractStep, type ContractStep } from '@/hooks/useContractStep';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { explainWriteError } from '@/lib/horizon-revert';
 
 export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
   const { confirm, dialog } = useDialog();
   const queryClient = useQueryClient();
   // The whole board, sharing a cache with the per-deployment read in the detail modal.
-  const { data: bountiesData, isLoading, isError } = useBounties();
+  const board = useQueryState(useBounties());
+  const bountiesData = board.kind === 'ready' ? board.data : undefined;
   const [claimTarget, setClaimTarget] = useState<SyncBounty | null>(null);
 
   const [howToOpen, setHowToOpen] = useState(false);
@@ -166,12 +168,12 @@ export function BountyBoardTab({ sessionAddress }: { sessionAddress: string }) {
           )}
         </div>
 
-        {isLoading ? (
+        {board.kind === 'loading' ? (
           <div className="space-y-2">
             {[1, 2, 3].map((i) => <div key={i} className="h-20 rounded-lg shimmer" />)}
           </div>
-        ) : isError ? (
-          <p className="text-sm text-[var(--red-text)] py-4">Failed to load bounties. Please refresh.</p>
+        ) : isUnavailable(board) ? (
+          <p className="text-sm text-[var(--red-text)] py-4">{unavailableReason(board)}</p>
         ) : bounties.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-[var(--text-muted)] text-sm">No bounties posted yet.</p>

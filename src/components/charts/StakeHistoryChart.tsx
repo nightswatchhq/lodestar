@@ -10,13 +10,15 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { useIndexerStakeHistory } from '@/hooks/useNetworkStats';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { formatGRT, formatGRTFull } from '@/lib/utils';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 
 export function StakeHistoryChart({ indexer }: { indexer: string }) {
-  const { data, isLoading } = useIndexerStakeHistory(indexer);
+  const state = useQueryState(useIndexerStakeHistory(indexer));
+  const data = state.kind === 'ready' ? state.data : undefined;
   const history = data?.history ?? [];
 
   return (
@@ -25,8 +27,12 @@ export function StakeHistoryChart({ indexer }: { indexer: string }) {
         <CardTitle>Stake History</CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {state.kind === 'loading' ? (
           <ChartSkeleton height="280px" />
+        ) : isUnavailable(state) ? (
+          <div className="h-[280px] flex items-center justify-center">
+            <p className="text-sm text-[var(--text-faint)]">{unavailableReason(state)}</p>
+          </div>
         ) : history.length === 0 ? (
           <div className="h-[280px] flex items-center justify-center">
             <p className="text-sm text-[var(--text-faint)]">No stake history available</p>

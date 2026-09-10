@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, cn } from '@/lib/utils';
 import type { ActivityEvent } from '@/app/api/horizon/activity/route';
@@ -38,12 +39,14 @@ const SLOW_MESSAGES = [
 export function HorizonActivity() {
   const [slowMessage, setSlowMessage] = useState<string | null>(null);
 
-  const { data, isLoading, isFetching, dataUpdatedAt } = useQuery<{ data: ActivityEvent[] }>({
+  const query = useQuery<{ data: ActivityEvent[] }>({
     queryKey: ['horizon-activity'],
     queryFn: () => fetch('/api/horizon/activity?limit=25').then((r) => r.json()),
     refetchInterval: 30_000,
     staleTime: 25_000,
   });
+  const state = useQueryState(query);
+  const { data, isLoading, isFetching, dataUpdatedAt } = query;
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async slow-load timer — intentional
@@ -95,6 +98,11 @@ export function HorizonActivity() {
                 {slowMessage}
               </p>
             )}
+          </div>
+        ) : isUnavailable(state) ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <span className="text-2xl">⛓</span>
+            <p className="text-sm text-[var(--text-muted)]">{unavailableReason(state)}</p>
           </div>
         ) : events.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">

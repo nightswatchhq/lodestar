@@ -9,6 +9,7 @@ import {
   usePayments,
 } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, formatNumber } from '@/lib/utils';
+import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -29,7 +30,9 @@ function SectionHeader({ title, blurb }: { title: string; blurb: string }) {
 
 export default function NetworkStatePage() {
   const { data: networkData, isLoading: networkLoading } = useNetworkStats();
-  const { data: subgraphs30d, isLoading: subgraphsLoading } = useSubgraphDeployments30d();
+  const subgraphs30dState = useQueryState(useSubgraphDeployments30d());
+  const subgraphs30d = subgraphs30dState.kind === 'ready' ? subgraphs30dState.data : undefined;
+  const subgraphsLoading = subgraphs30dState.kind === 'loading';
   const { data: payments, isLoading: paymentsLoading } = usePayments();
   const { epoch } = useEpochInfo();
 
@@ -176,6 +179,10 @@ export default function NetworkStatePage() {
                 <div key={i} className="h-10 shimmer rounded" />
               ))}
             </div>
+          ) : subgraphs30dState.kind !== 'ready' ? (
+            <p className="text-sm text-[var(--text-faint)]">
+              {unavailableReason(subgraphs30dState) ?? 'No data available'}
+            </p>
           ) : topSubgraphs.length === 0 ? (
             <p className="text-sm text-[var(--text-faint)]">No data available</p>
           ) : (

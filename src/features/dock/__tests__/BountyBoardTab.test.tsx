@@ -34,9 +34,11 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 const bounties: unknown[] = [];
+// `useQueryState` reads `status` and `fetchStatus`, not the derived booleans, which is the whole
+// point of it: a mock that only supplies `isLoading` is the shape that hid the defect.
 vi.mock('../api', () => ({
   dockKeys: { allBounties: ['dock', 'bounties'] },
-  useBounties: () => ({ data: bounties, isLoading: false, isError: false }),
+  useBounties: () => ({ status: 'success', fetchStatus: 'idle', data: bounties }),
 }));
 
 vi.mock('../constants', () => ({ BOUNTY_BOARD_DEPLOYED: true }));

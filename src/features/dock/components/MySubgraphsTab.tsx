@@ -6,6 +6,7 @@ import { SubgraphCard } from './SubgraphCard';
 import { RegisterModal } from './RegisterModal';
 import { SubgraphDetailModal } from './SubgraphDetailModal';
 import { dockKeys, useMySubgraphs } from '../api';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import type { StudioSubgraph } from '../types';
 
 export function MySubgraphsTab({ sessionAddress }: { sessionAddress: string }) {
@@ -13,7 +14,8 @@ export function MySubgraphsTab({ sessionAddress }: { sessionAddress: string }) {
   const [showRegister, setShowRegister] = useState(false);
   const [activeSubgraph, setActiveSubgraph] = useState<StudioSubgraph | null>(null);
 
-  const { data: subgraphs = [], isLoading, isError } = useMySubgraphs();
+  const query = useQueryState(useMySubgraphs());
+  const subgraphs = query.kind === 'ready' ? query.data : [];
 
   const handleCreated = (sg: StudioSubgraph) => {
     // `useCreateSubgraph` already invalidates the list; this keeps the new row on screen without
@@ -60,14 +62,18 @@ export function MySubgraphsTab({ sessionAddress }: { sessionAddress: string }) {
           </button>
         </div>
 
-        {isLoading ? (
+        {/* "No subgraphs yet" is a claim about this account, so it waits for an answer. A failed
+            or paused read used to fall straight through to it. */}
+        {isUnavailable(query) ? (
+          <p className="text-sm text-[var(--text-muted)] py-8 text-center">
+            {unavailableReason(query)}
+          </p>
+        ) : query.kind !== 'ready' ? (
           <div className="space-y-2">
             {[1, 2].map((i) => (
               <div key={i} className="h-16 rounded-lg shimmer" />
             ))}
           </div>
-        ) : isError ? (
-          <p className="text-sm text-[var(--red-text)] py-4">Failed to load subgraphs. Please refresh.</p>
         ) : subgraphs.length === 0 ? (
           <div className="flex flex-col items-center py-16 text-center gap-4 border border-dashed border-[var(--border)] rounded-xl">
             <div className="w-12 h-12 rounded-xl bg-[var(--accent-dim)] flex items-center justify-center">
