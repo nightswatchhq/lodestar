@@ -56,6 +56,11 @@ const LIMITS: Array<[RegExp, number]> = [
   [/^\/api\/indexer-node-health/, 200],
   // Same fan-out shape, same reasoning: read per row, cheap, and previously sharing one bucket.
   [/^\/api\/dropped-chains/, 120],
+  // Opening an issue writes to a public repository under one credential, so the cost of abuse is
+  // borne by that repository rather than by this box. Read the per-instance note at the top before
+  // treating three a minute as a ceiling: it is a speed bump on one warm instance, and the honeypot
+  // and the required fields in the route are what a script actually has to get past.
+  [/^\/api\/file-issue/, 3],
   // The catch-all. Raised from 200: this is a public read-only dashboard whose pages legitimately
   // make dozens of calls each, and the per-instance note at the top of this file means the figure
   // was never a global quota anyway - it is a guard against one IP leaning on one warm instance.

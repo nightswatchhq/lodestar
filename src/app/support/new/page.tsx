@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import NewIssueChooser from './NewIssueChooser';
+import NewIssueForm from './NewIssueForm';
 
 export const metadata: Metadata = {
   title: 'File a support issue | Lodestar',
@@ -44,8 +44,8 @@ export default async function NewIssuePage({
           </a>
           , community triage run by The Night&rsquo;s Watch. You get a root cause, a workaround, or
           the name of the party who can actually fix it, and the thread stays public so the next
-          person finds it. Filing needs a GitHub account and the issue is opened under your own
-          name, not Lodestar&rsquo;s.
+          person finds it. You can file it here without a GitHub account, or open it on GitHub under
+          your own name, which is the better of the two if you have one.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default async function NewIssuePage({
         </p>
       </div>
 
-      <NewIssueChooser initialTitle={title ?? ''} />
+      <NewIssueForm initialTitle={title ?? ''} />
     </div>
   );
 }
