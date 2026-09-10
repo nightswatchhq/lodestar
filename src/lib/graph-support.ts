@@ -32,20 +32,16 @@ export interface SupportIssue {
   updatedAt: string;
 }
 
-/** What `/api/support` answers. */
+/**
+ * What `/api/support` answers.
+ *
+ * Served by kittiwake's twice-daily mirror of the repository. `fetchedAt` is when that mirror last
+ * ran, not when this request was made, so a page can say how old the archive is rather than how
+ * recently it asked.
+ */
 export interface SupportArchive {
   issues: SupportIssue[];
-  /** When the data was read from GitHub, so the page can say how fresh it is. */
   fetchedAt: string;
-  /**
-   * Set when GitHub could not be read and the committed snapshot is being served instead.
-   *
-   * The page says so out loud, with the date. A snapshot presented as live is the same class of
-   * lie as an empty archive presented as an empty repository.
-   */
-  stale?: boolean;
-  /** Why the live read failed, when it did. */
-  reason?: string;
 }
 
 /** A rendered group: issues that share an owner, or share a disposition. */

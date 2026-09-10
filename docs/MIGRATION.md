@@ -4,7 +4,7 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**36 of 77 routes** on kittiwake, **47%**. 41 left.
+**37 of 77 routes** on kittiwake, **48%**. 40 left.
 
 The denominator is routes meant to move that have not yet. It excludes 1 agreed for deletion, 3 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
@@ -12,12 +12,12 @@ The denominator is routes meant to move that have not yet. It excludes 1 agreed 
 
 | Block | Done | Left |
 |---|---|---|
-| the long tail | 0/21 | 21 |
+| the long tail | 0/20 | 20 |
 | the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
 | the disassembler | 0/3 | 3 |
 | the SQL upper tier | 0/2 | 2 |
-| data plane | 36/36 | 0 |
+| data plane | 37/37 | 0 |
 
 ## On kittiwake
 
@@ -54,6 +54,7 @@ The denominator is routes meant to move that have not yet. It excludes 1 agreed 
 - `/api/subgraph-history/[hash]`
 - `/api/subgraph-names`
 - `/api/subgraph-search`
+- `/api/support`
 - `/api/token-metrics`
 - `/api/tvl`
 - `/api/whoami`
@@ -100,7 +101,6 @@ The denominator is routes meant to move that have not yet. It excludes 1 agreed 
 - `/api/studio/subgraphs/[id]`
 - `/api/subgraph-schema/[hash]`
 - `/api/subgraph-versions/[hash]`
-- `/api/support`
 
 ## Staying on Next by decision
 

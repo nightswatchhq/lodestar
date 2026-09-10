@@ -8,7 +8,6 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import snapshot from '@/data/graph-support.json';
 import {
   areaCounts,
   areasOf,
@@ -208,54 +207,5 @@ describe('areas', () => {
       { area: 'gateway', count: 1 },
       { area: 'studio', count: 1 },
     ]);
-  });
-});
-
-describe('the committed snapshot', () => {
-  // src/data/graph-support.json is what /support serves when GitHub cannot be read, so a broken
-  // regeneration must fail here rather than reach a phone as an empty page. Refresh it with
-  // `pnpm support:snapshot`.
-  const issues = snapshot.issues as SupportIssue[];
-
-  it('holds the archive rather than an empty list', () => {
-    expect(issues.length).toBeGreaterThan(20);
-    expect(snapshot.capturedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-
-  it('has every field the page reads, on every issue', () => {
-    for (const i of issues) {
-      expect(typeof i.number, `#${i.number}`).toBe('number');
-      expect(i.title.length, `#${i.number} title`).toBeGreaterThan(0);
-      expect(i.url).toContain('github.com/nightswatchhq/graph-support/issues/');
-      expect(['open', 'closed']).toContain(i.state);
-      expect(Array.isArray(i.labels)).toBe(true);
-      expect(Number.isFinite(new Date(i.updatedAt).getTime()), `#${i.number} updatedAt`).toBe(true);
-    }
-  });
-
-  it('carries no pull requests, which the issues endpoint also returns', () => {
-    expect(issues.every((i) => i.url.includes('/issues/'))).toBe(true);
-  });
-
-  it('groups without losing an issue', () => {
-    // The real labels, not fixtures: multi-area, multi-owner and multi-disposition are all here.
-    const seen = new Set(groupByArea(issues).flatMap((g) => g.issues.map((i) => i.number)));
-    expect(seen.size).toBe(issues.length);
-  });
-
-  it('files every issue under at least one area, so none is search-only', () => {
-    const unfiled = issues.filter((i) => areasOf(i).length === 0).map((i) => i.number);
-    expect(unfiled, 'issues with no area/* label').toEqual([]);
-  });
-
-  it('lists more rows than issues, because issues span areas', () => {
-    // The page states this rather than leaving a reader to add the headings up and wonder.
-    const rows = groupByArea(issues).reduce((n, g) => n + g.issues.length, 0);
-    expect(rows).toBeGreaterThan(issues.length);
-  });
-
-  it('has labels outside the ones TRIAGE.md publishes, which is why nothing rejects them', () => {
-    const all = new Set(issues.flatMap((i) => i.labels));
-    expect(all.has('area/governance') || all.has('kind/question')).toBe(true);
   });
 });
