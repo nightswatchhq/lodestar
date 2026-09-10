@@ -113,6 +113,10 @@ export function useContractStep(opts?: {
 
   useEffect(() => {
     if (!mined || !receipt || !txHash || handled.current === txHash) return;
+    // A reverted transaction was mined, so the wait succeeded and `mined` is true. It must not run
+    // `onMined`: at three call sites that callback POSTs the transaction to our own API, and a
+    // claim that reverted on chain would be recorded as a claim that happened.
+    if (receipt.status === 'reverted') return;
     handled.current = txHash;
 
     let cancelled = false;
@@ -137,7 +141,17 @@ export function useContractStep(opts?: {
     resetWrite();
   }, [resetWrite]);
 
-  const error = writeError ?? waitError ?? minedError ?? null;
+  /**
+   * The failure that costs nothing to miss and everything to get wrong.
+   *
+   * `useWaitForTransactionReceipt` resolves for a reverted transaction rather than rejecting: the
+   * receipt was fetched, which is all the wait promised. Reading only `isSuccess` therefore reports
+   * a transaction that consumed gas and did nothing as `done`.
+   */
+  const revertError =
+    receipt?.status === 'reverted' ? new Error('The transaction reverted on chain.') : null;
+
+  const error = writeError ?? waitError ?? revertError ?? minedError ?? null;
 
   // Order matters: an error outranks progress, and a transaction is not `done` until `onMined` has
   // finished rather than merely when the receipt landed.

@@ -6,7 +6,7 @@ import { arbitrum } from 'wagmi/chains';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CONTRACTS } from '@/lib/wallet';
-import { SubgraphLifecyclePanel } from '@/components/studio/SubgraphLifecyclePanel';
+import { SubgraphLifecyclePanel } from './SubgraphLifecyclePanel';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { extractSubgraphId } from '../receipts';
 import { BOUNTY_BOARD_DEPLOYED, NODE_URL } from '../constants';
