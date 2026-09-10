@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { DataService } from '@/data/data-services';
 import { cn } from '@/lib/utils';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 type RunState = 'idle' | 'loading' | 'done' | 'error';
 
@@ -19,7 +20,7 @@ export function Playground({ service }: { service: DataService }) {
   const pg = service.playground;
   const [state, setState] = useState<RunState>('idle');
   const [resp, setResp] = useState<QueryResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { copy, copied } = useCopyToClipboard();
 
   if (!pg) return null;
 
@@ -42,9 +43,7 @@ export function Playground({ service }: { service: DataService }) {
   }
 
   function copyCode() {
-    navigator.clipboard?.writeText(pg!.exampleCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    void copy(pg!.exampleCode);
   }
 
   const resultText =

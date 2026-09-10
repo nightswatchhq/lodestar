@@ -46,26 +46,18 @@ import { shortenAddress, cn } from '@/lib/utils';
 import { gradeVariant } from '@/lib/foghorn';
 import { useQuery } from '@tanstack/react-query';
 import type { Concentration, TierCapture } from '@/lib/concentration';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 /** A code line with a copy button. Local because it is used only here. */
 function CopyRow({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copy, copied } = useCopyToClipboard();
   return (
     <div className="flex items-center gap-2">
       <code className="flex-1 text-xs bg-[var(--bg-elevated)] rounded px-3 py-2 overflow-x-auto whitespace-pre">
         {text}
       </code>
       <button
-        onClick={() => {
-          navigator.clipboard?.writeText(text).then(
-            () => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 1500);
-            },
-            // Clipboard access can be denied; say so rather than showing a false success.
-            () => setCopied(false)
-          );
-        }}
+        onClick={() => void copy(text)}
         className="px-2 py-1 text-xs rounded border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] shrink-0"
       >
         {copied ? 'copied' : 'copy'}

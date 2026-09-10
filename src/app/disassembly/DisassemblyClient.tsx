@@ -21,6 +21,7 @@ import type { DisassemblyDiff, HandlerDiffEntry, HandlerStatus } from '@/lib/dis
 import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/signal';
 import type { VerifyComparison, ModuleComparison, ModuleStatus, OverallVerdict } from '@/lib/disassembly/verify';
 import { emptySearchMessage } from '@/lib/search-backlog';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 const CATEGORY_META: Record<HostCategory, { label: string; variant: 'default' | 'accent' | 'success' | 'warning' | 'error' }> = {
   store: { label: 'store', variant: 'default' },
@@ -349,18 +350,10 @@ function InspectPanel({ initialId }: { initialId?: string }) {
 }
 
 function ShareLink({ id }: { id: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copy, copied } = useCopyToClipboard();
   const href = `/disassembly/${id}`;
 
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}${href}`);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable — the link is still visible below */
-    }
-  };
+
 
   return (
     <div className="flex items-center gap-2 text-[12px]">
@@ -368,7 +361,7 @@ function ShareLink({ id }: { id: string }) {
       <a href={href} className="font-mono text-[var(--accent-text)] hover:underline truncate">{href}</a>
       <button
         type="button"
-        onClick={copy}
+        onClick={() => void copy(`${window.location.origin}${href}`)}
         className="px-2 py-0.5 rounded-[var(--radius-button)] bg-[var(--bg-surface)] border-[0.5px] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors shrink-0"
       >
         {copied ? 'Copied ✓' : 'Copy'}
