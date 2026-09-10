@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
@@ -19,7 +19,6 @@ import type {
 } from '@/lib/disassembly/types';
 import type { DisassemblyDiff, HandlerDiffEntry, HandlerStatus } from '@/lib/disassembly/diff';
 import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/signal';
-import type { VerifyComparison, ModuleComparison, ModuleStatus, OverallVerdict } from '@/lib/disassembly/verify';
 import { emptySearchMessage } from '@/lib/search-backlog';
 
 const CATEGORY_META: Record<HostCategory, { label: string; variant: 'default' | 'accent' | 'success' | 'warning' | 'error' }> = {
@@ -85,21 +84,6 @@ const SAMPLE_ID = 'QmQKXcNQQRdUvNRMGJiE2idoTu9fo5F5MRtKztH4WyKxED';
 
 function short(hash: string, head = 8, tail = 6): string {
   return hash.length > head + tail + 1 ? `${hash.slice(0, head)}…${hash.slice(-tail)}` : hash;
-}
-
-const VERIFY_HOSTS = ['github.com', 'gitlab.com', 'bitbucket.org'];
-
-/** Normalise a metadata codeRepository into a verifiable https git URL, or undefined. */
-function normalizeRepo(url?: string | null): string | undefined {
-  if (!url || !url.trim()) return undefined;
-  let u = url.trim();
-  if (!/^https?:\/\//i.test(u)) u = `https://${u.replace(/^\/+/, '')}`;
-  try {
-    const host = new URL(u).hostname.replace(/^www\./, '');
-    return VERIFY_HOSTS.includes(host) ? u.replace(/^http:\/\//i, 'https://') : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 interface ApiResponse {
@@ -343,7 +327,6 @@ function InspectPanel({ initialId }: { initialId?: string }) {
 
       {data && <ShareLink id={target} />}
       {data && <Report report={data} />}
-      {data && <SourceVerification key={target} deploymentId={target} defaultRepoUrl={normalizeRepo(data.sourceHint?.codeRepository)} />}
     </>
   );
 }
@@ -471,239 +454,6 @@ function ComparePanel() {
 
       {data && <DiffReport diff={data.diff} baseSignal={data.base.signal} targetSignal={data.target.signal} />}
     </>
-  );
-}
-
-// ── Source verification (Phase 2) ────────────────────────────────────────────
-
-type Verdict = OverallVerdict | 'unbuildable';
-
-interface VerifyData {
-  verdict: Verdict;
-  comparison: VerifyComparison | null;
-  build: { log: string; durationMs: number; moduleCount?: number; error?: string };
-}
-interface VerifyApiResponse {
-  data?: VerifyData;
-  error?: string;
-}
-
-const VERDICT_META: Record<Verdict, { label: string; color: string; borderClass: string; blurb: string }> = {
-  'verified-exact': {
-    label: '✓ Verified: byte-identical',
-    color: 'var(--green)',
-    borderClass: 'border-[var(--green-dim)]',
-    blurb: 'Every deployed module is byte-for-byte the build of this source. The strongest possible proof.',
-  },
-  'verified-structural': {
-    label: '✓ Verified: structural match',
-    color: 'var(--green)',
-    borderClass: 'border-[var(--green-dim)]',
-    blurb: 'Bytes differ (build-toolchain noise) but every module exposes an identical reachable host-API surface.',
-  },
-  diverged: {
-    label: '✗ Diverged',
-    color: 'var(--red-text)',
-    borderClass: 'border-[var(--red-dim)]',
-    blurb: 'The deployed WASM differs from this source in ways that change which host APIs are reachable, or a module is missing on one side.',
-  },
-  unbuildable: {
-    label: '⚠ Unbuildable',
-    color: 'var(--amber)',
-    borderClass: 'border-[var(--amber)]',
-    blurb: 'The source could not be built in the sandbox. See the build log below.',
-  },
-};
-
-const MODULE_STATUS_META: Record<ModuleStatus, { label: string; color: string }> = {
-  exact: { label: 'byte-exact', color: 'var(--green)' },
-  structural: { label: 'structural', color: 'var(--green)' },
-  diverged: { label: 'diverged', color: 'var(--red-text)' },
-  'only-built': { label: 'only in source', color: 'var(--amber)' },
-  'only-deployed': { label: 'only deployed', color: 'var(--amber)' },
-};
-
-// Optional source verification, folded into the Inspect view. The deployed WASM
-// is already in hand (fetched from the Qm hash); supplying a repo only adds the
-// "does this match the public source?" check, so it lives behind a disclosure.
-function SourceVerification({ deploymentId, defaultRepoUrl }: { deploymentId: string; defaultRepoUrl?: string }) {
-  const [repoUrl, setRepoUrl] = useState(defaultRepoUrl ?? '');
-  const [ref, setRef] = useState('');
-  const [manifestPath, setManifestPath] = useState('');
-  const [prepareCommand, setPrepareCommand] = useState('');
-
-  const { mutate, data, error, isPending } = useMutation<VerifyData, Error>({
-    mutationFn: async () => {
-      const r = await fetch('/api/disassembly/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deploymentId,
-          repoUrl: repoUrl.trim(),
-          ref: ref.trim() || undefined,
-          manifestPath: manifestPath.trim() || undefined,
-          prepareCommand: prepareCommand.trim() || undefined,
-        }),
-      });
-      const json: VerifyApiResponse = await r.json();
-      if (!r.ok || !json.data) throw new Error(json.error ?? 'Verification failed');
-      return json.data;
-    },
-  });
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (repoUrl.trim() && !isPending) mutate();
-  };
-
-  const inputCls =
-    'px-3 py-2 rounded-[var(--radius-button)] bg-[var(--bg-surface)] border-[0.5px] border-[var(--border)] text-[var(--text)] text-sm font-mono placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--border-mid)]';
-
-  return (
-    <Card>
-      <details>
-        <summary className="cursor-pointer list-none flex items-center justify-between gap-3">
-          <span className="font-semibold text-[var(--text)] text-sm">Verify against source <span className="text-[var(--text-faint)] font-normal">(optional)</span></span>
-          {defaultRepoUrl ? (
-            <Badge variant="success">repo auto-resolved</Badge>
-          ) : (
-            <span className="text-[11px] text-[var(--text-muted)]">does the deployed WASM match the public repo?</span>
-          )}
-        </summary>
-
-        <div className="mt-3 space-y-3">
-          <p className="text-[12px] text-[var(--text-muted)]">
-            The deployed WASM above came straight from the deployment hash. To check it against its source, point us at
-            the public repo. We build it in an ephemeral sandbox and compare the produced WASM byte-for-byte.
-          </p>
-
-          <form onSubmit={submit} className="space-y-2">
-            <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="Source repo URL (https://github.com/org/repo)" spellCheck={false} className={`w-full ${inputCls}`} />
-            {defaultRepoUrl && repoUrl === defaultRepoUrl && (
-              <p className="text-[11px] text-[var(--green)]">↪ auto-resolved from the subgraph&apos;s on-chain metadata; edit if needed.</p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Ref: branch / tag / commit (optional)" spellCheck={false} className={inputCls} />
-              <input value={manifestPath} onChange={(e) => setManifestPath(e.target.value)} placeholder="Manifest path (default subgraph.yaml)" spellCheck={false} className={inputCls} />
-            </div>
-            <input value={prepareCommand} onChange={(e) => setPrepareCommand(e.target.value)} placeholder="Prepare command (advanced, e.g. yarn prepare:mainnet)" spellCheck={false} className={`w-full ${inputCls}`} />
-            <button
-              type="submit"
-              className="px-4 py-2 rounded-[var(--radius-button)] bg-[var(--accent)] text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-              disabled={!repoUrl.trim() || isPending}
-            >
-              {isPending ? 'Building & verifying… (may take a few minutes)' : 'Verify against source'}
-            </button>
-            <p className="text-[11px] text-[var(--text-faint)]">
-              Templated manifests are auto-generated via the repo&apos;s prepare script; for bespoke pipelines, set a
-              custom prepare command. Public github.com / gitlab.com / bitbucket.org repos only.
-            </p>
-          </form>
-
-          {error && (
-            <Card className="border-[var(--red-dim)]">
-              <p className="text-sm text-[var(--red-text)] font-mono">{error.message}</p>
-            </Card>
-          )}
-
-          {data && <VerifyReport result={data} />}
-        </div>
-      </details>
-    </Card>
-  );
-}
-
-function VerifyReport({ result }: { result: VerifyData }) {
-  const meta = VERDICT_META[result.verdict];
-  const c = result.comparison;
-
-  return (
-    <div className="space-y-6">
-      <Card className={meta.borderClass}>
-        <div className="flex flex-col gap-1">
-          <span className="text-lg font-semibold" style={{ color: meta.color }}>{meta.label}</span>
-          <span className="text-sm text-[var(--text-muted)]">{meta.blurb}</span>
-        </div>
-      </Card>
-
-      {c && (
-        <>
-          <StatGrid>
-            <StatCard label="Byte-exact" value={String(c.summary.exact)} subtitle="identical modules" />
-            <StatCard label="Structural" value={String(c.summary.structural)} subtitle="same host surface" />
-            <StatCard label="Diverged" value={String(c.summary.diverged)} subtitle="behaviour differs" />
-            <StatCard label="Modules" value={String(c.summary.total)} subtitle={`${result.build.moduleCount ?? c.summary.total} built`} />
-          </StatGrid>
-
-          <Card>
-            <CardHeader><CardTitle>Per-module comparison</CardTitle></CardHeader>
-            <CardContent>
-              <ModuleTable modules={c.modules} />
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>Build log</CardTitle>
-            <span className="text-[11px] text-[var(--text-muted)]">{(result.build.durationMs / 1000).toFixed(1)}s</span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {result.build.error && <p className="text-[12px] text-[var(--red-text)] mb-2">{result.build.error}</p>}
-          <pre className="max-h-80 overflow-auto text-[11px] font-mono text-[var(--text-muted)] whitespace-pre-wrap bg-[var(--bg-elevated)] rounded-[var(--radius-button)] p-3">
-            {result.build.log || '(no output)'}
-          </pre>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ModuleTable({ modules }: { modules: ModuleComparison[] }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[12px]">
-        <thead>
-          <tr className="text-[var(--text-muted)] text-left">
-            <th className="font-medium py-1 pr-3">Data source</th>
-            <th className="font-medium py-1 pr-3">Status</th>
-            <th className="font-medium py-1 pr-3">Built</th>
-            <th className="font-medium py-1 pr-3">Deployed</th>
-            <th className="font-medium py-1">Host-API delta</th>
-          </tr>
-        </thead>
-        <tbody>
-          {modules.map((m) => {
-            const sm = MODULE_STATUS_META[m.status];
-            return (
-              <tr key={m.name} className="border-t border-[var(--border)]/40 align-top">
-                <td className="py-1.5 pr-3 font-mono text-[var(--text)]">{m.name}</td>
-                <td className="py-1.5 pr-3 font-mono font-semibold" style={{ color: sm.color }}>{sm.label}</td>
-                <td className="py-1.5 pr-3 font-mono text-[var(--text-faint)]">{m.builtBytes != null ? `${(m.builtBytes / 1024).toFixed(0)}KB` : '—'}</td>
-                <td className="py-1.5 pr-3 font-mono text-[var(--text-faint)]">{m.deployedBytes != null ? `${(m.deployedBytes / 1024).toFixed(0)}KB` : '—'}</td>
-                <td className="py-1.5">
-                  {m.hostImportsAdded.length === 0 && m.hostImportsRemoved.length === 0 ? (
-                    <span className="text-[var(--text-faint)]">{m.status === 'exact' || m.status === 'structural' ? '—' : 'n/a'}</span>
-                  ) : (
-                    <span className="flex flex-wrap gap-1 items-center">
-                      {m.hostImportsAdded.map((h) => (
-                        <span key={`+${h}`} className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>+ {h}</span>
-                      ))}
-                      {m.hostImportsRemoved.map((h) => (
-                        <span key={`-${h}`} className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: 'var(--red-dim)', color: 'var(--red-text)' }}>− {h}</span>
-                      ))}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

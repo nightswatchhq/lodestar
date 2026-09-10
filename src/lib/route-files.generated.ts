@@ -37,7 +37,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/dips/agreements',
   '/api/disassembly',
   '/api/disassembly/diff',
-  '/api/disassembly/verify',
   '/api/dropped-chains',
   '/api/ens',
   '/api/epochs',

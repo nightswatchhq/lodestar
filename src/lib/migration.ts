@@ -168,7 +168,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
   { path: '/api/disassembly', state: 'next', workstream: 'the disassembler' },
   { path: '/api/disassembly/diff', state: 'next', workstream: 'the disassembler' },
-  { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
 
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─
   { path: '/api/sql/named', state: 'next', workstream: 'the SQL upper tier' },
