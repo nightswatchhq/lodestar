@@ -3,7 +3,6 @@ import { NextResponse } from 'next/server';
 import { cached } from '@/lib/cache';
 import { log } from '@/lib/logger';
 import type { SupportArchive, SupportIssue } from '@/lib/graph-support';
-import snapshot from '@/data/graph-support.json';
 
 const REPO = 'nightswatchhq/graph-support';
 
@@ -38,12 +37,11 @@ interface GitHubIssue {
 }
 
 /**
- * Thrown when GitHub could not be read, so `cached` stores nothing and the route serves the
- * committed snapshot instead.
+ * Thrown when GitHub could not be read, so `cached` stores nothing and the route answers 503.
  *
  * What it must never do is fold the failure into an empty array. That would cache an empty
  * archive for fifteen minutes and render it as "no issues" - thirty-three worked answers reading
- * as none, with a 200 on it. Absent data must read as absent, and stale data must read as stale.
+ * as none, with a 200 on it. Absent data must read as absent.
  */
 class UpstreamError extends Error {}
 
@@ -111,25 +109,9 @@ export async function GET() {
       },
     });
   } catch (e) {
-    // The archive is a store of write-ups rather than a live feed, so a snapshot committed to the
-    // repo is a usable answer where nothing at all is not. It is labelled and dated in the
-    // payload; the page renders that, and never presents it as live.
-    const reason = e instanceof UpstreamError ? e.message : 'graph-support could not be read';
-    log.api.warn({ reason, snapshotAt: snapshot.capturedAt }, 'Serving the committed graph-support snapshot');
-
     return NextResponse.json(
-      {
-        issues: snapshot.issues as SupportIssue[],
-        fetchedAt: snapshot.capturedAt,
-        stale: true,
-        reason,
-      } satisfies SupportArchive,
-      {
-        // Deliberately short. A rotated token should take effect in a minute rather than in the
-        // fifteen the live path caches for, so this does not outlive the fault that caused it.
-        status: 200,
-        headers: { 'Cache-Control': 'public, s-maxage=60' },
-      },
+      { error: e instanceof UpstreamError ? e.message : 'graph-support could not be read' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }
