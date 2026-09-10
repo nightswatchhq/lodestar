@@ -19,7 +19,9 @@ export function renderDoc() {
   L.push(`**${s.remaining} route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. ` +
     `That is **${s.percentToFrontend}%** of the way from ${ROUTES_AT_BASELINE} on 10 September 2026.`);
   L.push('');
-  L.push(`Of the port itself, **${s.onKittiwake} of ${s.inScope}** are across, **${s.percent}%**, with ${s.onNext} to go.`);
+  L.push(`Of the port itself, **${s.onKittiwake} of ${s.inScope}** are across, **${s.percent}%**. ` +
+    `Of the rest, **${s.readyToCutOver} are written and answering on kittiwake already** and wait only on a cutover, ` +
+    `and **${s.onNext}** have still to be ported.`);
   L.push('');
   L.push(`That second denominator is routes meant to move that have not yet, and it excludes ` +
     `${s.doomed} agreed for deletion, ${s.stayingOnNext} staying on Next by decision, and ` +
@@ -51,6 +53,7 @@ export function renderDoc() {
   section('On kittiwake', inv.filter((r) => r.state === 'kittiwake'), false);
   section('Still on Next', inv.filter((r) => r.state === 'next'), false);
   section('Staying on Next by decision', inv.filter((r) => r.state === 'staying'), true);
+  section('Written on kittiwake, still routed here', inv.filter((r) => r.state === 'ready'), true);
   section('To be deleted rather than ported', inv.filter((r) => r.state === 'doomed'), true);
 
   return L.join('\n') + '\n';

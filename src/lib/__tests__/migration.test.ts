@@ -170,7 +170,12 @@ describe('summarise', () => {
     // A percentage is only honest if the denominator is. Counting routes we have agreed to delete
     // as outstanding work would understate progress; counting them as done would overstate it.
     // They are reported on their own line instead.
-    expect(summary.inScope).toBe(summary.onKittiwake + summary.onNext);
+    // `ready` is in scope as well: written on kittiwake but still routed here, so it is neither
+    // done nor deletable. Leaving it out of the denominator would flatter the percentage by
+    // shrinking what it is a share of, which is the one thing this table must not do.
+    expect(summary.inScope).toBe(
+      summary.onKittiwake + summary.onNext + summary.readyToCutOver,
+    );
     expect(summary.scheduled).toBeGreaterThan(0);
   });
 
