@@ -6,7 +6,7 @@
 
 **38 of 77 routes** on kittiwake, **49%**. 39 left.
 
-The denominator is routes meant to move that have not yet. It excludes 1 agreed for deletion, 3 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
+The denominator is routes meant to move that have not yet. It excludes 0 agreed for deletion, 4 staying on Next by decision, and 12 scheduled endpoints. Each is listed below rather than quietly improving the figure.
 
 ## By block of work
 
@@ -111,12 +111,7 @@ The denominator is routes meant to move that have not yet. It excludes 1 agreed 
 | `/api/health` | judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker. |
 | `/api/indexing-status/[hash]` | pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves. |
 | `/api/migration` | reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did. |
-
-## To be deleted rather than ported
-
-| Route | Why |
-|---|---|
-| `/api/provider-liveness` | goes with the Dispatch removal, nightswatchhq/lodestar#99 |
+| `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
 
 ## Descheduled crons, handlers kept as the rollback
 

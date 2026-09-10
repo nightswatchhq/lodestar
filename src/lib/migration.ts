@@ -227,14 +227,20 @@ const UNMIGRATED: readonly RouteRecord[] = [
     workstream: 'data plane',
     note: 'judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker.',
   },
+  {
+    path: '/api/provider-liveness',
+    state: 'staying',
+    workstream: 'the long tail',
+    note: 'was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99).',
+  },
 
   // ── Agreed for deletion, kittiwake#20. Not outstanding work. ──────────────
   //
   // The push and Lodie routes were here and are now gone, along with the UI behind them: the crons
   // that fed push were struck when it was discontinued on 2026-09-06, so the subscribe button was
-  // offering people a thing that could no longer notify them. `provider-liveness` is the last one
-  // standing and goes with the Dispatch removal, #99.
-  { path: '/api/provider-liveness', state: 'doomed', workstream: 'deletions', note: 'goes with the Dispatch removal, nightswatchhq/lodestar#99' },
+  // offering people a thing that could no longer notify them. Nothing is left in this block, which
+  // is the state it should be in: a route agreed for deletion and not deleted is a claim about the
+  // future rather than a description of the present.
 
   // ── Scheduled endpoints. kittiwake schedules its own; these two have not moved.
   {
