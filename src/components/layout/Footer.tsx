@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export function Footer() {
   return (
-    <footer className="md:pl-[var(--sidebar-width)] lg:pr-[var(--feed-active-width)] pb-[calc(var(--bottom-nav-height)+var(--safe-bottom))] md:pb-0 transition-[padding] duration-200">
+    <footer className="md:pl-[var(--sidebar-width)] pb-[calc(var(--bottom-nav-height)+var(--safe-bottom))] md:pb-0 transition-[padding] duration-200">
       <div className="max-w-[1440px] mx-auto px-4 md:px-6 py-8 border-t border-[var(--border)]">
         <p className="text-center text-[11px] text-[var(--text-faint)] mb-6 italic">
           <span className="not-italic font-medium text-[var(--text-muted)]">lodestar</span> /ˈloʊdstɑːr/ <span className="not-italic text-[var(--text-faint)]">n.</span>{' '}

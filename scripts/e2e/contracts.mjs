@@ -90,7 +90,6 @@ export const CONTRACTS = [
   { path: '/api/grt-flow', name: 'GRT flow', required: ['data'] },
   { path: '/api/chain-lag', name: 'chain lag', required: ['data'] },
   { path: '/api/dips', name: 'DIPS', required: ['data'] },
-  { path: '/api/feed', name: 'activity feed', collection: 'items', minRows: 1, sample: ['id'] },
   { path: '/api/price', name: 'GRT price', required: ['price'] },
 
   // ---------------------------------------------------------------------------------------------

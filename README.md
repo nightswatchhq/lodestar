@@ -12,7 +12,6 @@ Analytics dashboard for The Graph Protocol on Arbitrum One. Real-time network me
 ## Features
 
 - **Protocol Overview** — Total stake, delegation, signalling, total supply, estimated annual issuance, epoch progress, a per-epoch fees/rewards table with derived status (Active/Settling/Distributing/Finalized), rewards-per-epoch chart, token distribution. Delegation Flows chart shows inflow/outflow bar chart with current-vs-previous period comparison and net GRT summary.
-- **Intel Feed** — Live protocol intelligence panel with governance proposals, GIP updates, epoch summaries, and announcements sourced from The Graph Forum, GitHub, and on-chain data
 - **Indexer Directory** — Sortable/filterable table with stake, delegation capacity, reward cuts, delegation-parameter cooldown remaining, REO eligibility indicators, recent delegation activity icons, and mobile card view
 - **Indexer Profiles** — Detailed view with active and historical/closed allocations, operator addresses, disputes & slashing history, delegator breakdown, Horizon service provisions, REO eligibility assessment, recent delegation activity, and reward cut change alerts
 - **Accurate APR & Effective Cut** — Per-allocation signal-weighted APR calculation and effective cut formula matching [grtinfo](https://github.com/ellipfra/grtinfo)
@@ -65,7 +64,6 @@ Analytics dashboard for The Graph Protocol on Arbitrum One. Real-time network me
 - [x] Recent delegation activity — delegation/undelegation events on indexer profiles, activity indicators in the directory
 - [x] Reward cut change alerts — flagged in indexer table and profile when parameters changed within 30 days
 - [x] Accurate APR and effective cut using per-allocation signal-weighted rewards (grtinfo method)
-- [x] Protocol Intelligence Feed with forum governance, GIP commits, epoch summaries
 - [x] Mobile-first responsive overhaul with bottom tab bar and card views
 - [x] Delegation calculator with redelegation cost modelling
 - [x] Indexer comparison tool (up to 3 side-by-side)
@@ -189,7 +187,7 @@ Lodestar reads five nests. They sit behind one host and one basic-auth credentia
 
 | Base path | Nest | What it holds | What it serves |
 |---|---|---|---|
-| `/alloc` | `graph-allocations-nest` | The whole protocol: staking, delegation, curation, allocations, epochs, disputes, RAVs, GRT supply | Network stats, indexers, curators, epochs, payments, portfolio, provisions, POI, rewards history, feed, token metrics, the subgraph routes, both OpenGraph images and every ingest cron |
+| `/alloc` | `graph-allocations-nest` | The whole protocol: staking, delegation, curation, allocations, epochs, disputes, RAVs, GRT supply | Network stats, indexers, curators, epochs, payments, portfolio, provisions, POI, rewards history, token metrics, the subgraph routes, both OpenGraph images and every ingest cron |
 | `/gns` | `graph-gns-nest` | L2GNS publish and metadata events | Subgraph names and versions, the Developer Activity chart |
 | `/dips` | DIPS (Arbitrum One) | Indexing-agreement lifecycle | `/api/dips/agreements` |
 | `/dips-sepolia` | DIPS (Arbitrum Sepolia) | The same lifecycle on testnet, where there are rows | `/api/dips/agreements` when `NUTHATCH_DIPS_BASE_PATH` selects it |
@@ -239,7 +237,6 @@ Open [http://localhost:3000](http://localhost:3000).
 | `NUTHATCH_URL` | Base URL of the nuthatch host fronting every nest. Without it, every protocol route returns 503 | Yes |
 | `NUTHATCH_USER` / `NUTHATCH_PASSWORD` | Basic-auth credential for that host | Yes |
 | `NUTHATCH_*_BASE_PATH` | Per-surface overrides to point one route at a different nest. Defaults are `/alloc`, except `/gns` and `/dips` (see [Data from nuthatch](#data-from-nuthatch)) | No |
-| `GITHUB_TOKEN` | GitHub PAT for the Intel Feed (forum/GIP data). An **expired** token is worse than none: it 401s rather than falling back to the unauthenticated 60/hour, and the feed then answers 200 with its GitHub categories silently missing. If it has expired, **remove the variable** rather than leaving it set | Yes |
 | `NEXT_PUBLIC_SITE_URL` | Production URL e.g. `https://lodestar-dashboard.com` | Yes |
 | `SESSION_SECRET` | Secret for Studio session HMAC | No |
 | `TAP_SIGNER_PRIVATE_KEY` | Private key for TAP receipt signing | No |
@@ -295,7 +292,7 @@ Restores are periodically test-verified against a throwaway Postgres container. 
 ```
 src/
   app/           # Next.js pages and API routes
-    api/         # Nest-backed data routes, price, TVL, feed, cron, Push, studio endpoints
+    api/         # Nest-backed data routes, price, TVL, cron, Push, studio endpoints
     activity/    # Live Horizon on-chain event feed
     ai/          # AI / MCP tool directory
     blog/        # Technical blog (Markdown posts)
@@ -316,7 +313,7 @@ src/
     subgraphs/   # Subgraph directory
     support/     # graph-support archive: worked answers, grouped by area of the stack
                  #   served by kittiwake's twice-daily mirror; the Next handler is the rollback
-  components/    # UI components, layout, charts, tables, feed
+  components/    # UI components, layout, charts, tables
   content/       # Blog posts (Markdown)
   hooks/         # React Query hooks
   lib/           # Nest clients, SQL builders, utilities, wallet config

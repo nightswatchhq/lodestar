@@ -194,7 +194,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   { path: '/api/delegate/recommend', state: 'next', workstream: 'the long tail' },
   { path: '/api/dips/agreements', state: 'next', workstream: 'the long tail' },
   { path: '/api/ens', state: 'next', workstream: 'the long tail' },
-  { path: '/api/feed', state: 'next', workstream: 'the long tail' },
   { path: '/api/foghorn/[...path]', state: 'next', workstream: 'the long tail', note: 'a proxy; check it still needs to be one now both services sit on the same box' },
   { path: '/api/horizon/debug', state: 'next', workstream: 'the long tail', note: 'no in-repo consumer beyond its auth test. Cron-authed, so possibly curled by hand; confirm before deleting. kittiwake#20.' },
   { path: '/api/indexer-disputes/[address]', state: 'next', workstream: 'the long tail' },
