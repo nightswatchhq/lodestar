@@ -436,14 +436,17 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
   const [search, setSearch] = useState('');
   const autoOpened = useRef(false);
 
-  const { data, isLoading } = useQuery({
+  const discover = useQueryState(useQuery({
     queryKey: ['curate-discover'],
     queryFn: async () => {
       const res = await fetch('/api/subgraph-deployments?first=100&orderBy=queryFeesAmount&orderDirection=desc');
+      if (!res.ok) throw new Error(`Deployments failed: ${res.status}`);
       return res.json() as Promise<{ data: Deployment[] }>;
     },
     staleTime: 5 * 60 * 1000,
-  });
+  }));
+  const data = discover.kind === 'ready' ? discover.data : undefined;
+  const isLoading = discover.kind === 'loading';
 
   const ranked = useMemo(() => {
     if (!data?.data) return [];
@@ -477,6 +480,7 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
     queryKey: ['deployment-lookup', search],
     queryFn: async () => {
       const res = await fetch(`/api/subgraph-deployments?hash=${encodeURIComponent(search)}`);
+      if (!res.ok) throw new Error(`Deployment lookup failed: ${res.status}`);
       return res.json() as Promise<{ data: Deployment[] }>;
     },
     enabled: isExactHash && filteredBeforeFetch.length === 0 && !isLoading,
@@ -548,6 +552,10 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
           <div className="space-y-2">
             {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-14 rounded-lg shimmer" />)}
           </div>
+        ) : isUnavailable(discover) ? (
+          <p className="py-10 text-center text-sm text-[var(--text-muted)]">
+            {unavailableReason(discover)}
+          </p>
         ) : filtered.length === 0 && search ? (
           <div className="py-10 text-center space-y-3">
             {specificFetching ? (

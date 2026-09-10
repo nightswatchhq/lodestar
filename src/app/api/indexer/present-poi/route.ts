@@ -80,7 +80,9 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(10_000),
     });
     const data = await res.json();
-    return NextResponse.json(data);
+    // Pass the agent's status through. Flattening everything to 200 meant a refused mutation
+    // arrived at the caller looking like an accepted one.
+    return NextResponse.json(data, { status: res.ok ? 200 : res.status });
   } catch (err) {
     return NextResponse.json(
       { error: `Failed to reach indexer-agent: ${(err as Error).message}` },

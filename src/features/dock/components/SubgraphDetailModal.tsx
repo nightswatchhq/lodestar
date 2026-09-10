@@ -52,6 +52,9 @@ export function SubgraphDetailModal({
   });
   const activeBounties = bountiesForDeployment?.filter((b) => b.status === 'open');
 
+  /** Set when the resolved NFT id could not be written back, which hides the lifecycle actions. */
+  const [nftIdError, setNftIdError] = useState<string | null>(null);
+
   // Auto-resolve legacy tx hash → on-chain subgraph NFT ID
   const legacyTxHash = (
     sg.published_subgraph_id?.startsWith('0x') ? sg.published_subgraph_id as `0x${string}` : undefined
@@ -61,11 +64,17 @@ export function SubgraphDetailModal({
     if (!legacyReceipt) return;
     const nftId = extractSubgraphId(legacyReceipt.logs, CONTRACTS.gns);
     if (!nftId) return;
-    updateSubgraph.mutateAsync({ id: sg.id, patch: { published_subgraph_id: nftId } }).then(() => {
-      const updated = { ...sg, published_subgraph_id: nftId };
-      setSg(updated);
-      onUpdated(updated);
-    }).catch(() => {});
+    // Not best-effort: `published_subgraph_id` staying a tx hash is what hides the on-chain
+    // lifecycle actions, so a swallowed failure here quietly takes transfer and deprecate away
+    // from this subgraph and leaves no trace of why.
+    updateSubgraph
+      .mutateAsync({ id: sg.id, patch: { published_subgraph_id: nftId } })
+      .then(() => {
+        const updated = { ...sg, published_subgraph_id: nftId };
+        setSg(updated);
+        onUpdated(updated);
+      })
+      .catch((e) => setNftIdError(e instanceof Error ? e.message : String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [legacyReceipt]);
 
@@ -316,6 +325,13 @@ export function SubgraphDetailModal({
                 <div className="pt-4 border-t border-[var(--border)]">
                   <DeployKeyPanel />
                 </div>
+
+                {nftIdError && (
+                  <p className="pt-4 text-xs text-[var(--red-text)]">
+                    The on-chain subgraph id was resolved but could not be saved ({nftIdError}), so
+                    the lifecycle actions below stay hidden. Reopening this subgraph will try again.
+                  </p>
+                )}
 
                 <SubgraphLifecyclePanel
                   sg={sg}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { Badge } from '@/components/ui/Badge';
@@ -204,12 +205,15 @@ function SubgraphPicker({
 
   const isFullHash = QM_HASH_RE.test(value.trim());
 
-  const { data: answer, isFetching } = useQuery<{ hits: SubgraphSearchResult[]; warmBacklog: number | null }>({
+  const searchQuery = useQuery<{ hits: SubgraphSearchResult[]; warmBacklog: number | null }>({
     queryKey: ['subgraph-search', debounced],
     enabled: debounced.length >= 2 && !QM_HASH_RE.test(debounced),
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const r = await fetch(`/api/subgraph-search?q=${encodeURIComponent(debounced)}`);
+      // Without this a 500 becomes `json.data ?? []`, react-query records a success, and the panel
+      // says the search found nothing.
+      if (!r.ok) throw new Error(`Subgraph search failed: ${r.status}`);
       const json: { data?: SubgraphSearchResult[]; warmBacklog?: number | null } = await r.json();
       // The backlog rides along with the hits rather than in its own state, so the message and the
       // list it explains can never be from different answers. kittiwake#8.
@@ -220,6 +224,9 @@ function SubgraphPicker({
     },
   });
 
+  const searchState = useQueryState(searchQuery);
+  const answer = searchState.kind === 'ready' ? searchState.data : undefined;
+  const isFetching = searchQuery.isFetching;
   const hits = (answer?.hits ?? []).filter((s) => s.currentVersion?.subgraphDeployment?.ipfsHash).slice(0, 12);
   const show = open && !isFullHash && debounced.length >= 2;
 
@@ -237,7 +244,13 @@ function SubgraphPicker({
       {show && (
         <ul className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-[var(--radius-card)] border-[0.5px] border-[var(--border)] bg-[var(--bg-surface)] shadow-lg">
           {hits.length === 0 ? (
-            <li className="px-3 py-2 text-[12px] text-[var(--text-faint)]">{isFetching ? 'Searching…' : emptySearchMessage(debounced, answer?.warmBacklog)}</li>
+            <li className="px-3 py-2 text-[12px] text-[var(--text-faint)]">
+              {isFetching
+                ? 'Searching…'
+                : isUnavailable(searchState)
+                  ? unavailableReason(searchState)
+                  : emptySearchMessage(debounced, answer?.warmBacklog)}
+            </li>
           ) : (
             hits.map((s) => {
               const hash = s.currentVersion!.subgraphDeployment.ipfsHash;
