@@ -61,16 +61,23 @@ function chainLabel(network: string): string {
 function useChainLag() {
   const [data, setData] = useState<ChainLagData | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Set when the read failed, which is not the same as there being no chains to report. */
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/chain-lag')
-      .then((r) => r.json())
+      .then((r) => {
+        // The old version parsed the body whatever the status, so a 500 with a JSON error in it
+        // became `json.data ?? null` and the panel rendered as though no chain were lagging.
+        if (!r.ok) throw new Error(`Chain lag could not be read (HTTP ${r.status}).`);
+        return r.json();
+      })
       .then((json) => setData(json.data ?? null))
-      .catch(() => {})
+      .catch((e) => setError(e instanceof Error ? e.message : 'Chain lag could not be read.'))
       .finally(() => setLoading(false));
   }, []);
 
-  return { data, loading };
+  return { data, loading, error };
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +85,7 @@ function useChainLag() {
 // ---------------------------------------------------------------------------
 
 function ChainHealthPanel() {
-  const { data, loading } = useChainLag();
+  const { data, loading, error } = useChainLag();
   // Mount-stable "now" (ms) — keeps render pure (no Date.now() during render).
   const [nowMs] = useState(() => Date.now());
 
@@ -97,7 +104,7 @@ function ChainHealthPanel() {
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
       <Card>
         <CardHeader>
@@ -105,7 +112,7 @@ function ChainHealthPanel() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-[var(--text-muted)] py-2">
-            No chain data yet. The cron job populates this every 30 minutes.
+            {error ?? 'No chain data yet. The cron job populates this every 30 minutes.'}
           </p>
         </CardContent>
       </Card>

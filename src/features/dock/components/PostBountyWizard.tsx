@@ -53,21 +53,24 @@ export function PostBountyWizard({
   });
 
   const postTx = useContractStep({
-    onMined: (receipt) => {
+    onMined: async (receipt) => {
       const id = extractBountyId(receipt.logs, CONTRACTS.bountyBoard);
       setBountyId(id?.toString() ?? null);
 
       // Recording the bounty is a POST, and the effect this replaces both suppressed
       // `exhaustive-deps` and keyed on a boolean, so a re-render could write the row twice.
-      // `useContractStep` runs this once per transaction. Still best-effort: the bounty exists on
-      // chain either way and the row is for discoverability. `useRecordBounty` invalidates the
-      // board itself, so there is no second key to remember here.
+      // `useContractStep` runs this once per transaction.
+      //
+      // It is no longer best-effort. The GRT is locked on chain by the time this runs, and the row
+      // is what puts the bounty in front of an indexer: without it the money sits in a bounty
+      // nobody can see until the developer cancels it. Awaiting the write means a failure shows as
+      // an error on the wizard instead of a success the poster walks away from.
       if (sg.deployment_id) {
         const expiresAt = expiresInDays
           ? new Date(Date.now() + parseInt(expiresInDays) * 86_400_000).toISOString()
           : null;
-        recordBounty
-          .mutateAsync({
+        try {
+          await recordBounty.mutateAsync({
             deployment_id: sg.deployment_id,
             slug: sg.slug,
             amount_grt: amountGrt,
@@ -75,8 +78,13 @@ export function PostBountyWizard({
             expires_at: expiresAt,
             chain_bounty_id: id?.toString() ?? null,
             post_tx_hash: receipt.transactionHash,
-          })
-          .catch(() => {});
+          });
+        } catch {
+          throw new Error(
+            'The bounty was posted on chain, but Lodestar could not add it to the board. ' +
+              'The GRT is locked and the transaction is on Arbiscan; the row can be added again.',
+          );
+        }
       }
     },
   });

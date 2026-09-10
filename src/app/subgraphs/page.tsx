@@ -117,6 +117,8 @@ function SubgraphDirectory() {
   // it as zero would tell a searcher everything is indexed when nobody has checked. kittiwake#8.
   const [warmBacklog, setWarmBacklog] = useState<number | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  /** Set when the search itself failed, which is not the same as it matching nothing. */
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [feeWindow, setFeeWindow] = useState<'allTime' | '30d'>(() =>
     searchParams.get('window') === 'allTime' ? 'allTime' : '30d'
   );
@@ -192,12 +194,17 @@ function SubgraphDirectory() {
     debounceRef.current = setTimeout(async () => {
       try {
         const res = await fetch(`/api/subgraph-search?q=${encodeURIComponent(searchQuery)}`);
+        if (!res.ok) throw new Error(`The search could not be run (HTTP ${res.status}).`);
         const json = await res.json();
         setSearchResults(json.data ?? []);
         setWarmBacklog(typeof json.warmBacklog === 'number' ? json.warmBacklog : null);
-      } catch {
-        setSearchResults([]);
+        setSearchError(null);
+      } catch (e) {
+        // The old catch set the results to `[]`, so a search that could not run and a search that
+        // matched nothing rendered the same sentence.
+        setSearchResults(null);
         setWarmBacklog(null);
+        setSearchError(e instanceof Error ? e.message : 'The search could not be run.');
       } finally {
         setSearchLoading(false);
       }
@@ -511,6 +518,8 @@ function SubgraphDirectory() {
             <div className="flex items-center justify-center py-8">
               <div className="w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
             </div>
+          ) : searchError ? (
+            <p className="px-4 py-8 text-center text-sm text-[var(--text-muted)]">{searchError}</p>
           ) : searchResults && searchResults.length > 0 ? (
             <div className="divide-y divide-[var(--border)]">
               {searchResults.map((s) => {

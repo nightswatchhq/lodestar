@@ -13,6 +13,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { hashKey } from '@/lib/studio/auth';
 import { hasDbAccess } from '@/lib/db';
+import { log } from '@/lib/logger';
 import { findOwnerByKeyHash, getSubgraphBySlug, updateSubgraphDeployment } from '@/lib/studio/db';
 
 const ALLOWED_METHODS = new Set(['subgraph_create', 'subgraph_deploy']);
@@ -52,7 +53,15 @@ export async function POST(req: NextRequest) {
     const ipfsHash: string = body.params?.ipfs_hash ?? '';
     const network: string | null = body.params?.network ?? null;
     if (ipfsHash) {
-      await updateSubgraphDeployment(name, ipfsHash, network).catch(() => {});
+      // This write is the whole of what `subgraph_deploy` does here, so swallowing it meant
+      // `graph deploy` printed success while nothing had been recorded and the Dock went on
+      // showing the previous deployment.
+      try {
+        await updateSubgraphDeployment(name, ipfsHash, network);
+      } catch (e) {
+        log.api.error({ err: String(e), name, ipfsHash }, 'recording a studio deploy failed');
+        return rpcError(-32603, 'The deployment could not be recorded. Nothing has changed.');
+      }
     }
     const explorerBase = 'https://thegraph.com/explorer/subgraphs';
     return NextResponse.json({
