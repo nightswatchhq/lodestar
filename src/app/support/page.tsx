@@ -17,7 +17,15 @@ export default function SupportPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-[var(--text)]">Support</h1>
+        <div className="flex items-start justify-between gap-4">
+          <h1 className="text-3xl font-bold tracking-tight text-[var(--text)]">Support</h1>
+          <Link
+            href="/support/new"
+            className="shrink-0 rounded-full bg-[var(--accent)] px-4 py-2 text-xs font-medium text-white transition-opacity hover:opacity-90"
+          >
+            New issue
+          </Link>
+        </div>
         <p className="mt-3 max-w-2xl text-[var(--text-muted)]">
           Something in The Graph is broken and nobody is answering. These are the threads where it
           got worked out: a root cause, a workaround, or the name of the party who can actually fix
