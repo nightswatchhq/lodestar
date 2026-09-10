@@ -26,7 +26,7 @@ The implication: you need an *active* (not closed) allocation, and you need to h
 
 ## Step 1: Find a bounty
 
-Go to [lodestar-dashboard.com/dock](https://www.lodestar-dashboard.com/dock) and open the **Bounty Board** tab. Each bounty shows:
+Go to [the Bounty Board](https://www.lodestar-dashboard.com/dock/bounties). Each bounty shows:
 
 - The deployment ID (IPFS hash): this is what you'll index
 - The GRT reward
@@ -176,7 +176,7 @@ The agent will call `SubgraphService.collect()` on your behalf. Once confirmed o
 
 ## Step 6: Claim on Lodestar
 
-1. Go to the [Bounty Board](https://www.lodestar-dashboard.com/dock) (Bounty Board tab)
+1. Go to the [Bounty Board](https://www.lodestar-dashboard.com/dock/bounties)
 2. Find the bounty and click **Claim**
 3. Enter your allocation ID (the `0x...` address from Step 3)
 4. The status panel will show:
