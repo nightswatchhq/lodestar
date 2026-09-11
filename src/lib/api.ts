@@ -12,7 +12,7 @@ import { parseResponse } from './contract';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status';
-import type { DeveloperActivityResponse } from '@/app/api/developer-activity/route';
+import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activity';
 
 /**
  * Fetch network statistics via cached GET endpoint
@@ -564,7 +564,7 @@ export async function fetchSubgraphSchema(hash: string): Promise<{ schemaText: s
 }
 
 export async function fetchCuratorLeaderboard(params: { first?: number; skip?: number } = {}): Promise<
-  import('@/app/api/curators/route').CuratorLeaderboardEntry[]
+  import('@/lib/contracts/curators').CuratorLeaderboardEntry[]
 > {
   const { first = 50, skip = 0 } = params;
   const qs = new URLSearchParams({ first: String(first), skip: String(skip) });

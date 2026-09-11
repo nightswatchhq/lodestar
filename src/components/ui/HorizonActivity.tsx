@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, cn } from '@/lib/utils';
-import type { ActivityEvent } from '@/app/api/horizon/activity/route';
+import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
 
 // ── Event display config ────────────────────────────────────────────────────
 
