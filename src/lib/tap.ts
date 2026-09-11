@@ -30,9 +30,6 @@ const GRT_TOKEN             = '0x9623063377AD1B27544C965cCd7342f7EA7e88C7' as co
 
 // Minimum escrow (wei) before we top up — 1 GRT should last ~10^18 playground queries.
 
-export const MIN_ESCROW_WEI = 1_000_000_000_000_000_000n; // 1 GRT
-
-// EIP-712 domain for GraphTallyCollector on Arbitrum One.
 const TAP_DOMAIN = {
   name: 'GraphTallyCollector',
   version: '1',
@@ -132,74 +129,4 @@ export async function signTapReceipt(indexerAddress: string): Promise<string | n
     },
     signature,
   });
-}
-
-/**
- * Return our escrow balance (wei) with a given indexer.
- */
-export async function getEscrowBalance(indexerAddress: string): Promise<bigint> {
-  const account = getAccount();
-  const client = getPublicClient();
-
-  return client.readContract({
-    address: PAYMENTS_ESCROW,
-    abi: ESCROW_ABI,
-    functionName: 'getBalance',
-    args: [account.address, GRAPH_TALLY_COLLECTOR, indexerAddress as Hex],
-  });
-}
-
-/**
- * Ensure we have at least MIN_ESCROW_WEI in escrow with `indexerAddress`.
- * Deposits 1 GRT if below threshold. Approves GRT allowance if needed.
- * No-op if already funded.
- *
- * Note: after a deposit the indexer-service refreshes its escrow cache in up
- * to 60 seconds — allow for that delay before expecting receipts to be accepted.
- */
-export async function ensureEscrow(indexerAddress: string): Promise<void> {
-  const account = getAccount();
-  const client = getPublicClient();
-  const walletClient = createWalletClient({
-    account,
-    chain: arbitrum,
-    transport: http(rpcUrl()),
-  });
-
-  const balance = await client.readContract({
-    address: PAYMENTS_ESCROW,
-    abi: ESCROW_ABI,
-    functionName: 'getBalance',
-    args: [account.address, GRAPH_TALLY_COLLECTOR, indexerAddress as Hex],
-  });
-
-  if (balance >= MIN_ESCROW_WEI) return; // already funded
-
-  const deposit = MIN_ESCROW_WEI;
-
-  // Approve GRT if allowance is insufficient.
-  const allowance = await client.readContract({
-    address: GRT_TOKEN,
-    abi: GRT_ABI,
-    functionName: 'allowance',
-    args: [account.address, PAYMENTS_ESCROW],
-  });
-
-  if (allowance < deposit) {
-    const approveTx = await walletClient.writeContract({
-      address: GRT_TOKEN,
-      abi: GRT_ABI,
-      functionName: 'approve',
-      args: [PAYMENTS_ESCROW, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
-    });
-    await client.waitForTransactionReceipt({ hash: approveTx });
-  }
-
-  const depositTx = await walletClient.writeContract({
-    address: PAYMENTS_ESCROW,
-    abi: ESCROW_ABI,
-    functionName: 'deposit',
-    args: [GRAPH_TALLY_COLLECTOR, indexerAddress as Hex, deposit],
-  });
-  await client.waitForTransactionReceipt({ hash: depositTx });
 }

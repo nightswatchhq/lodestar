@@ -179,7 +179,16 @@ describe('summarise', () => {
     expect(summary.inScope).toBe(
       summary.onKittiwake + summary.onNext + summary.readyToCutOver,
     );
-    expect(summary.scheduled).toBeGreaterThan(0);
+    // Asserted against a fixture, not the live inventory. This read `scheduled > 0` until the
+    // bounty feature was deleted on 2026-09-11 and took both crons with it - and no crons at all
+    // is the state we want, not a fault. Same lesson as the `doomed` assertion below: a test that
+    // only passes while there is work outstanding cannot tell you the work is finished.
+    const withCron = summarise([
+      { path: '/api/a', state: 'kittiwake', workstream: 'the long tail' },
+      { path: '/api/cron/x', state: 'cron', workstream: 'scheduled' },
+    ]);
+    expect(withCron.scheduled).toBe(1);
+    expect(withCron.inScope).toBe(1);
   });
 
   it('excludes a doomed route from the denominator, whether or not one exists today', () => {

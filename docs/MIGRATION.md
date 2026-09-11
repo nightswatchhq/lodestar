@@ -4,19 +4,19 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**11 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **88%** of the way from 93 on 10 September 2026.
+**8 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **91%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **71 of 74** are across, **96%**. Of the rest, **3 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
+Of the port itself, **69 of 71** are across, **97%**. Of the rest, **2 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
 
-That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
+That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
 ## By block of work
 
 | Block | Done | Left |
 |---|---|---|
-| the long tail | 0/2 | 2 |
+| the long tail | 0/1 | 1 |
 | the SQL upper tier | 0/1 | 1 |
-| data plane | 71/71 | 0 |
+| data plane | 69/69 | 0 |
 
 ## On kittiwake
 
@@ -70,8 +70,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 - `/api/sql/named`
 - `/api/sql/query`
 - `/api/studio/auth`
-- `/api/studio/bounties`
-- `/api/studio/bounties/[id]`
 - `/api/studio/deploy-key`
 - `/api/studio/ipfs/[...path]`
 - `/api/studio/metadata`
@@ -96,8 +94,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 | Route | Why |
 |---|---|
-| `/api/cron/reconcile-bounties` | reads the BountyBoard contract and updates sync_bounties. Belongs with the Dock, kittiwake#16. |
-| `/api/cron/tap-provision` | holds TAP_SIGNER_PRIVATE_KEY and spends GRT. A custody decision rather than a port, kittiwake#11. |
 | `/api/file-issue` | holds GRAPH_SUPPORT_ISSUE_TOKEN, which writes to a public repository. It sits outside /api/support because everything under that prefix is proxied; moving it to kittiwake would move the credential onto the box that serves the archive it writes to. |
 | `/api/health` | judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker. |
 | `/api/indexing-status/[hash]` | pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves. |
@@ -110,6 +106,5 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | Route | Why |
 |---|---|
 | `/api/data-services/query` | answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip. |
-| `/api/indexer/present-poi` | answering, and probed on 2026-09-11: it validated an empty body and returned its own message rather than the address handler's, so kittiwake routes the literal path correctly and the NEVER_FORWARD pin could be lifted on that count. It stays pinned on another: nothing exercises a POST that queues an action on a live indexer agent, and validating a bad payload is not the same as submitting a good one. |
 | `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
 
