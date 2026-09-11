@@ -312,13 +312,13 @@ const UNMIGRATED: readonly RouteRecord[] = [
     path: '/api/disassembly',
     state: 'ready',
     workstream: 'the disassembler',
-    note: 'answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED.',
+    note: 'answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port.',
   },
   {
     path: '/api/disassembly/diff',
     state: 'ready',
     workstream: 'the disassembler',
-    note: 'answering in production. Nothing known blocks it; it wants a look and a line in MIGRATED.',
+    note: 'answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port.',
   },
   { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
 
@@ -345,13 +345,13 @@ const UNMIGRATED: readonly RouteRecord[] = [
     path: '/api/data-services/query',
     state: 'ready',
     workstream: 'the long tail',
-    note: 'answering. Probed with slug=dispatch on 2026-09-10: it reached the upstream RPC and reported the failure honestly, so the handler works. Ready for MIGRATED.',
+    note: 'answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip.',
   },
   {
     path: '/api/indexer/present-poi',
     state: 'ready',
     workstream: 'the long tail',
-    note: 'answering. Probed with an empty body: it validated and returned a precise 400, so the handler works. Wants INDEXER_AGENT_URL on the box for the server-configured path; callers supplying their own agentUrl work without it.',
+    note: 'answering, and probed on 2026-09-11: it validated an empty body and returned its own message rather than the address handler\'s, so kittiwake routes the literal path correctly and the NEVER_FORWARD pin could be lifted on that count. It stays pinned on another: nothing exercises a POST that queues an action on a live indexer agent, and validating a bad payload is not the same as submitting a good one.',
   },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
