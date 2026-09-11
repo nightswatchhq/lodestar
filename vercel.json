@@ -1,12 +1,1 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/tap-provision",
-      "schedule": "1-59/5 * * * *"
-    },
-    {
-      "path": "/api/cron/reconcile-bounties",
-      "schedule": "*/10 * * * *"
-    }
-  ]
-}
+{}

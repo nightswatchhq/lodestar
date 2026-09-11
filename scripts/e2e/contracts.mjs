@@ -151,7 +151,6 @@ export const LIVENESS = [
   '/api/tvl',
   '/api/token-metrics',
   '/api/scuttlebutt/messages',
-  '/api/studio/bounties',
   '/api/provider-liveness',
   '/api/horizon/activity',
   '/api/delegation-flows',

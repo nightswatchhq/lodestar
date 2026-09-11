@@ -1,7 +1,6 @@
 /**
  * API route tests (assignment api-routes-b)
  *
- *  - /api/cron/tap-provision         — Bearer auth + main provisioning path
  *  - /api/indexer-node-health        — isSafeUrl SSRF guard + happy path
  *  - /api/indexer-status/[address]   — address validation + subgraph/status merge
  */
@@ -132,114 +131,6 @@ function statusResponse(indexingStatuses: unknown[]): Response {
 // /api/cron/tap-provision
 // ============================================================
 
-describe('/api/cron/tap-provision', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/cron/tap-provision/route');
-    GET = mod.GET as typeof GET;
-  });
-
-  it('returns 401 without a bearer token', async () => {
-    const res = await GET(plainRequest('/api/cron/tap-provision'));
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 401 with a wrong bearer token', async () => {
-    const res = await GET(cronRequest('/api/cron/tap-provision', 'nope'));
-    expect(res.status).toBe(401);
-  });
-
-  it('skips when the TAP signer is not configured', async () => {
-    mockHasTapSigner.mockReturnValue(false);
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json.skipped).toBe(true);
-    expect(json.reason).toMatch(/TAP_SIGNER/);
-  });
-
-  it('returns 503 when the DB is unavailable', async () => {
-    mockHasDbAccess.mockReturnValue(false);
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-    expect(res.status).toBe(503);
-    expect(json.error).toMatch(/DB/);
-  });
-
-  it('returns a note when there are no claimed bounties', async () => {
-    mockDb.mockResolvedValueOnce([]); // sync_bounties query
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json.note).toMatch(/no claimed bounties/);
-    expect(json.provisioned).toEqual({});
-  });
-
-  it('main path: provisions escrow for the resolved winner', async () => {
-    mockDb.mockResolvedValueOnce([
-      { chain_bounty_id: '7', deployment_id: 'QmDeploy' },
-    ]);
-    // resolveIndexers: getBounty returns a non-zero winner
-    mockReadContract.mockResolvedValueOnce({ winner: '0xWinneR00000000000000000000000000000Aaaa' });
-    // winner has a URL in the subgraph → [winner]
-    mockSubgraphQuery.mockResolvedValueOnce({ indexer: { url: 'https://winner.example.com' } });
-    // escrow below threshold → deposit
-    mockGetEscrowBalance.mockResolvedValueOnce(0n);
-    mockEnsureEscrow.mockResolvedValueOnce(undefined);
-
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    const winner = '0xwinner00000000000000000000000000000aaaa';
-    expect(json.provisioned[winner]).toBe('deposited');
-    expect(mockEnsureEscrow).toHaveBeenCalledWith(winner);
-  });
-
-  it('main path: marks already-funded indexers as sufficient (no deposit)', async () => {
-    mockDb.mockResolvedValueOnce([
-      { chain_bounty_id: '9', deployment_id: 'QmDeploy' },
-    ]);
-    mockReadContract.mockResolvedValueOnce({ winner: '0xWinneR00000000000000000000000000000Aaaa' });
-    mockSubgraphQuery.mockResolvedValueOnce({ indexer: { url: 'https://winner.example.com' } });
-    mockGetEscrowBalance.mockResolvedValueOnce(2_000_000_000_000_000_000n); // 2 GRT >= 1 GRT
-
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.provisioned['0xwinner00000000000000000000000000000aaaa']).toBe('sufficient');
-    expect(mockEnsureEscrow).not.toHaveBeenCalled();
-  });
-
-  it('captures per-indexer errors instead of failing the whole run', async () => {
-    mockDb.mockResolvedValueOnce([
-      { chain_bounty_id: '1', deployment_id: 'QmDeploy' },
-    ]);
-    mockReadContract.mockResolvedValueOnce({ winner: '0xWinneR00000000000000000000000000000Aaaa' });
-    mockSubgraphQuery.mockResolvedValueOnce({ indexer: { url: 'https://winner.example.com' } });
-    mockGetEscrowBalance.mockRejectedValueOnce(new Error('rpc timeout'));
-
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.provisioned['0xwinner00000000000000000000000000000aaaa']).toMatch(/^error: rpc timeout/);
-  });
-
-  it('resolves no indexers when getBounty reverts (empty provisioned)', async () => {
-    mockDb.mockResolvedValueOnce([
-      { chain_bounty_id: '1', deployment_id: 'QmDeploy' },
-    ]);
-    mockReadContract.mockRejectedValueOnce(new Error('execution reverted'));
-
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json.provisioned).toEqual({});
-  });
-});
 
 // ============================================================
 // /api/indexer-node-health  (isSafeUrl SSRF guard)
@@ -397,26 +288,3 @@ describe('/api/indexer-status/[address]', () => {
   });
 });
 
-// ============================================================
-// /api/cron/tap-provision — bounty-board-not-configured branch
-// (kept LAST: needs a fresh module eval with the env var unset, which
-//  requires vi.resetModules and would otherwise poison shared imports.)
-// ============================================================
-
-describe('/api/cron/tap-provision (bounty board unset)', () => {
-  it('skips when NEXT_PUBLIC_BOUNTY_BOARD_ADDRESS is not configured', async () => {
-    process.env.CRON_SECRET = CRON_SECRET;
-    delete process.env.NEXT_PUBLIC_BOUNTY_BOARD_ADDRESS;
-    mockHasTapSigner.mockReturnValue(true);
-
-    vi.resetModules();
-    const mod = await import('@/app/api/cron/tap-provision/route');
-    const GET = mod.GET as (req: NextRequest) => Promise<Response>;
-
-    const res = await GET(cronRequest('/api/cron/tap-provision', CRON_SECRET));
-    const json = await res.json();
-    expect(res.status).toBe(200);
-    expect(json.skipped).toBe(true);
-    expect(json.reason).toMatch(/BOUNTY_BOARD/);
-  });
-});
