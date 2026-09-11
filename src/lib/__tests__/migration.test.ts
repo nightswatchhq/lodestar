@@ -7,7 +7,7 @@
  * inventory disagree with what is actually on disk, in either direction.
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   MIGRATED,
@@ -24,6 +24,10 @@ const API_DIR = join(process.cwd(), 'src', 'app', 'api');
 /** Every `route.ts` under src/app/api, as the URL path it serves. */
 function routeFilePaths(dir = API_DIR, prefix = '/api'): string[] {
   const out: string[] = [];
+  // An absent directory is zero routes. On 2026-09-12 the last route file went and `src/app/api`
+  // stopped existing, which threw ENOENT out of a walk that had only ever run while there was
+  // still something to find.
+  if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
@@ -47,21 +51,17 @@ describe('the route inventory', () => {
     expect([...ROUTE_FILES].sort()).toEqual([...onDisk].sort());
   });
 
-  it('finds the API routes at all, so an empty walk cannot pass as agreement', () => {
-    // Absent data rendering as healthy is the failure this whole file exists to prevent. A broken
-    // path here would make every other assertion below vacuously true.
-    // Was `> 50` and `/api/network-stats` until the rollback handlers were deleted on 2026-09-11
-    // and this repo went from 74 route files to 8. The guard is still worth having and its numbers
-    // were not: the canary is now a route this repo actually serves. `/api/health` was that
-    // canary until it moved to kittiwake on 2026-09-11, and `/api/file-issue` and
-    // `/api/indexing-status/[hash]` until they followed the same day. `/api/sql/receipt` is the
-    // last one standing, and it is waiting on a key reaching the box rather than on any code.
-    // Not a floor on how many routes remain — that number is falling on purpose and a floor would
-    // have to be edited every time it does, which is how an assertion stops being read. What this
-    // guards is the walk itself: a broken path would return nothing and make every check below
-    // vacuously true.
-    expect(onDisk.length).toBeGreaterThan(0);
-    expect(onDisk).toContain('/api/sql/receipt');
+  it('serves no API routes, which is the finished state rather than a broken walk', () => {
+    // This asserted the opposite for most of its life: that the walk found something, so an empty
+    // result could not pass as agreement. That guard was right while routes remained and it was
+    // the last thing in this file still asserting the migration was unfinished.
+    //
+    // Zero is now the correct answer, so the guard inverts. What it protects is the same thing:
+    // that `onDisk` reflects reality. If a route file comes back, `src/app/api` exists again and
+    // this fails, which is the signal to decide whether it belongs here at all - and `covers every
+    // route file on disk` below will then hold it to having an inventory line.
+    expect(existsSync(API_DIR)).toBe(false);
+    expect(onDisk).toEqual([]);
   });
 
   it('covers every route file on disk', () => {

@@ -89,6 +89,7 @@ export const MIGRATED: readonly string[] = [
   '/api/scuttlebutt/messages/',
   '/api/scuttlebutt/stream',
   '/api/service-census',
+  '/api/sql/receipt',
   '/api/sql/catalog',
   '/api/sql/named',
   '/api/sql/query',
@@ -323,12 +324,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
     
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─
-  {
-    path: '/api/sql/receipt',
-    state: 'ready',
-    workstream: 'the SQL upper tier',
-    note: 'answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision.',
-  },
 
   // ── The long tail: kittiwake#20, to be triaged rather than worked through ──
   //

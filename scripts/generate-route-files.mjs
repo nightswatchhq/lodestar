@@ -1,11 +1,15 @@
 // Regenerates src/lib/route-files.generated.ts from the filesystem.
 // `migration.test.ts` fails if the committed list and the real directory disagree, so this is a
 // convenience rather than the guarantee.
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+// An absent `src/app/api` is zero routes, not a crash. It crashed on 2026-09-12, the moment the
+// last route file was deleted and the directory stopped existing, which is a generator that could
+// only run while there was still work left to do.
 function walk(dir, prefix = '/api') {
   const out = [];
+  if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) out.push(...walk(full, `${prefix}/${entry}`));
