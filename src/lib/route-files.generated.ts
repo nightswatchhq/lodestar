@@ -49,7 +49,6 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/manifest',
   '/api/migration',
   '/api/network-stats',
-  '/api/operator-preflight',
   '/api/parameter-history/[address]',
   '/api/payments',
   '/api/poi',
