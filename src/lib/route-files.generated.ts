@@ -11,12 +11,10 @@
  *     pnpm migration:routes
  */
 export const ROUTE_FILES: readonly string[] = [
-  '/api/data-services/query',
   '/api/file-issue',
   '/api/health',
   '/api/indexing-status/[hash]',
   '/api/issue-forms',
-  '/api/migration',
   '/api/provider-liveness',
   '/api/sql/receipt',
 ];

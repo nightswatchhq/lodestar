@@ -147,7 +147,6 @@ export const LIVENESS = [
   '/api/indexers-enriched',
   '/api/sql/catalog',
   '/api/payments',
-  '/api/migration',
   '/api/tvl',
   '/api/token-metrics',
   '/api/scuttlebutt/messages',

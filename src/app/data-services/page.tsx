@@ -15,7 +15,6 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { cn } from '@/lib/utils';
-import { Playground } from '@/components/data-services/Playground';
 import { RegistryVsReality } from '@/components/data-services/RegistryVsReality';
 import { ProviderCensus } from '@/components/data-services/ProviderCensus';
 
@@ -315,8 +314,6 @@ const DetailPanel = ({
         {service.fees && <DetailBlock label="Fees" value={service.fees} />}
         {service.notable && <DetailBlock label="Notable" value={service.notable} />}
       </div>
-
-      <Playground service={service} />
 
       <div className="mt-5 pt-4 border-t border-[var(--border)] flex flex-wrap gap-2">
         {service.links.map((l) => (

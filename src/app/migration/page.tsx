@@ -188,11 +188,8 @@ export default function MigrationPage() {
         edge routes from. A test walks{' '}
         <span className="font-mono">src/app/api</span> and fails if the two disagree, so a route
         added without a line in that table breaks the build rather than becoming an uncounted
-        straggler. The machine-readable form is at{' '}
-        <a href="/api/migration" className="text-[var(--accent)] hover:underline font-mono">
-          /api/migration
-        </a>
-        .
+        straggler. This page computes the figures from that module directly: there is no endpoint
+        behind it, and there is no longer an API in this repository for one to live in.
       </p>
     </main>
   );
