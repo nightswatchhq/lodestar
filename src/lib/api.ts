@@ -11,7 +11,7 @@ import { normaliseEnrichedResponse, type EnrichedResponse } from './enriched-nor
 import { parseResponse } from './contract';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
-import type { DeploymentIndexingStatus } from './indexing-status';
+import type { DeploymentIndexingStatus } from './indexing-status-shape';
 import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activity';
 
 /**
