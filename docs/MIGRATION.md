@@ -4,9 +4,9 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**15 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **84%** of the way from 93 on 10 September 2026.
+**12 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **87%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **68 of 75** are across, **91%**. Of the rest, **5 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
+Of the port itself, **71 of 75** are across, **95%**. Of the rest, **3 are written and answering on kittiwake already** and wait only on a cutover, and **1** have still to be ported.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -14,13 +14,14 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 | Block | Done | Left |
 |---|---|---|
-| the disassembler | 0/3 | 3 |
-| the long tail | 0/3 | 3 |
+| the long tail | 0/2 | 2 |
+| the disassembler | 0/1 | 1 |
 | the SQL upper tier | 0/1 | 1 |
-| data plane | 68/68 | 0 |
+| data plane | 71/71 | 0 |
 
 ## On kittiwake
 
+- `/api/analytics/clickthrough`
 - `/api/apr-provenance/[address]`
 - `/api/chain-lag`
 - `/api/curators`
@@ -30,6 +31,8 @@ That second denominator is routes meant to move that have not yet, and it exclud
 - `/api/developer-activity`
 - `/api/dips`
 - `/api/dips/agreements`
+- `/api/disassembly`
+- `/api/disassembly/diff`
 - `/api/dropped-chains`
 - `/api/ens`
 - `/api/epochs`
@@ -92,7 +95,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 ## Still on Next
 
-- `/api/analytics/clickthrough`
 - `/api/disassembly/verify`
 
 ## Staying on Next by decision
@@ -113,8 +115,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | Route | Why |
 |---|---|
 | `/api/data-services/query` | answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip. |
-| `/api/disassembly` | answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port. |
-| `/api/disassembly/diff` | answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port. |
 | `/api/indexer/present-poi` | answering, and probed on 2026-09-11: it validated an empty body and returned its own message rather than the address handler's, so kittiwake routes the literal path correctly and the NEVER_FORWARD pin could be lifted on that count. It stays pinned on another: nothing exercises a POST that queues an action on a live indexer agent, and validating a bad payload is not the same as submitting a good one. |
 | `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
 
