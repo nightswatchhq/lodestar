@@ -53,7 +53,11 @@ describe('the route inventory', () => {
     // Was `> 50` and `/api/network-stats` until the rollback handlers were deleted on 2026-09-11
     // and this repo went from 74 route files to 8. The guard is still worth having and its numbers
     // were not: the canary is now a route this repo actually serves.
-    expect(onDisk.length).toBeGreaterThan(5);
+    // Not a floor on how many routes remain — that number is falling on purpose and a floor would
+    // have to be edited every time it does, which is how an assertion stops being read. What this
+    // guards is the walk itself: a broken path would return nothing and make every check below
+    // vacuously true.
+    expect(onDisk.length).toBeGreaterThan(0);
     expect(onDisk).toContain('/api/health');
   });
 

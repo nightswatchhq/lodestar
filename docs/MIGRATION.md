@@ -4,11 +4,11 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**6 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **94%** of the way from 93 on 10 September 2026.
+**5 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **95%** of the way from 93 on 10 September 2026.
 
 Of the port itself, **68 of 69** are across, **99%**. Of the rest, **1 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
 
-That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 5 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
+That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 4 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
 ## By block of work
 
@@ -96,7 +96,6 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | `/api/health` | judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker. |
 | `/api/indexing-status/[hash]` | pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves. |
 | `/api/issue-forms` | the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does. |
-| `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
 
 ## Written on kittiwake, still routed here
 

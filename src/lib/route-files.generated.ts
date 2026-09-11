@@ -15,6 +15,5 @@ export const ROUTE_FILES: readonly string[] = [
   '/api/health',
   '/api/indexing-status/[hash]',
   '/api/issue-forms',
-  '/api/provider-liveness',
   '/api/sql/receipt',
 ];
