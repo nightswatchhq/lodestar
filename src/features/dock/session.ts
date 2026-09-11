@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
-import { buildSignInMessage } from '@/lib/studio/auth';
+import { buildSignInMessage } from '@/lib/studio/sign-in-message';
 import { useSession, useSignIn, useSignOut } from './api';
 
 export function useStudioSession() {
