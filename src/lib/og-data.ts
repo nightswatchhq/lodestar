@@ -149,3 +149,44 @@ export function ogWeiToGrt(wei: string | number | undefined | null): number {
   if (!/^-?\d+$/.test(s)) return 0;
   return Number(BigInt(s)) / 1e18;
 }
+
+/**
+ * What the share surfaces read out of kittiwake's report; the rest of it is ignored here.
+ *
+ * Defaulted at the edge rather than declared optional throughout, because these surfaces render a
+ * dash for a missing figure and no branch in them wants to know the difference.
+ */
+export interface OgReport {
+  scorecard: {
+    grade: string;
+    riskScore: number;
+    flags: { level?: string; title?: string; detail?: string }[];
+    categories: { name: string; score: number; note?: string }[];
+  };
+  totals?: {
+    dataSources: number;
+    templates: number;
+    handlers: number;
+    resolvedHandlers: number;
+    wasmBytes: number;
+    hostCategories: string[];
+  };
+  manifest?: {
+    specVersion?: string | null;
+    apiVersions?: string[];
+    network?: string | null;
+    features?: string[];
+    schemaHash?: string | null;
+    graft?: { base?: string; block?: number } | null;
+  };
+  signal?: { signalledGRT: number } | null;
+}
+
+/**
+ * The disassembly report, for a link unfurl or a preview card.
+ *
+ * A longer budget than the rest: this one parses a manifest and a wasm module on the far side.
+ */
+export async function ogDisassembly(deploymentId: string): Promise<OgReport | null> {
+  return ogFetch<OgReport>(`/api/disassembly?id=${encodeURIComponent(deploymentId)}`, 8000);
+}
