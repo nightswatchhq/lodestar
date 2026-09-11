@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import type { DipsAllocation, DipsStep } from '@/app/api/dips/route';
+import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
 
 interface DipsResponse {
   available: boolean;

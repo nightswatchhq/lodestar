@@ -217,10 +217,88 @@ export interface RouteRecord {
  *
  * `/api/whoami` only ever existed in kittiwake, and `/api/support/[number]` was built there from
  * the start: it reads a mirror of graph-support that has no equivalent here, so a Next handler for
- * it could only be a second, worse implementation. Listed so the counts describe the surface the
- * public sees rather than the surface this repo happens to contain.
+ * it could only be a second, worse implementation.
+ *
+ * The rest arrived on 2026-09-11, when the rollback path was deleted. Each had a Next handler kept
+ * after the edge started proxying it, so that clearing `LODESTAR_API_ORIGIN` reverted everything on
+ * the next request. That was the right arrangement while the port was unproven and it stopped being
+ * one: the handlers had not served a request in weeks, they were 15,000 lines the compiler still
+ * had to check and a reader still had to wonder about, and kittiwake now reports its own schema
+ * gaps and failing jobs rather than being taken on trust.
+ *
+ * They are listed rather than forgotten because the counts describe the surface the public sees,
+ * not the surface this repo happens to contain. A route served by kittiwake is still a route.
  */
-export const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[number]'];
+export const BACKEND_ONLY: readonly string[] = [
+  '/api/whoami',
+  '/api/support/[number]',
+  '/api/analytics/clickthrough',
+  '/api/apr-provenance/[address]',
+  '/api/chain-lag',
+  '/api/curators',
+  '/api/delegate/recommend',
+  '/api/delegation-events',
+  '/api/delegation-flows',
+  '/api/developer-activity',
+  '/api/dips',
+  '/api/dips/agreements',
+  '/api/disassembly',
+  '/api/disassembly/diff',
+  '/api/dropped-chains',
+  '/api/ens',
+  '/api/epochs',
+  '/api/foghorn/[...path]',
+  '/api/grt-flow',
+  '/api/horizon/activity',
+  '/api/indexer-disputes/[address]',
+  '/api/indexer-node-health',
+  '/api/indexer-stake-history/[address]',
+  '/api/indexer-status/[address]',
+  '/api/indexer/[address]',
+  '/api/indexer/[address]/pnl',
+  '/api/indexer/[address]/revenue',
+  '/api/indexers',
+  '/api/indexers-enriched',
+  '/api/manifest',
+  '/api/network-stats',
+  '/api/parameter-history/[address]',
+  '/api/payments',
+  '/api/poi',
+  '/api/portfolio',
+  '/api/price',
+  '/api/provisions',
+  '/api/qos/capture',
+  '/api/reo',
+  '/api/rewards-history',
+  '/api/scuttlebutt/admin/login',
+  '/api/scuttlebutt/admin/messages',
+  '/api/scuttlebutt/bans',
+  '/api/scuttlebutt/messages',
+  '/api/scuttlebutt/messages/[id]',
+  '/api/scuttlebutt/stream',
+  '/api/service-census',
+  '/api/sql/catalog',
+  '/api/sql/named',
+  '/api/sql/query',
+  '/api/studio/auth',
+  '/api/studio/deploy-key',
+  '/api/studio/ipfs/[...path]',
+  '/api/studio/metadata',
+  '/api/studio/node',
+  '/api/studio/subgraphs',
+  '/api/studio/subgraphs/[id]',
+  '/api/subgraph-curation/[hash]',
+  '/api/subgraph-deployments',
+  '/api/subgraph-fees-30d',
+  '/api/subgraph-history/[hash]',
+  '/api/subgraph-names',
+  '/api/subgraph-schema/[hash]',
+  '/api/subgraph-search',
+  '/api/subgraph-versions/[hash]',
+  '/api/support',
+  '/api/token-metrics',
+  '/api/tvl',
+];
 
 /**
  * Everything that is not migrated, and what it is waiting on.

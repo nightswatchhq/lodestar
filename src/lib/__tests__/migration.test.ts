@@ -14,6 +14,7 @@ import {
   isMigrated,
   buildInventory,
   summarise,
+  BACKEND_ONLY,
   type RouteRecord,
 } from '../migration';
 import { ROUTE_FILES } from '../route-files.generated';
@@ -49,8 +50,11 @@ describe('the route inventory', () => {
   it('finds the API routes at all, so an empty walk cannot pass as agreement', () => {
     // Absent data rendering as healthy is the failure this whole file exists to prevent. A broken
     // path here would make every other assertion below vacuously true.
-    expect(onDisk.length).toBeGreaterThan(50);
-    expect(onDisk).toContain('/api/network-stats');
+    // Was `> 50` and `/api/network-stats` until the rollback handlers were deleted on 2026-09-11
+    // and this repo went from 74 route files to 8. The guard is still worth having and its numbers
+    // were not: the canary is now a route this repo actually serves.
+    expect(onDisk.length).toBeGreaterThan(5);
+    expect(onDisk).toContain('/api/health');
   });
 
   it('covers every route file on disk', () => {
@@ -59,9 +63,12 @@ describe('the route inventory', () => {
   });
 
   it('claims no route that does not exist', () => {
-    // Backend-only routes are the deliberate exception and are declared as such.
+    // Backend-only routes are the deliberate exception and are declared as such. Asserted against
+    // the declaration rather than a hardcoded pair: that list was two entries when this was written
+    // and is sixty-eight now, and a test that has to be edited every time a route moves is a test
+    // people edit without reading.
     const backendOnly = inventory.filter((r) => !onDisk.includes(r.path)).map((r) => r.path);
-    expect(backendOnly.sort()).toEqual(['/api/support/[number]', '/api/whoami']);
+    expect(backendOnly.sort()).toEqual([...BACKEND_ONLY].sort());
   });
 
   it('agrees with the proxy about which routes the edge sends to kittiwake', () => {

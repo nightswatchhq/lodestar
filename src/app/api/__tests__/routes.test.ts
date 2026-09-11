@@ -137,97 +137,11 @@ async function getJson(response: Response) {
 // /api/price
 // ============================================================
 
-describe('/api/price', () => {
-  let GET: (req?: Request) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/price/route');
-    GET = mod.GET;
-  });
-
-  it('returns { price, change24h } on success', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ 'the-graph': { usd: 0.15, usd_24h_change: 2.5 } }),
-        { status: 200 },
-      ),
-    );
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('price');
-    expect(json).toHaveProperty('change24h');
-    expect(typeof json.price).toBe('number');
-  });
-
-  it('falls back to DefiLlama when CoinGecko fails', async () => {
-    // CoinGecko fails
-    mockFetch.mockResolvedValueOnce(new Response('', { status: 429 }));
-    // DefiLlama succeeds
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ coins: { 'coingecko:the-graph': { price: 0.14 } } }),
-        { status: 200 },
-      ),
-    );
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.price).toBe(0.14);
-  });
-
-  it('returns null price when both sources fail', async () => {
-    mockFetch.mockResolvedValue(new Response('', { status: 500 }));
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.price).toBeNull();
-  });
-});
 
 // ============================================================
 // /api/tvl
 // ============================================================
 
-describe('/api/tvl', () => {
-  let GET: () => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/tvl/route');
-    GET = mod.GET;
-  });
-
-  it('returns { tvl } on success', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ currentChainTvls: { staking: 3_500_000_000 } }),
-        { status: 200 },
-      ),
-    );
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('tvl');
-    expect(typeof json.tvl).toBe('number');
-  });
-
-  it('returns 500 with error on fetch failure', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('network error'));
-
-    const res = await GET();
-    expect(res.status).toBe(500);
-    const json = await getJson(res);
-    expect(json).toHaveProperty('error');
-  });
-});
 
 // ============================================================
 // /api/network-stats
@@ -241,45 +155,6 @@ describe('/api/tvl', () => {
 // /api/indexers-enriched
 // ============================================================
 
-describe('/api/indexers-enriched', () => {
-  let GET: () => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/indexers-enriched/route');
-    GET = mod.GET;
-  });
-
-  it('returns { indexers, computedAt } when cache has data', async () => {
-    const mockData = [
-      {
-        id: '0x1',
-        name: 'Test',
-        selfStakeGRT: 1000000,
-        delegatorAPR: 5.5,
-        score: 85,
-        scoreGrade: 'A',
-        computedAt: 1700000000,
-      },
-    ];
-    mockCacheGet.mockResolvedValueOnce(mockData);
-
-    const res = await GET();
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('indexers');
-    expect(json).toHaveProperty('computedAt');
-    expect(Array.isArray(json.indexers)).toBe(true);
-  });
-
-  it('returns 503 when cache is empty (cron not yet run)', async () => {
-    // mockCacheGet defaults to null from beforeEach
-    const res = await GET();
-    expect(res.status).toBe(503);
-    const json = await getJson(res);
-    expect(json).toHaveProperty('error');
-  });
-});
 
 // ============================================================
 // /api/epochs
@@ -289,303 +164,26 @@ describe('/api/indexers-enriched', () => {
 // /api/ens
 // ============================================================
 
-describe('/api/ens', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/ens/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  it('returns { ensName } on success', async () => {
-    mockResolveEnsName.mockResolvedValueOnce('vitalik.eth');
-
-    const req = makeRequest('/api/ens?address=0xd8da6bf26964af9d7eed9e03e53415d37aa96045');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('ensName');
-    expect(json.ensName).toBe('vitalik.eth');
-  });
-
-  it('returns 400 when address missing', async () => {
-    const req = makeRequest('/api/ens');
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns null ensName for invalid address format', async () => {
-    const req = makeRequest('/api/ens?address=0x1234');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.ensName).toBeNull();
-  });
-
-  it('returns null ensName when the address has no primary name', async () => {
-    mockResolveEnsName.mockResolvedValueOnce(null);
-
-    const req = makeRequest('/api/ens?address=0xd8da6bf26964af9d7eed9e03e53415d37aa96045');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(json.ensName).toBeNull();
-  });
-
-  it('503s when the ENS lookup errors, rather than reporting no name', async () => {
-    // This previously asserted `200 { ensName: null }`, which made "the lookup failed" and
-    // "this address has no ENS name" the same answer (#36).
-    mockResolveEnsName.mockRejectedValueOnce(new Error('subgraph down'));
-
-    const req = makeRequest('/api/ens?address=0xd8da6bf26964af9d7eed9e03e53415d37aa96045');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(503);
-    expect(json.ensName).toBeUndefined();
-  });
-});
 
 // ============================================================
 // /api/manifest
 // ============================================================
 
-describe('/api/manifest', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/manifest/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  it('returns 400 for invalid IPFS hash', async () => {
-    const req = makeRequest('/api/manifest?hash=invalid');
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 when hash missing', async () => {
-    const req = makeRequest('/api/manifest');
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns { data } with manifest analysis on success', async () => {
-    const yaml = `specVersion: 0.0.5
-dataSources:
-  - name: Factory
-    kind: ethereum/contract
-    network: mainnet
-    source:
-      address: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
-      startBlock: 20000000
-    mapping:
-      kind: ethereum/events
-      apiVersion: 0.0.7
-      eventHandlers:
-        - event: PairCreated
-          handler: handlePairCreated`;
-
-    mockFetch.mockResolvedValueOnce(
-      new Response(yaml, { status: 200 }),
-    );
-
-    const req = makeRequest('/api/manifest?hash=QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('data');
-    expect(json.data).toHaveProperty('score');
-    expect(json.data).toHaveProperty('category');
-    expect(json.data).toHaveProperty('breakdown');
-    expect(json.data).toHaveProperty('dataSources');
-    expect(json.data).toHaveProperty('specVersion');
-  });
-});
 
 // ============================================================
 // /api/reo
 // ============================================================
 
-describe('/api/reo', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/reo/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  it('returns 400 when address missing', async () => {
-    const req = makeRequest('/api/reo');
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('returns { status } with REO eligibility data', async () => {
-    const req = makeRequest('/api/reo?address=0x1234');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('status');
-    expect(json.status).toHaveProperty('address');
-    expect(json.status).toHaveProperty('status');
-    expect(json.status).toHaveProperty('isEligible');
-    expect(json.status).toHaveProperty('source');
-  });
-});
 
 // ============================================================
 // /api/subgraph-search
 // ============================================================
 
-describe('/api/subgraph-search', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  const HIT = {
-    id: 's1',
-    metadata: { displayName: 'Uniswap V3', description: null },
-    currentVersion: { subgraphDeployment: { ipfsHash: 'QmTest', signalledTokens: '100', stakedTokens: '200' } },
-  };
-
-  beforeEach(async () => {
-    mockHasNuthatch.mockReturnValue(true);
-    const mod = await import('@/app/api/subgraph-search/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  it('returns empty array for short query', async () => {
-    const req = makeRequest('/api/subgraph-search?q=a');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json).toHaveProperty('data');
-    expect(json.data).toEqual([]);
-  });
-
-  it('returns search results for name query', async () => {
-    mockSearchByName.mockResolvedValueOnce([HIT]);
-
-    const req = makeRequest('/api/subgraph-search?q=uniswap');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.data).toHaveLength(1);
-    expect(json.data[0]).toHaveProperty('metadata');
-    expect(json.data[0]).toHaveProperty('currentVersion');
-    expect(mockSearchByName).toHaveBeenCalledWith('uniswap', 10);
-  });
-
-  it('handles Qm hash search differently', async () => {
-    mockSearchByHashPrefix.mockResolvedValueOnce([HIT]);
-
-    const req = makeRequest('/api/subgraph-search?q=QmTestHash');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(Array.isArray(json.data)).toBe(true);
-  });
-
-  it('searches by contract address through the manifest index', async () => {
-    const addr = '0x1f98431c8ad98523631ae4a59f267346ea31f984';
-    mockSearchByManifestAddress.mockResolvedValueOnce([{ ...HIT, id: 'sA', currentVersion: { subgraphDeployment: { ipfsHash: 'QmDeployA', signalledTokens: '1', stakedTokens: '1' } } }]);
-
-    const req = makeRequest(`/api/subgraph-search?q=${addr}`);
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(mockSearchByManifestAddress).toHaveBeenCalledWith(addr, 20);
-    expect(mockSearchByName).not.toHaveBeenCalled();
-    expect(res.status).toBe(200);
-    expect(json.data).toHaveLength(1);
-    expect(json.data[0].id).toBe('sA');
-    expect(json.data[0].currentVersion.subgraphDeployment.ipfsHash).toBe('QmDeployA');
-  });
-
-
-
-  it('returns 503 when no nest is configured', async () => {
-    mockHasNuthatch.mockReturnValue(false);
-    const req = makeRequest('/api/subgraph-search?q=uniswap');
-    const res = await GET(req);
-    expect(res.status).toBe(503);
-  });
-});
 
 // ============================================================
 // /api/subgraph-versions/[hash]
 // ============================================================
 
-describe('/api/subgraph-versions/[hash]', () => {
-  const VALID_HASH = 'QmNNqSFDNDhWPhscvpsyjAXTbHbpLpzyvhw51SxTx5mtwg';
-  let GET: (req: NextRequest, ctx: { params: Promise<{ hash: string }> }) => Promise<Response>;
-
-  const OLD_HASH = 'QmNRuGkzXYPd75LbqHfx6Ksu8n7eDHwD18VCU3UEoxAZxT';
-  const META = '0x' + '11'.repeat(32); // any non-zero bytes32 decodes to a CID for the version document
-  /** The gns nest's owner and version rows, and the allocations nest's per-deployment figures (nuthatch#1160). */
-  function nest(subgraphId: string | null, versions: Array<{ version: number; hash: string; created_at: number }>) {
-    mockNuthatchSql.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM deployment_subgraphs')) return subgraphId ? [{ subgraph_id: subgraphId }] : [];
-      if (sql.includes('FROM subgraph_versions')) return versions.map((v) => ({ deployment_id: ipfsHashToBytes32(v.hash).toLowerCase(), version_metadata: META, version_number: v.version, created_at: v.created_at }));
-      if (sql.includes('GROUP BY 1')) return versions.map((v) => ({ subgraph_deployment: ipfsHashToBytes32(v.hash).toLowerCase(), signalled_tokens: '100', staked_tokens: '200' }));
-      return [];
-    });
-  }
-
-  beforeEach(async () => {
-    mockHasNuthatch.mockReturnValue(true);
-    const mod = await import('@/app/api/subgraph-versions/[hash]/route');
-    GET = mod.GET as typeof GET;
-  });
-
-  it('rejects an invalid deployment hash with 400', async () => {
-    const req = makeRequest('/api/subgraph-versions/not-a-hash');
-    const res = await GET(req, { params: Promise.resolve({ hash: 'not-a-hash' }) });
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 503 when no nest is configured', async () => {
-    mockHasNuthatch.mockReturnValue(false);
-    const req = makeRequest(`/api/subgraph-versions/${VALID_HASH}`);
-    const res = await GET(req, { params: Promise.resolve({ hash: VALID_HASH }) });
-    expect(res.status).toBe(503);
-  });
-
-  it('maps versions and flags the current deployment', async () => {
-    nest('sg-1', [{ version: 1, hash: VALID_HASH, created_at: 1711047781 }, { version: 0, hash: OLD_HASH, created_at: 1701215330 }]);
-    mockIpfsJson.mockResolvedValueOnce({ label: '0.0.3', description: 'd' }).mockResolvedValueOnce({ label: '0.0.2', description: 'd' });
-
-    const req = makeRequest(`/api/subgraph-versions/${VALID_HASH}`);
-    const res = await GET(req, { params: Promise.resolve({ hash: VALID_HASH }) });
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.data.subgraphId).toBe('sg-1');
-    expect(json.data.versions).toHaveLength(2);
-    expect(json.data.versions[0].label).toBe('0.0.3');
-    expect(json.data.versions[0].isCurrent).toBe(true);
-    expect(json.data.versions[1].isCurrent).toBe(false);
-  });
-
-
-  it('returns an empty list when the deployment has no parent subgraph', async () => {
-    nest(null, []);
-
-    const req = makeRequest(`/api/subgraph-versions/${VALID_HASH}`);
-    const res = await GET(req, { params: Promise.resolve({ hash: VALID_HASH }) });
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.data.subgraphId).toBeNull();
-    expect(json.data.versions).toEqual([]);
-  });
-});
 
 // ============================================================
 // /api/indexer/[address]
@@ -662,91 +260,8 @@ describe('/api/indexing-status/[hash]', () => {
 // /api/delegation-events
 // ============================================================
 
-describe('/api/delegation-events', () => {
-  let GET: (req: NextRequest) => Promise<Response>;
-
-  beforeEach(async () => {
-    const mod = await import('@/app/api/delegation-events/route');
-    GET = mod.GET as (req: NextRequest) => Promise<Response>;
-  });
-
-  // Migrated to Nuthatch in 4.26.0: no Graph fallback, so an unconfigured
-  // origin is a visible 503 rather than an empty 200.
-  it('fails closed with 503 when Nuthatch is not configured', async () => {
-    mockHasNuthatch.mockReturnValue(false);
-
-    const req = makeRequest('/api/delegation-events');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(503);
-    expect(json.error).toMatch(/not configured/i);
-  });
-
-  it('returns delegationEvents with nuthatch provenance when the nest answers', async () => {
-    mockHasNuthatch.mockReturnValue(true);
-    mockNuthatchSql.mockResolvedValue([]);
-
-    const req = makeRequest('/api/delegation-events');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.data).toHaveProperty('delegationEvents');
-    expect(json.data.source).toBe('nuthatch');
-  });
-});
 
 // ============================================================
 // Security: input validation across routes
 // ============================================================
 
-describe('Security: address validation', () => {
-  it('/api/ens rejects GraphQL-injectable address (no format check)', async () => {
-    const mod = await import('@/app/api/ens/route');
-    const GET = mod.GET as (req: NextRequest) => Promise<Response>;
-
-    // Attempt to inject GraphQL syntax via address param
-    const req = makeRequest('/api/ens?address=0x0000%22%7D%7B%20id%20%7D');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    // Invalid format — should not reach ENS query; returns null
-    expect(res.status).toBe(200);
-    expect(json.ensName).toBeNull();
-    expect(mockEnsQuery).not.toHaveBeenCalled();
-  });
-
-  it('/api/payments rejects non-address receiver', async () => {
-    const mod = await import('@/app/api/payments/route');
-    const GET = mod.GET as (req: NextRequest) => Promise<Response>;
-
-    const req = makeRequest('/api/payments?receiver=0xnot-an-address');
-    const res = await GET(req);
-
-    expect(res.status).toBe(400);
-    expect(mockSubgraphQuery).not.toHaveBeenCalled();
-  });
-
-  it('/api/portfolio rejects invalid address', async () => {
-    const mod = await import('@/app/api/portfolio/route');
-    const GET = mod.GET as (req: NextRequest) => Promise<Response>;
-
-    const req = makeRequest('/api/portfolio?address=notanaddress&type=delegator');
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-  });
-
-  it('/api/subgraph-search rejects query with GraphQL special chars', async () => {
-    const mod = await import('@/app/api/subgraph-search/route');
-    const GET = mod.GET as (req: NextRequest) => Promise<Response>;
-
-    const req = makeRequest('/api/subgraph-search?q=uniswap%22%7D%7Badmin');
-    const res = await GET(req);
-    const json = await getJson(res);
-
-    expect(res.status).toBe(200);
-    expect(json.data).toEqual([]); // allowlist blocks special chars
-    expect(mockSubgraphQuery).not.toHaveBeenCalled();
-  });
-});

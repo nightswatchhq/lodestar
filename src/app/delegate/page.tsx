@@ -8,7 +8,7 @@ import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { weiToGRT, cn } from '@/lib/utils';
-import type { RecommendResponse } from '@/app/api/delegate/recommend/route';
+import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
 import type { EnrichedIndexer } from '@/lib/enriched';
 
 // ─── Preference sliders ───────────────────────────────────────────────────────
