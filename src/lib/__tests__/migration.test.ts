@@ -53,14 +53,15 @@ describe('the route inventory', () => {
     // Was `> 50` and `/api/network-stats` until the rollback handlers were deleted on 2026-09-11
     // and this repo went from 74 route files to 8. The guard is still worth having and its numbers
     // were not: the canary is now a route this repo actually serves. `/api/health` was that
-    // canary until it moved to kittiwake on 2026-09-11, and `/api/file-issue` until it followed
-    // the same afternoon. `/api/indexing-status/[hash]` is the one with real work left in it.
+    // canary until it moved to kittiwake on 2026-09-11, and `/api/file-issue` and
+    // `/api/indexing-status/[hash]` until they followed the same day. `/api/sql/receipt` is the
+    // last one standing, and it is waiting on a key reaching the box rather than on any code.
     // Not a floor on how many routes remain — that number is falling on purpose and a floor would
     // have to be edited every time it does, which is how an assertion stops being read. What this
     // guards is the walk itself: a broken path would return nothing and make every check below
     // vacuously true.
     expect(onDisk.length).toBeGreaterThan(0);
-    expect(onDisk).toContain('/api/indexing-status/[hash]');
+    expect(onDisk).toContain('/api/sql/receipt');
   });
 
   it('covers every route file on disk', () => {
@@ -222,8 +223,12 @@ describe('summarise', () => {
 
   it('reports a percentage consistent with its own counts', () => {
     expect(summary.percent).toBe(Math.round((summary.onKittiwake / summary.inScope) * 100));
-    expect(summary.percent).toBeGreaterThan(0);
-    expect(summary.percent).toBeLessThan(100);
+    // A range, not a floor and a ceiling. `toBeLessThan(100)` was here and it is an assertion that
+    // the migration is unfinished, which fails on the day it finishes - the one day nobody wants to
+    // be arguing with a test. What this guards is a nonsense percentage, so nonsense is what it
+    // checks for.
+    expect(summary.percent).toBeGreaterThanOrEqual(0);
+    expect(summary.percent).toBeLessThanOrEqual(100);
   });
 
   it('accounts for every in-scope route exactly once across the workstreams', () => {
@@ -232,7 +237,10 @@ describe('summarise', () => {
   });
 
   it('counts routes that are staying separately from routes that are done', () => {
-    expect(summary.stayingOnNext).toBeGreaterThan(0);
+    // No floor. This was `toBeGreaterThan(0)` and that stopped being true on 2026-09-11, when the
+    // last route staying on Next by decision moved: nothing is staying now, and an assertion that
+    // something must be would have to be deleted the day the migration finished. Whether the
+    // counter counts at all is pinned on the fixture below, which always has a staying route.
     const staying = inventory.filter((r) => r.state === 'staying' && r.workstream !== 'scheduled');
     expect(summary.stayingOnNext).toBe(staying.length);
   });

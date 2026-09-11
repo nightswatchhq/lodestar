@@ -27,11 +27,16 @@
  * Kept in step by hand, which is the honest weakness of it. What catches a drift is the parity
  * harness on the kittiwake side and the filesystem check on this one.
  *
- * A route answering in kittiwake is not on its own a reason to add it here. `indexing-status` is
- * the standing example: it is served there and the parity harness compares it, and it stays on Next
- * anyway, because kittiwake probes without a TAP receipt and so cannot tell a serving stack that
- * wants payment from one that actually served. Its entry below records that. The bar for this list
- * is that the harness compares the route **and** the answer is not weaker than the one it replaces.
+ * A route answering in kittiwake is not on its own a reason to add it here. The bar is that the
+ * harness compares the route **and** the answer is not weaker than the one it replaces.
+ *
+ * `indexing-status` was the standing example of failing that second half: served there, compared by
+ * the harness, and kept here anyway because kittiwake probed without a TAP receipt and so could not
+ * tell a serving stack that wants payment from one that actually served. It met the bar on
+ * 2026-09-11, once the payer key reached the box and a shape diff over eight real deployments
+ * agreed field for field. Two fixes came out of that diff rather than out of the harness, which is
+ * the case for doing it: a fatal error had lost the three fields that say whether it will happen
+ * again (kittiwake#116), and the query had never asked graph-node for them (kittiwake#117).
  */
 export const MIGRATED: readonly string[] = [
   '/api/apr-provenance/',
@@ -54,6 +59,7 @@ export const MIGRATED: readonly string[] = [
   '/api/grt-flow',
   '/api/health',
   '/api/horizon/activity',
+  '/api/indexing-status/',
   '/api/issue-forms',
   '/api/indexer-disputes/',
   '/api/indexer-node-health',
@@ -334,14 +340,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // "nobody reads it" for a public path on a public host. Confirmed with a person on 2026-09-10 and
   // deleted: a TCP-and-TLS probe against ampd is an operator tool, and an operator tool belongs on
   // the box it probes from rather than in the frontend.
-
-  // ── Staying on Next by decision ───────────────────────────────────────────
-  {
-    path: '/api/indexing-status/[hash]',
-    state: 'staying',
-    workstream: 'data plane',
-    note: 'pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves.',
-  },
 
   // ── Agreed for deletion, kittiwake#20. Not outstanding work. ──────────────
   //

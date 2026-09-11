@@ -63,8 +63,15 @@ describe('the migrated route list', () => {
    * One of the eight remains out. Its port needs the live serving probe and the multi-round
    * servability persistence, which is a subsystem rather than a shape. See kittiwake#23.
    */
-  it('keeps indexing-status on Next until its port is finished', () => {
-    expect(isMigrated('/api/indexing-status/QmAbc')).toBe(false);
+  /**
+   * The inverse of what this asserted until 2026-09-11, when the payer key reached the box and a
+   * shape diff over eight real deployments agreed field for field. Kept rather than deleted: the
+   * route was ported, pulled back, and ported again, so which way it is pointing is worth pinning.
+   */
+  it('routes indexing-status now that the probe can pay', () => {
+    expect(isMigrated('/api/indexing-status/QmAbc')).toBe(true);
+    // One more segment, not a catch-all: nothing below the hash is a route.
+    expect(isMigrated('/api/indexing-status/QmAbc/extra')).toBe(false);
   });
 
   it('has the seven finished ports back', () => {
