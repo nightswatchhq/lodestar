@@ -35,11 +35,14 @@
  */
 export const MIGRATED: readonly string[] = [
   '/api/apr-provenance/',
+  '/api/analytics/clickthrough',
   '/api/chain-lag',
   '/api/curators',
   '/api/delegate/recommend',
   '/api/delegation-events',
   '/api/delegation-flows',
+  '/api/disassembly',
+  '/api/disassembly/diff',
   '/api/developer-activity',
   '/api/dips',
   '/api/dips/agreements',
@@ -233,19 +236,7 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // ── Scuttlebutt: a rewrite rather than a port, kittiwake#17 ───────────────
             
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
-  {
-    path: '/api/disassembly',
-    state: 'ready',
-    workstream: 'the disassembler',
-    note: 'answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port.',
-  },
-  {
-    path: '/api/disassembly/diff',
-    state: 'ready',
-    workstream: 'the disassembler',
-    note: 'answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port.',
-  },
-  { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
+      { path: '/api/disassembly/verify', state: 'next', workstream: 'the disassembler' },
 
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─
   {
@@ -265,7 +256,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // "nobody reads it" for a public path on a public host. Confirmed with a person on 2026-09-10 and
   // deleted: a TCP-and-TLS probe against ampd is an operator tool, and an operator tool belongs on
   // the box it probes from rather than in the frontend.
-  { path: '/api/analytics/clickthrough', state: 'next', workstream: 'the long tail' },
   {
     path: '/api/data-services/query',
     state: 'ready',
