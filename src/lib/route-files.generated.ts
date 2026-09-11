@@ -11,6 +11,5 @@
  *     pnpm migration:routes
  */
 export const ROUTE_FILES: readonly string[] = [
-  '/api/indexing-status/[hash]',
   '/api/sql/receipt',
 ];
