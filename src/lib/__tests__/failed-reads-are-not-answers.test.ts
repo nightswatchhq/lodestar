@@ -16,7 +16,7 @@
  * the next inline `queryFn` written outside that file forgetting it.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOTS = ['src/app', 'src/components', 'src/features', 'src/hooks', 'src/lib'];
@@ -50,8 +50,6 @@ const DELIBERATE: Record<string, string> = {
     'search keeps working on titles, excerpts and tags without the bodies; the degradation is invisible and harmless.',
   'src/app/scuttlebutt/page.tsx':
     'an admin-status probe. Failing leaves `isAdmin` false, which is the safe direction for a privilege check.',
-  'src/hooks/useClickTracking.ts':
-    'analytics. A reader must never see a dialog because a click could not be counted.',
   'src/lib/cache.ts':
     'two background refreshes whose rejection is handled by the `.finally` that clears the inflight entry; the caller already has its own answer.',
 };
@@ -106,7 +104,13 @@ describe('a failure has to reach somebody', () => {
   });
 
   it('keeps the deliberate list honest, so a cleaned-up file cannot sit in it', () => {
-    const stale = Object.keys(DELIBERATE).filter((f) => !SWALLOW.test(code(readFileSync(f, 'utf8'))));
+    // A deleted file counts as stale rather than throwing. It used to throw ENOENT from inside the
+    // filter, which reports a missing file as a crash in the test harness rather than as the thing
+    // it is: an entry excusing something that no longer exists.
+    const stale = Object.keys(DELIBERATE).filter((f) => {
+      if (!existsSync(f)) return true;
+      return !SWALLOW.test(code(readFileSync(f, 'utf8')));
+    });
     expect(stale).toEqual([]);
   });
 });
