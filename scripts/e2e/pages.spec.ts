@@ -122,7 +122,88 @@ test('the delegation activity filter does not throw on indexers with no name', a
   ).toHaveLength(0);
 });
 
-for (const path of ['/curators', '/delegators', '/subgraphs', '/payments', '/grt-flow', '/indexing']) {
+/**
+ * A deployment's POI detail, which 400'd for every deployment on the site.
+ *
+ * `/api/poi?deployment=` normalised its argument by lowercasing, and base58 is case-sensitive, so
+ * every `Qm…` CID became rubbish. The page returned 200 and rendered its shell, the request failed
+ * in the console, and nothing else noticed: the #114 shape again, in a route no test opened.
+ * nightswatchhq/kittiwake#124.
+ */
+test('a POI deployment page renders epochs rather than a failed read', async ({ page, request }) => {
+  const failed: string[] = [];
+  page.on('response', (r) => {
+    if (r.status() >= 400 && r.url().includes('/api/poi')) failed.push(`${r.status()} ${r.url()}`);
+  });
+
+  // The subject comes from the API, not from scraping the index. Which deployments have POIs
+  // changes, so hardcoding one is a test that rots; and the index renders its links inside a panel
+  // Playwright reads as hidden, so locating one there tests the index's layout rather than this
+  // page. What is under test is the detail route.
+  const index = await request.get('/api/poi');
+  expect(index.ok(), `/api/poi returned ${index.status()}`).toBe(true);
+  const body = await index.json();
+  const list = body.data ?? body;
+  const deployments = Array.isArray(list) ? list : (list.deployments ?? []);
+  expect(deployments.length, '/api/poi lists no deployments').toBeGreaterThan(0);
+
+  await page.goto(`/poi/${deployments[0].ipfsHash}`);
+
+  // **The request, not the rendering, is what this pins.** The bug was the route refusing a CID,
+  // and the page's honest response to a refused read is to say so - so accepting "unavailable" as
+  // a pass makes the test agree with the bug. Worse, the first draft checked the rendering first
+  // and the failures second, and a page that answers instantly with "unavailable" satisfied it
+  // before the 400 had even landed. It passed against a deliberately broken URL.
+  //
+  // So: settle, then assert nothing was refused.
+  await page.waitForLoadState('networkidle').catch(() => {
+    // A hung page is itself the symptom: a refused CID leaves the query retrying and networkidle
+    // never arrives. Swallowed so the assertions below report it rather than a timeout stack.
+  });
+  await page.waitForTimeout(1500);
+  expect(failed, `the POI detail read was refused: ${failed.join(', ')}`).toHaveLength(0);
+
+  const text = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
+  expect(
+    /Something went wrong|Application error/i.test(text),
+    'the POI detail page rendered an error boundary',
+  ).toBe(false);
+  expect(
+    /POI Analysis|Total Allocations|Unique Indexers/i.test(text),
+    `the POI detail page rendered no figures: ${text.slice(0, 200)}`,
+  ).toBe(true);
+});
+
+/**
+ * The board's moderator-status check, which answered 405 after the route moved with only POST
+ * bound. Its caller swallows the failure, so a signed-in moderator was demoted by a refresh and
+ * the page looked entirely normal. nightswatchhq/kittiwake#124.
+ *
+ * Asserted on the request rather than on the controls, because the controls are correctly absent
+ * for the anonymous visitor this test is: what must not happen is the question failing to be asked.
+ */
+test('the board can ask whether you are a moderator', async ({ page }) => {
+  const rejected: string[] = [];
+  page.on('response', (r) => {
+    const u = r.url();
+    if (r.status() >= 400 && u.includes('/api/scuttlebutt/')) {
+      rejected.push(`${r.status()} ${r.request().method()} ${u.split('/api')[1]}`);
+    }
+  });
+  await page.goto('/scuttlebutt');
+  await page.waitForTimeout(3000);
+  expect(rejected, `the board made requests the backend refused: ${rejected.join(', ')}`).toHaveLength(0);
+});
+
+// Widened from six to sixteen after a sweep of all forty pages on 2026-09-12 found two routes
+// broken in production that nothing here opened. This is the floor - up, no boundary, no console
+// errors, some content - and it is deliberately not a data assertion: the tests above carry those
+// for the pages where a specific figure is the point.
+for (const path of [
+  '/curators', '/delegators', '/subgraphs', '/payments', '/grt-flow', '/indexing',
+  '/activity', '/calculator', '/curate', '/data-services', '/foghorn', '/poi',
+  '/qos', '/sql', '/support', '/verify',
+]) {
   test(`${path} renders without an error boundary`, async ({ page }) => {
     const errors = trackErrors(page);
     const res = await page.goto(path);
