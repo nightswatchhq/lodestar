@@ -1,8 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { hasNuthatch, nuthatchSqlReady } from '@/lib/nuthatch';
-import { deploymentsByIdSql, type NestDeploymentListRow } from '@/lib/nest-queries';
-import { ipfsText, manifestFacts, subgraphMetadataForDeployments } from '@/lib/subgraph-metadata';
-import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
+import { ogDeployment, ogManifest, ogWeiToGrt } from '@/lib/og-data';
 
 // Node runtime rather than edge: the nest path reads the IPFS cache through Postgres (nuthatch#1160).
 export const alt = 'Subgraph Deployment | Lodestar';
@@ -17,10 +14,6 @@ function formatGRT(amount: number): string {
   return amount.toFixed(0);
 }
 
-function weiToGRT(wei: string): number {
-  const intPart = wei.split('.')[0];
-  return Number(BigInt(intPart)) / 1e18;
-}
 
 function shortenHash(hash: string): string {
   return `${hash.slice(0, 8)}…${hash.slice(-6)}`;
@@ -134,35 +127,24 @@ export default async function OGImage({
   let substreams = false;
   let found = false;
 
-  try {
-    if (hasNuthatch()) {
-      // From the nests (nuthatch#1160, group B). `deniedAt` is the rewards-eligibility oracle's
-      // verdict and is not on chain in any event the nests carry, so the "Rewards denied" chip is
-      // never shown on this path; network and substreams come off the manifest on IPFS.
-      let id: string | null = null;
-      try { id = ipfsHashToBytes32(hash).toLowerCase(); } catch { id = null; }
-      if (id) {
-        const r = await nuthatchSqlReady<NestDeploymentListRow>(deploymentsByIdSql([id]), process.env.NUTHATCH_ALLOCATIONS_BASE_PATH || '/alloc');
-        const dep = r.ok ? r.data.rows[0] : undefined;
-        if (dep) {
-          found = true;
-          const [meta, manifest] = await Promise.all([subgraphMetadataForDeployments([id]), ipfsText(hash)]);
-          name = meta.get(id)?.metadata?.displayName ?? shortenHash(hash);
-          signal = weiToGRT(String(dep.signalled_tokens));
-          allocated = weiToGRT(String(dep.staked_tokens));
-          queryFees = weiToGRT(String(dep.query_fees_amount));
-          activeIndexers = Number(dep.active_allocation_count);
-          curators = Number(dep.curator_count);
-          const facts = manifestFacts(manifest);
-          network = facts.network;
-          substreams = facts.poweredBySubstreams;
-          createdAt = Number(dep.created_at);
-        }
-      }
-    }
-  } catch {
-    // fall through with defaults
+  // Asked of kittiwake rather than read out of the nests and Postgres. `deniedAt` is the
+  // rewards-eligibility oracle's verdict and is on neither, so the "Rewards denied" chip is never
+  // shown here, exactly as on the path this replaces.
+  const [dep, facts] = await Promise.all([ogDeployment(hash), ogManifest(hash)]);
+  if (dep) {
+    found = true;
+    name = dep.displayName ?? shortenHash(hash);
+    signal = ogWeiToGrt(dep.signalledTokens);
+    allocated = ogWeiToGrt(dep.stakedTokens);
+    queryFees = ogWeiToGrt(dep.queryFeesAmount);
+    // Lengths, not counts: this is the shaping the deployment list has always returned and what
+    // every page reading it already does.
+    activeIndexers = (dep.indexerAllocations ?? []).length;
+    curators = (dep.curatorSignals ?? []).length;
+    createdAt = Number(dep.createdAt ?? 0);
   }
+  network = facts.network;
+  substreams = facts.poweredBySubstreams;
 
   const nameSize = name.length > 34 ? 34 : name.length > 26 ? 40 : 46;
 

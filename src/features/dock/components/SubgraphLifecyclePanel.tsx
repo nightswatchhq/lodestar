@@ -21,7 +21,7 @@ import { useContractStep } from '@/hooks/useContractStep';
 import { isAddress, getAddress } from 'viem';
 import { CONTRACTS } from '@/lib/wallet';
 import { cn } from '@/lib/utils';
-import type { StudioSubgraph } from '@/lib/studio/db';
+import type { StudioSubgraph } from '@/lib/studio/types';
 
 // GNS lifecycle ABI — kept local so the inline publish ABI in dock/page.tsx
 // stays untouched. GNS is itself the ERC-721 for subgraph NFTs, hence
