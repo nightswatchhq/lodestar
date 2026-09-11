@@ -223,6 +223,27 @@ export default function VerifyPage() {
           {/* The honest limit, stated where it cannot be missed rather than in a footnote. */}
           <Card>
             <h3 className="text-sm font-semibold text-[var(--text)] mb-1">
+              Lodestar changed issuer key on 12 September 2026
+            </h3>
+            {/*
+              A receipt carries the public half of the key that signed it, and this page checks the
+              signature against that rather than against a key it knows, so receipts from either
+              side of the change verify here without anything special. What changes is identity:
+              anyone who recorded "Lodestar signs with 64cc..." needs the other half of the story,
+              and nothing published that mapping, so this is where it goes.
+            */}
+            <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+              Receipts issued before that date name{' '}
+              <code className="font-mono text-[11px] text-[var(--text)]">64cc87e9…</code>; ones
+              issued after name{' '}
+              <code className="font-mono text-[11px] text-[var(--text)]">bd3b3313…</code>. Both
+              verify here, because this page checks a receipt against the key the receipt names
+              rather than against one it has memorised. The change happened when receipt issuing
+              moved from the dashboard to Lodestar&apos;s own backend, and the old key did not come
+              with it.
+            </p>
+
+            <h3 className="text-sm font-semibold text-[var(--text)] mb-1 mt-4">
               What a green tick here does not mean
             </h3>
             <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">

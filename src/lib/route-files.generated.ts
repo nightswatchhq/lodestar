@@ -11,5 +11,4 @@
  *     pnpm migration:routes
  */
 export const ROUTE_FILES: readonly string[] = [
-  '/api/sql/receipt',
 ];

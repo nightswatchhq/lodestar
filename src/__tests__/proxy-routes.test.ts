@@ -98,8 +98,9 @@ describe('the migrated route list', () => {
     expect(isMigrated('/api/sql/query')).toBe(true);
     expect(isMigrated('/api/sql/catalog')).toBe(true);
     expect(isMigrated('/api/sql/named')).toBe(true);
-    // The upper tier is not one thing. `receipt` signs what it returns, so it moves on its own
-    // terms rather than on the prefix's.
-    expect(isMigrated('/api/sql/receipt')).toBe(false);
+    // The upper tier is not one thing. `receipt` signs what it returns, so it moved on its own
+    // terms rather than on the prefix's - and it moved last, on 2026-09-12, once the issuer key
+    // question was settled by rotating deliberately rather than by matching the old one.
+    expect(isMigrated('/api/sql/receipt')).toBe(true);
   });
 });
