@@ -87,8 +87,6 @@ export const MIGRATED: readonly string[] = [
   '/api/subgraph-deployments',
   '/api/subgraph-fees-30d',
   '/api/studio/auth',
-  '/api/studio/bounties',
-  '/api/studio/bounties/',
   '/api/studio/deploy-key',
   '/api/studio/ipfs/**',
   '/api/studio/metadata',
@@ -261,12 +259,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
     workstream: 'the long tail',
     note: 'answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip.',
   },
-  {
-    path: '/api/indexer/present-poi',
-    state: 'ready',
-    workstream: 'the long tail',
-    note: 'answering, and probed on 2026-09-11: it validated an empty body and returned its own message rather than the address handler\'s, so kittiwake routes the literal path correctly and the NEVER_FORWARD pin could be lifted on that count. It stays pinned on another: nothing exercises a POST that queues an action on a live indexer agent, and validating a bad payload is not the same as submitting a good one.',
-  },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
@@ -315,18 +307,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // future rather than a description of the present.
 
   // ── Scheduled endpoints. kittiwake schedules its own; these two have not moved.
-  {
-    path: '/api/cron/tap-provision',
-    state: 'staying',
-    workstream: 'scheduled',
-    note: 'holds TAP_SIGNER_PRIVATE_KEY and spends GRT. A custody decision rather than a port, kittiwake#11.',
-  },
-  {
-    path: '/api/cron/reconcile-bounties',
-    state: 'staying',
-    workstream: 'scheduled',
-    note: 'reads the BountyBoard contract and updates sync_bounties. Belongs with the Dock, kittiwake#16.',
-  },
 ];
 
 

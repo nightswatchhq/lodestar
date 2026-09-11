@@ -7,13 +7,12 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { CONTRACTS } from '@/lib/wallet';
 import { SubgraphLifecyclePanel } from './SubgraphLifecyclePanel';
+import { NODE_URL } from '../constants';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { extractSubgraphId } from '../receipts';
-import { BOUNTY_BOARD_DEPLOYED, NODE_URL } from '../constants';
 import { CodeBlock } from './CodeBlock';
 import { PublishWizard } from './PublishWizard';
 import { DeployKeyPanel } from './DeployKeyPanel';
-import { PostBountyWizard } from './PostBountyWizard';
 import { useBounties, useDeleteSubgraph, useUpdateSubgraph } from '../api';
 import type { StudioSubgraph } from '../types';
 import { useDialog } from '@/hooks/useDialog';
@@ -39,7 +38,6 @@ export function SubgraphDetailModal({
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [showPublish, setShowPublish] = useState(false);
-  const [showBountyWizard, setShowBountyWizard] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const updateSubgraph = useUpdateSubgraph();
@@ -196,15 +194,6 @@ export function SubgraphDetailModal({
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Post Bounty button */}
-              {sg.deployment_id && BOUNTY_BOARD_DEPLOYED && (
-                <button
-                  onClick={() => setShowBountyWizard(true)}
-                  className="px-3 py-1.5 text-sm font-medium rounded-[var(--radius-button)] border border-amber-500/40 text-amber-500 hover:bg-amber-500/10 transition-colors"
-                >
-                  Post Bounty
-                </button>
-              )}
               {/* Publish / Update Version */}
               {isPublished && !canPublish && sg.deployment_id ? (
                 <div className="relative group">
@@ -400,14 +389,6 @@ export function SubgraphDetailModal({
           sg={sg}
           onClose={() => setShowPublish(false)}
           onPublished={handlePublished}
-        />
-      )}
-
-      {showBountyWizard && (
-        <PostBountyWizard
-          sg={sg}
-          sessionAddress={sessionAddress}
-          onClose={() => setShowBountyWizard(false)}
         />
       )}
     </>
