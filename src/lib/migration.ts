@@ -331,12 +331,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // "nobody reads it" for a public path on a public host. Confirmed with a person on 2026-09-10 and
   // deleted: a TCP-and-TLS probe against ampd is an operator tool, and an operator tool belongs on
   // the box it probes from rather than in the frontend.
-  {
-    path: '/api/data-services/query',
-    state: 'ready',
-    workstream: 'the long tail',
-    note: 'answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip.',
-  },
 
   // ── Staying on Next by decision ───────────────────────────────────────────
   {
@@ -344,12 +338,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
     state: 'staying',
     workstream: 'data plane',
     note: 'pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves.',
-  },
-  {
-    path: '/api/migration',
-    state: 'staying',
-    workstream: 'data plane',
-    note: 'reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did.',
   },
   {
     path: '/api/health',

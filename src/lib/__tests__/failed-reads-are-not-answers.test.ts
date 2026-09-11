@@ -27,8 +27,6 @@ const ROOTS = ['src/app', 'src/components', 'src/features', 'src/hooks', 'src/li
  * The narrow case: an endpoint whose body carries its own success flag, which the caller reads.
  */
 const READS_ITS_OWN_FLAG: Record<string, string> = {
-  'src/components/data-services/Playground.tsx':
-    'the route answers `{ ok, ... }` and the component switches on `j.ok`, so the status adds nothing it does not already have.',
 };
 
 /**

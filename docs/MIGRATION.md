@@ -4,17 +4,16 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**8 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **91%** of the way from 93 on 10 September 2026.
+**6 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **94%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **68 of 70** are across, **97%**. Of the rest, **2 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
+Of the port itself, **68 of 69** are across, **99%**. Of the rest, **1 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
 
-That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
+That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 5 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
 ## By block of work
 
 | Block | Done | Left |
 |---|---|---|
-| the long tail | 0/1 | 1 |
 | the SQL upper tier | 0/1 | 1 |
 | data plane | 68/68 | 0 |
 
@@ -97,13 +96,11 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | `/api/health` | judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker. |
 | `/api/indexing-status/[hash]` | pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves. |
 | `/api/issue-forms` | the read half of /api/file-issue, split off because the rate limiter buckets by path rather than by method and a write budget is not a read budget. Moves when filing does. |
-| `/api/migration` | reports on this migration. Proxying it to kittiwake would mean the progress figure went down whenever the thing it measures did. |
 | `/api/provider-liveness` | was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99). |
 
 ## Written on kittiwake, still routed here
 
 | Route | Why |
 |---|---|
-| `/api/data-services/query` | answering, and probed on 2026-09-11: it reached the upstream RPC and reported the failure honestly. Excused entirely by the parity harness, because a POST that signs a receipt and calls a live provider cannot be compared without spending receipts against production. Wants a deliberate check rather than a flip. |
 | `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
 
