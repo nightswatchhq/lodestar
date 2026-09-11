@@ -13,10 +13,6 @@ function formatGRT(amount: number): string {
   return amount.toFixed(2);
 }
 
-function weiToGRT(wei: string): number {
-  const intPart = wei.split('.')[0];
-  return Number(BigInt(intPart)) / 1e18;
-}
 
 function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -59,7 +55,7 @@ export default async function OGImage({ params }: { params: Promise<{ address: s
   const addr = address.toLowerCase();
 
   // Try enriched cache first (has pre-computed data)
-  let name = shortenAddress(addr);
+  const name = shortenAddress(addr);
   let selfStake = 0;
   let delegated = 0;
   let allocations = 0;
