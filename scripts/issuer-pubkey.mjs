@@ -12,7 +12,6 @@
 // against what the live deployment is signing with. The key never leaves this machine.
 
 import { createRequire } from 'node:module';
-import { createInterface } from 'node:readline';
 
 const require = createRequire(import.meta.url);
 const wasm = require(`${process.cwd()}/public/tattler/tattler_wasm_node.cjs`);
@@ -60,14 +59,36 @@ async function readKey() {
     for await (const c of process.stdin) chunks.push(c);
     return chunks.join('').trim();
   }
-  const rl = createInterface({ input: process.stdin, output: process.stderr, terminal: true });
-  // Echo off, so a key pasted into a shared screen does not stay on it.
-  rl.output.write('issuer key (input hidden): ');
-  rl._writeToOutput = () => {};
-  const answer = await new Promise((r) => rl.question('', r));
-  rl.close();
-  process.stderr.write('\n');
-  return answer.trim();
+
+  // Raw mode, collecting the bytes here. `readline` with its output muted read nothing at all:
+  // the prompt printed, the question resolved at once, and it reported a key of length zero.
+  // Hiding the input is the whole job, so it has to be done a way that also reads.
+  process.stderr.write('issuer key (input hidden, then Enter): ');
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.setEncoding('utf8');
+
+  let buf = '';
+  for await (const chunk of process.stdin) {
+    for (const ch of chunk) {
+      if (ch === '\r' || ch === '\n') {
+        process.stdin.setRawMode(false);
+        process.stdin.pause();
+        process.stderr.write('\n');
+        return buf.trim();
+      }
+      // Raw mode stops the terminal handling these, so they are handled here or not at all.
+      if (ch === '\u0003' || ch === '\u0004') {
+        process.stdin.setRawMode(false);
+        process.stderr.write('\n');
+        process.exit(130);
+      }
+      if (ch === '\u007f' || ch === '\b') buf = buf.slice(0, -1);
+      else buf += ch;
+    }
+  }
+  process.stdin.setRawMode(false);
+  return buf.trim();
 }
 
 const raw = await readKey();
