@@ -70,6 +70,12 @@ export const MIGRATED: readonly string[] = [
   '/api/qos/capture',
   '/api/reo',
   '/api/rewards-history',
+  '/api/scuttlebutt/admin/login',
+  '/api/scuttlebutt/admin/messages',
+  '/api/scuttlebutt/bans',
+  '/api/scuttlebutt/messages',
+  '/api/scuttlebutt/messages/',
+  '/api/scuttlebutt/stream',
   '/api/service-census',
   '/api/sql/catalog',
   '/api/sql/named',
@@ -225,43 +231,7 @@ const UNMIGRATED: readonly RouteRecord[] = [
   // ── The Dock: nightswatchhq/kittiwake#16 ──────────────────────────────────
                   
   // ── Scuttlebutt: a rewrite rather than a port, kittiwake#17 ───────────────
-  {
-    path: '/api/scuttlebutt/admin/login',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
-  },
-  {
-    path: '/api/scuttlebutt/admin/messages',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
-  },
-  {
-    path: '/api/scuttlebutt/bans',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
-  },
-  {
-    path: '/api/scuttlebutt/messages',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'answers "Scuttlebutt is not configured" in production, so it wants a config section on the box. It reads the same scuttlebutt_messages table and the same room, so cutting over keeps the history.',
-  },
-  {
-    path: '/api/scuttlebutt/messages/[id]',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
-  },
-  {
-    path: '/api/scuttlebutt/stream',
-    state: 'ready',
-    workstream: 'Scuttlebutt',
-    note: 'part of the Scuttlebutt cutover; see /api/scuttlebutt/messages.',
-  },
-
+            
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
   {
     path: '/api/disassembly',

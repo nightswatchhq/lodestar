@@ -4,9 +4,9 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**21 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **77%** of the way from 93 on 10 September 2026.
+**15 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **84%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **62 of 75** are across, **83%**. Of the rest, **11 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
+Of the port itself, **68 of 75** are across, **91%**. Of the rest, **5 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -14,11 +14,10 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 | Block | Done | Left |
 |---|---|---|
-| Scuttlebutt | 0/6 | 6 |
 | the disassembler | 0/3 | 3 |
 | the long tail | 0/3 | 3 |
 | the SQL upper tier | 0/1 | 1 |
-| data plane | 62/62 | 0 |
+| data plane | 68/68 | 0 |
 
 ## On kittiwake
 
@@ -58,6 +57,12 @@ That second denominator is routes meant to move that have not yet, and it exclud
 - `/api/qos/capture`
 - `/api/reo`
 - `/api/rewards-history`
+- `/api/scuttlebutt/admin/login`
+- `/api/scuttlebutt/admin/messages`
+- `/api/scuttlebutt/bans`
+- `/api/scuttlebutt/messages`
+- `/api/scuttlebutt/messages/[id]`
+- `/api/scuttlebutt/stream`
 - `/api/service-census`
 - `/api/sql/catalog`
 - `/api/sql/named`
@@ -111,11 +116,5 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | `/api/disassembly` | answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port. |
 | `/api/disassembly/diff` | answering in production, and excused entirely by the parity harness, which says three of its differences from the incumbent are deliberate. So it is written but unverified against what readers see today: the block is a decision about whether those differences are the ones we want, not a port. |
 | `/api/indexer/present-poi` | answering, and probed on 2026-09-11: it validated an empty body and returned its own message rather than the address handler's, so kittiwake routes the literal path correctly and the NEVER_FORWARD pin could be lifted on that count. It stays pinned on another: nothing exercises a POST that queues an action on a live indexer agent, and validating a bad payload is not the same as submitting a good one. |
-| `/api/scuttlebutt/admin/login` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
-| `/api/scuttlebutt/admin/messages` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
-| `/api/scuttlebutt/bans` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
-| `/api/scuttlebutt/messages` | answers "Scuttlebutt is not configured" in production, so it wants a config section on the box. It reads the same scuttlebutt_messages table and the same room, so cutting over keeps the history. |
-| `/api/scuttlebutt/messages/[id]` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
-| `/api/scuttlebutt/stream` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
 | `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
 

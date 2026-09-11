@@ -163,7 +163,6 @@ describe('isMigrated', () => {
     // read: `/api/disassembly/verify` needs a sandbox microVM and is the last genuinely unported
     // route, so it will outlast the rest of them.
     expect(isMigrated('/api/disassembly/verify')).toBe(false);
-    expect(isMigrated('/api/scuttlebutt/stream')).toBe(false);
   });
 });
 
