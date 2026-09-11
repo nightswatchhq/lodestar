@@ -27,9 +27,9 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { cn, formatNumber, formatGRT, weiToGRT, shortenAddress } from '@/lib/utils';
 import { VersionsTable } from '@/components/subgraph/VersionsTable';
 import { ActivitySection } from '@/components/subgraph/ActivitySection';
-import { SYNC_TOLERANCE_BLOCKS } from '@/lib/indexing-status';
+import { SYNC_TOLERANCE_BLOCKS } from '@/lib/indexing-status-shape';
 import { formatStallDuration } from '@/lib/chain-liveness';
-import type { IndexerStatusResult } from '@/lib/indexing-status';
+import type { IndexerStatusResult } from '@/lib/indexing-status-shape';
 import type { ComplexityCategory, DataSourceSignal, TemplateSignal } from '@/lib/manifest';
 
 // ---------------------------------------------------------------------------
