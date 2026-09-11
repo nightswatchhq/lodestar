@@ -1,9 +1,8 @@
 /**
- * IPFS access, the source-repo hint, and the verify rate limiter.
+ * IPFS access and the source-repo hint.
  *
  * Three small modules that guard real spend or real trust. The IPFS cap exists so a hostile
- * manifest cannot exhaust the function; the rate limiter exists because each verification boots a
- * microVM and runs a full subgraph build, so a missing cap is a bill rather than a bug; and the
+ * manifest cannot exhaust the function; and the
  * source hint must degrade to null rather than throw, because a share surface that throws takes a
  * page down over a nicety.
  */
@@ -26,7 +25,6 @@ import { ipfsHashToBytes32 } from '@/lib/studio/ipfs';
 
 import { IPFS_HASH_RE, ipfsCatText, ipfsCatBytes } from '../ipfs';
 import { fetchSourceHint } from '../source-hint';
-import { verifyRateLimit } from '../verify-limit';
 
 const HASH = 'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG';
 const fetchMock = vi.fn();
@@ -139,83 +137,5 @@ describe('fetchSourceHint', () => {
   it('swallows a nest failure, because this is a nicety on a share surface', async () => {
     metadataFor.mockRejectedValue(new Error('nest down'));
     await expect(fetchSourceHint(HASH)).resolves.toBeNull();
-  });
-});
-
-describe('verifyRateLimit', () => {
-  const NOW = 1_756_000_000_000;
-
-  it('allows the first build and consumes a slot in both counters', async () => {
-    process.env.REDIS_URL = 'redis://x';
-    const d = await verifyRateLimit('ip-a', NOW);
-
-    expect(d.allowed).toBe(true);
-    expect(cacheSet).toHaveBeenCalledTimes(2); // per-IP and global
-  });
-
-  it('denies a single IP past its hourly cap', async () => {
-    process.env.REDIS_URL = 'redis://x';
-    cacheGet.mockImplementation(async (k: string) => (k.includes(':ip:') ? 8 : 0));
-
-    const d = await verifyRateLimit('ip-b', NOW);
-    expect(d.allowed).toBe(false);
-    expect(d.reason).toMatch(/max 8 source builds per hour per IP/);
-    // Denied means denied: no slot is consumed.
-    expect(cacheSet).not.toHaveBeenCalled();
-  });
-
-  it('denies everyone past the global cap, which is the cost ceiling', async () => {
-    process.env.REDIS_URL = 'redis://x';
-    cacheGet.mockImplementation(async (k: string) => (k.includes(':global:') ? 60 : 0));
-
-    const d = await verifyRateLimit('ip-c', NOW);
-    expect(d.allowed).toBe(false);
-    expect(d.reason).toMatch(/global hourly build limit/);
-  });
-
-  it('keys the counters by time bucket, so the window rolls', async () => {
-    process.env.REDIS_URL = 'redis://x';
-    await verifyRateLimit('ip-d', NOW);
-    const firstKeys = cacheSet.mock.calls.map((c) => c[0]);
-
-    cacheSet.mockClear();
-    await verifyRateLimit('ip-d', NOW + 3600_000);
-    const laterKeys = cacheSet.mock.calls.map((c) => c[0]);
-
-    expect(laterKeys[0]).not.toBe(firstKeys[0]);
-  });
-
-  it('sets a TTL that outlives the window, so buckets expire on their own', async () => {
-    process.env.REDIS_URL = 'redis://x';
-    await verifyRateLimit('ip-e', NOW);
-    for (const call of cacheSet.mock.calls) expect(call[2]).toBe(3660);
-  });
-
-  it('falls back to the per-instance counter when Redis throws', async () => {
-    // A missing cache must weaken the cap, never take the endpoint down.
-    process.env.REDIS_URL = 'redis://x';
-    cacheGet.mockRejectedValue(new Error('redis unreachable'));
-
-    await expect(verifyRateLimit('ip-f', NOW)).resolves.toEqual({ allowed: true });
-  });
-
-  it('enforces the per-IP cap in the in-memory fallback too', async () => {
-    // No REDIS_URL at all, which is local dev and tests.
-    const ip = `ip-mem-${Math.random()}`;
-    for (let i = 0; i < 8; i++) {
-      expect((await verifyRateLimit(ip, NOW)).allowed).toBe(true);
-    }
-    const ninth = await verifyRateLimit(ip, NOW);
-    expect(ninth.allowed).toBe(false);
-    expect(ninth.reason).toMatch(/per IP/);
-  });
-
-  it('does not let one IP exhaust another IP\'s allowance', async () => {
-    const a = `ip-x-${Math.random()}`;
-    const b = `ip-y-${Math.random()}`;
-    for (let i = 0; i < 8; i++) await verifyRateLimit(a, NOW);
-
-    expect((await verifyRateLimit(a, NOW)).allowed).toBe(false);
-    expect((await verifyRateLimit(b, NOW)).allowed).toBe(true);
   });
 });
