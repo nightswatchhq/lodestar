@@ -51,6 +51,7 @@ export const MIGRATED: readonly string[] = [
   '/api/epochs',
   '/api/foghorn/**',
   '/api/grt-flow',
+  '/api/health',
   '/api/horizon/activity',
   '/api/indexer-disputes/',
   '/api/indexer-node-health',
@@ -338,12 +339,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
     state: 'staying',
     workstream: 'data plane',
     note: 'pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves.',
-  },
-  {
-    path: '/api/health',
-    state: 'staying',
-    workstream: 'data plane',
-    note: 'judges this deployment, including whether kittiwake is writing. Moving it into kittiwake would make the thing being checked the checker.',
   },
   {
     path: '/api/file-issue',
