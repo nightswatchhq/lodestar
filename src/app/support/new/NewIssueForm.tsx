@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { unavailableReason, useQueryState, type QueryState } from '@/hooks/useQueryState';
 import { CHOOSER_URL, ISSUE_TEMPLATES, newIssueUrl } from '@/lib/graph-support-templates';
-import { answerableFields, type IssueForm, type IssueFormValues } from '@/lib/issue-form';
+import type { IssueForm, IssueFormField, IssueFormValues } from '@/lib/issue-form';
 import { cn } from '@/lib/utils';
 
 interface FormsResponse {
@@ -266,7 +266,7 @@ function Field({
   value,
   onChange,
 }: {
-  field: ReturnType<typeof answerableFields>[number];
+  field: IssueFormField;
   value: string | string[] | undefined;
   onChange: (v: string | string[]) => void;
 }) {
