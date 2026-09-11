@@ -12,6 +12,5 @@
  */
 export const ROUTE_FILES: readonly string[] = [
   '/api/indexing-status/[hash]',
-  '/api/provider-liveness',
   '/api/sql/receipt',
 ];

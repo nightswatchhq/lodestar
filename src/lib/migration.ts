@@ -342,12 +342,6 @@ const UNMIGRATED: readonly RouteRecord[] = [
     workstream: 'data plane',
     note: 'pulled back from kittiwake on 7 September. Needs the live serving probe, which signs TAP receipts against funded escrow: the same custody question as kittiwake#11 in different clothes. Stays until the Dock moves.',
   },
-  {
-    path: '/api/provider-liveness',
-    state: 'staying',
-    workstream: 'the long tail',
-    note: 'was marked doomed on the premise that Dispatch was being retired whole. The gateway was; the data service was not. The catalogue entry now reads "Ready · awaiting an operator" and invites strangers to run it, and this probe is what stops that invitation going stale - it answered 2 registered, 0 serving, 2 lying on 2026-09-10. The page claimed "Live · Production" for 39 days once already, which is why this exists (nightswatchhq/lodestar#99).',
-  },
 
   // ── Agreed for deletion, kittiwake#20. Not outstanding work. ──────────────
   //
