@@ -50,8 +50,6 @@ const DELIBERATE: Record<string, string> = {
     'search keeps working on titles, excerpts and tags without the bodies; the degradation is invisible and harmless.',
   'src/app/scuttlebutt/page.tsx':
     'an admin-status probe. Failing leaves `isAdmin` false, which is the safe direction for a privilege check.',
-  'src/lib/cache.ts':
-    'two background refreshes whose rejection is handled by the `.finally` that clears the inflight entry; the caller already has its own answer.',
 };
 
 function walk(dir: string): string[] {
@@ -77,7 +75,12 @@ describe('a failure has to reach somebody', () => {
   const files = ROOTS.flatMap(walk);
 
   it('finds the modules to check', () => {
-    expect(files.length).toBeGreaterThan(200);
+    // Not a floor on how large the repo is. This was `> 200` and the repo has been shrinking on
+    // purpose all week, so it became an assertion that the migration is unfinished - the third one
+    // of those found today. What it guards is the walk: a broken path finds nothing and makes every
+    // check below vacuously true.
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.some((f) => f.endsWith('.tsx'))).toBe(true);
   });
 
   it('has no fetcher that reads a body without checking the status first', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { signalExposure, riskPriority, worstFlagLevel } from '../disassembly/signal';
+import { signalExposure, riskPriority, worstFlagLevel } from '../disassembly/priority';
 
 describe('signalExposure', () => {
   it('buckets GRT signalled into exposure levels', () => {

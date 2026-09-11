@@ -19,7 +19,7 @@ import type {
   SignalExposure,
 } from '@/lib/disassembly/types';
 import type { DisassemblyDiff, HandlerDiffEntry, HandlerStatus } from '@/lib/disassembly/diff';
-import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/signal';
+import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/priority';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 

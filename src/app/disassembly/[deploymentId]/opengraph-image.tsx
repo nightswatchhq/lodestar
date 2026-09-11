@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og';
-import { ogFetch } from '@/lib/og-data';
+import { ogDisassembly, type OgReport } from '@/lib/og-data';
 import { formatGRT } from '@/lib/utils';
 
 // Node runtime (not edge): lets us reuse runDisassembly + the Redis cache via
@@ -76,37 +76,6 @@ function Chip({ text, tone }: { text: string; tone?: 'accent' | 'warn' }) {
   );
 }
 
-/**
- * What the card reads out of kittiwake's report; everything else in it is ignored here.
- *
- * Defaulted at the edge rather than declared optional throughout, because a card renders a dash
- * for a missing figure and there is no branch in it that wants to know the difference.
- */
-interface OgReport {
-  scorecard: {
-    grade: string;
-    riskScore: number;
-    flags: { level?: string; title?: string; detail?: string }[];
-    categories: { name: string; score: number; note?: string }[];
-  };
-  totals?: {
-    dataSources: number;
-    templates: number;
-    handlers: number;
-    resolvedHandlers: number;
-    wasmBytes: number;
-    hostCategories: string[];
-  };
-  manifest?: {
-    specVersion?: string | null;
-    apiVersions?: string[];
-    network?: string | null;
-    features?: string[];
-    schemaHash?: string | null;
-    graft?: { base?: string; block?: number } | null;
-  };
-  signal?: { signalledGRT: number } | null;
-}
 
 export default async function OGImage({
   params,
@@ -119,12 +88,7 @@ export default async function OGImage({
   //
   // kittiwake returns the report flat; the card was written against `{ report, signal }`, so the
   // two are reconciled here rather than by editing every read below.
-  const report = await ogFetch<OgReport>(
-    `/api/disassembly?id=${encodeURIComponent(deploymentId)}`,
-    // Longer than the default: this one parses a manifest and a wasm module, and a blank card is
-    // the outcome if it does not finish.
-    8000,
-  );
+  const report = await ogDisassembly(deploymentId);
   const data = report ? { report, signal: report.signal ?? null } : null;
 
   const grade = data?.report.scorecard.grade ?? '—';
