@@ -4,9 +4,9 @@
      run `pnpm migration:doc`. The source is src/lib/migration.ts, which is also what
      the edge routes from and what /migration renders. -->
 
-**30 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **68%** of the way from 93 on 10 September 2026.
+**21 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **77%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **53 of 75** are across, **71%**. Of the rest, **20 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
+Of the port itself, **62 of 75** are across, **83%**. Of the rest, **11 are written and answering on kittiwake already** and wait only on a cutover, and **2** have still to be ported.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 6 staying on Next by decision, and 2 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -14,12 +14,11 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 | Block | Done | Left |
 |---|---|---|
-| the Dock | 0/9 | 9 |
 | Scuttlebutt | 0/6 | 6 |
 | the disassembler | 0/3 | 3 |
 | the long tail | 0/3 | 3 |
 | the SQL upper tier | 0/1 | 1 |
-| data plane | 53/53 | 0 |
+| data plane | 62/62 | 0 |
 
 ## On kittiwake
 
@@ -63,6 +62,15 @@ That second denominator is routes meant to move that have not yet, and it exclud
 - `/api/sql/catalog`
 - `/api/sql/named`
 - `/api/sql/query`
+- `/api/studio/auth`
+- `/api/studio/bounties`
+- `/api/studio/bounties/[id]`
+- `/api/studio/deploy-key`
+- `/api/studio/ipfs/[...path]`
+- `/api/studio/metadata`
+- `/api/studio/node`
+- `/api/studio/subgraphs`
+- `/api/studio/subgraphs/[id]`
 - `/api/subgraph-curation/[hash]`
 - `/api/subgraph-deployments`
 - `/api/subgraph-fees-30d`
@@ -110,13 +118,4 @@ That second denominator is routes meant to move that have not yet, and it exclud
 | `/api/scuttlebutt/messages/[id]` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
 | `/api/scuttlebutt/stream` | part of the Scuttlebutt cutover; see /api/scuttlebutt/messages. |
 | `/api/sql/receipt` | answers 405 to a GET, which is correct for a POST-only route. The block is TATTLER_ISSUER_KEY on the box, a custody decision rather than a port - the same question as /api/cron/tap-provision. |
-| `/api/studio/auth` | answers {address:null} in production today, which is the right answer signed out. The block is session_secret in kittiwake config on Nuremberg matching Vercel SESSION_SECRET, then one run of the verify-session binary with a live cookie: the session is stateless and signed, so a secret differing by a byte signs every logged-in user out with nothing erroring. |
-| `/api/studio/bounties` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/bounties/[id]` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/deploy-key` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/ipfs/[...path]` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/metadata` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/node` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/subgraphs` | part of the Dock cutover; see /api/studio/auth. |
-| `/api/studio/subgraphs/[id]` | part of the Dock cutover; see /api/studio/auth. |
 
