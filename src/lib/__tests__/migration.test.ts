@@ -158,7 +158,11 @@ describe('isMigrated', () => {
   });
 
   it('leaves an unlisted route alone', () => {
-    expect(isMigrated('/api/studio/auth')).toBe(false);
+    // `/api/studio/auth` stood here until the Dock was cut over on 2026-09-11. Picking examples
+    // that are one merge away from moving is how this assertion ends up being edited rather than
+    // read: `/api/disassembly/verify` needs a sandbox microVM and is the last genuinely unported
+    // route, so it will outlast the rest of them.
+    expect(isMigrated('/api/disassembly/verify')).toBe(false);
     expect(isMigrated('/api/scuttlebutt/stream')).toBe(false);
   });
 });

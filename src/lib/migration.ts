@@ -77,6 +77,15 @@ export const MIGRATED: readonly string[] = [
   '/api/subgraph-curation/',
   '/api/subgraph-deployments',
   '/api/subgraph-fees-30d',
+  '/api/studio/auth',
+  '/api/studio/bounties',
+  '/api/studio/bounties/',
+  '/api/studio/deploy-key',
+  '/api/studio/ipfs/**',
+  '/api/studio/metadata',
+  '/api/studio/node',
+  '/api/studio/subgraphs',
+  '/api/studio/subgraphs/',
   '/api/subgraph-history/',
   '/api/subgraph-names',
   '/api/subgraph-schema/',
@@ -214,61 +223,7 @@ export const BACKEND_ONLY: readonly string[] = ['/api/whoami', '/api/support/[nu
  */
 const UNMIGRATED: readonly RouteRecord[] = [
   // ── The Dock: nightswatchhq/kittiwake#16 ──────────────────────────────────
-  {
-    path: '/api/studio/auth',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'answers {address:null} in production today, which is the right answer signed out. The block is session_secret in kittiwake config on Nuremberg matching Vercel SESSION_SECRET, then one run of the verify-session binary with a live cookie: the session is stateless and signed, so a secret differing by a byte signs every logged-in user out with nothing erroring.',
-  },
-  {
-    path: '/api/studio/bounties',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/bounties/[id]',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/deploy-key',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/ipfs/[...path]',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/metadata',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/node',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/subgraphs',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-  {
-    path: '/api/studio/subgraphs/[id]',
-    state: 'ready',
-    workstream: 'the Dock',
-    note: 'part of the Dock cutover; see /api/studio/auth.',
-  },
-
+                  
   // ── Scuttlebutt: a rewrite rather than a port, kittiwake#17 ───────────────
   {
     path: '/api/scuttlebutt/admin/login',
