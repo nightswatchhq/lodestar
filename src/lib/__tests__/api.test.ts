@@ -30,6 +30,13 @@ import {
   fetchServiceCensus,
   fetchQosCapture,
   fetchGrtFlow,
+  fetchIndexerDetail,
+  fetchSubgraphHistory,
+  fetchSubgraphVersions,
+  fetchIndexerDisputes,
+  fetchREOStatus,
+  fetchDelegationEvents,
+  fetchENSName,
 } from '@/lib/api';
 
 const mockFetch = vi.fn();
@@ -554,5 +561,111 @@ describe('panels that no longer fetch for themselves', () => {
       }),
     );
     await expect(fetchGrtFlow()).resolves.toMatchObject({ supplyBreakdown: null });
+  });
+});
+
+/**
+ * The nine fetchers lifted out of the hooks and the two indexer pages.
+ *
+ * All of them checked the status already, which is why the last sweep did not reach them. None of
+ * them checked the shape, and several ended `json.data?.x ?? []` - the exact move that turned #114
+ * from a page-load into a day, because an empty list is a sentence the UI is happy to render.
+ */
+describe('the reads that moved out of the hooks', () => {
+  it('unwraps the indexer profile from its envelope', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          indexer: {
+            id: '0xabc',
+            account: { id: '0xabc', defaultDisplayName: null },
+            stakedTokens: '1',
+            delegatedTokens: '2',
+            allocations: [],
+            delegators: [],
+          },
+        },
+      }),
+    );
+    await expect(fetchIndexerDetail('0xABC')).resolves.toMatchObject({ id: '0xabc' });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc');
+  });
+
+  it('treats a null indexer as an answer, because an unstaked address is one', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { indexer: null } }));
+    await expect(fetchIndexerDetail('0xabc')).resolves.toBeNull();
+  });
+
+  it('refuses a body with no data at all', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'nest busy' }));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data');
+  });
+
+  it('keeps a deployment nobody published, which has a null subgraph and no versions', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { subgraphId: null, versions: [] } }));
+    await expect(fetchSubgraphVersions('QmX')).resolves.toEqual({ subgraphId: null, versions: [] });
+  });
+
+  it('refuses a versions body that lost its list', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { subgraphId: 'a' } }));
+    await expect(fetchSubgraphVersions('QmX')).rejects.toThrow('data.versions');
+  });
+
+  it('reads the history list out of its envelope', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ data: { history: [{ date: '2026-01-01', signalGrt: 1, stakeGrt: 2 }] } }),
+    );
+    await expect(fetchSubgraphHistory('QmX')).resolves.toMatchObject({ history: [{ signalGrt: 1 }] });
+  });
+
+  it('hands back disputes as a bare list and lowercases the address', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ disputes: [] }));
+    await expect(fetchIndexerDisputes('0xABCDEF')).resolves.toEqual([]);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer-disputes/0xabcdef');
+  });
+
+  it('refuses a disputes body with no list, rather than reporting a clean record', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'unavailable' }));
+    await expect(fetchIndexerDisputes('0xabc')).rejects.toThrow('disputes');
+  });
+
+  it('requires the REO reading to say whether the oracle is stale', async () => {
+    // An eligibility answer from an oracle that stopped updating is not an eligibility answer, and
+    // this hook returned `res.json()` untyped, so nothing anywhere asserted the field existed.
+    mockFetch.mockResolvedValue(jsonResponse({ status: { status: 'eligible' } }));
+    await expect(fetchREOStatus('0xabc')).rejects.toThrow('oracleStale');
+
+    mockFetch.mockResolvedValue(
+      jsonResponse({ status: { status: 'eligible', oracleStale: false } }),
+    );
+    await expect(fetchREOStatus('0xabc')).resolves.toMatchObject({
+      status: { status: 'eligible' },
+    });
+  });
+
+  it('refuses a delegation-events body with no list, rather than drawing an empty feed', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { events: [] } }));
+    await expect(fetchDelegationEvents({ first: 50 })).rejects.toThrow('data.delegationEvents');
+  });
+
+  it('carries the source through so the panel can say which backend answered', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ data: { delegationEvents: [{ id: 'e1' }], source: 'nuthatch' } }),
+    );
+    await expect(fetchDelegationEvents({ indexer: '0xabc', first: 100 })).resolves.toEqual({
+      events: [{ id: 'e1' }],
+      source: 'nuthatch',
+    });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/delegation-events?first=100&indexer=0xabc');
+  });
+
+  it('throws on a failed ENS lookup instead of answering "no name"', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'resolver down' }, 502));
+    await expect(fetchENSName('0xabc')).rejects.toThrow('502');
+  });
+
+  it('keeps a null ENS name, which is the answer for an address without one', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ensName: null }));
+    await expect(fetchENSName('0xabc')).resolves.toEqual({ ensName: null });
   });
 });

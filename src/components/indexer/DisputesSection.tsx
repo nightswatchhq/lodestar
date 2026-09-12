@@ -27,8 +27,11 @@ function grt(v: string | null): number {
 }
 
 export function DisputesSection({ address }: { address: string }) {
-  const { data, isLoading } = useIndexerDisputes(address);
-  const disputes: IndexerDispute[] = data?.disputes ?? [];
+  const { data, isLoading, isError, error } = useIndexerDisputes(address);
+  // Not `data ?? []`. An empty list here is rendered as "this indexer has never been disputed or
+  // slashed", which is an absolute claim about someone's record, and a request that did not come
+  // back is not evidence for it.
+  const disputes: IndexerDispute[] | undefined = data;
 
   return (
     <Card>
@@ -37,7 +40,11 @@ export function DisputesSection({ address }: { address: string }) {
           <CardTitle>Disputes &amp; Slashing</CardTitle>
           {!isLoading && (
             <span className="text-[10px] text-[var(--text-faint)]">
-              {disputes.length === 0 ? 'Clean record' : `${disputes.length} on record`}
+              {isError
+                ? 'not read'
+                : disputes?.length === 0
+                  ? 'Clean record'
+                  : `${disputes?.length ?? 0} on record`}
             </span>
           )}
         </div>
@@ -47,6 +54,12 @@ export function DisputesSection({ address }: { address: string }) {
           <div className="flex items-center justify-center py-6">
             <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           </div>
+        ) : isError || !disputes ? (
+          <p className="text-sm text-[var(--amber)] py-2">
+            The dispute record could not be read
+            {error instanceof Error ? `: ${error.message}` : ''}. This is not the same as a clean
+            record, and it should not be read as one.
+          </p>
         ) : disputes.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)] py-2">
             No disputes on record. This indexer has never been disputed or slashed.

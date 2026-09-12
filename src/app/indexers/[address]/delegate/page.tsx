@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useGRTPrice, useNetworkStats, useREOStatus, useEnrichedIndexers, useENSName } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrichedIndexers, useENSName } from '@/hooks/useNetworkStats';
 import { useGRTBalance } from '@/hooks/useGRTBalance';
 import { DelegatePanel } from '@/components/ui/DelegatePanel';
+import { reoStatusOrUnknown, reoSourceOrHeuristic } from '@/lib/contracts/indexer-signals';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -26,59 +27,13 @@ import { calculateDelegationCapacity } from '@/lib/rewards';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
-interface IndexerDetail {
-  id: string;
-  account: {
-    id: string;
-    defaultDisplayName: string | null;
-    metadata?: { displayName?: string | null } | null;
-  };
-  stakedTokens: string;
-  lockedTokens?: string;
-  delegatedTokens: string;
-  delegatedThawingTokens?: string;
-  allocatedTokens: string;
-  allocationCount: number;
-  indexingRewardCut: number;
-  queryFeeCut: number;
-  rewardsEarned: string;
-  queryFeesCollected: string;
-  delegatorShares: string;
-  delegatorParameterCooldown: number;
-  lastDelegationParameterUpdate: number;
-  url: string | null;
-  provisionedTokens?: string;
-  ownStakeRatio?: string;
-  indexingRewardEffectiveCut?: string;
-  allocations: Array<{
-    allocatedTokens: string;
-    subgraphDeployment: {
-      signalledTokens: string;
-      stakedTokens: string;
-    };
-  }>;
-}
-
-function useIndexerDetails(address: string) {
-  return useQuery<IndexerDetail | null>({
-    queryKey: ['indexerDetails', address],
-    queryFn: async () => {
-      const response = await fetch(`/api/indexer/${encodeURIComponent(address.toLowerCase())}`);
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-      const json = await response.json();
-      return json.data?.indexer ?? null;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 export default function DelegatePage({
   params,
 }: {
   params: Promise<{ address: string }>;
 }) {
   const { address } = use(params);
-  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
+  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetail(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
   const { data: reoData } = useREOStatus(address);
@@ -164,9 +119,9 @@ export default function DelegatePage({
   // Risk score
   const provisionedGRT = indexer.provisionedTokens ? weiToGRT(indexer.provisionedTokens) : null;
   const indexerScore: IndexerScore | null = reoData?.status ? calculateIndexerScore({
-    reoStatus: reoData.status.status === 'unknown' ? 'unknown' : reoData.status.status,
+    reoStatus: reoStatusOrUnknown(reoData.status.status),
     reoDaysRemaining: reoData.status.daysRemaining ?? null,
-    reoSource: reoData.status.source ?? 'heuristic',
+    reoSource: reoSourceOrHeuristic(reoData.status.source),
     selfStakeGRT: selfStake,
     lastDelegationParameterUpdate: indexer.lastDelegationParameterUpdate,
     delegatorParameterCooldown: indexer.delegatorParameterCooldown,
