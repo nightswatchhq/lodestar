@@ -125,8 +125,9 @@ const walletCovered = WALLET_FLOWS.filter((f) =>
 );
 
 const RFC = 'docs/rfc-the-frontend-after-the-backend-left.md';
-const ogDecided =
-  existsSync(RFC) && /^### Decided, \d{4}-\d{2}-\d{2}:/m.test(readFileSync(RFC, 'utf8'));
+const rfc = existsSync(RFC) ? readFileSync(RFC, 'utf8') : '';
+const ogDecided = /^### Decided, \d{4}-\d{2}-\d{2}:/m.test(rfc);
+const proxyDecided = /\*\*Stage 1b: decide `src\/proxy\.ts`\.\*\* \*\*Decided \d{4}-\d{2}-\d{2}/.test(rfc);
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const rainbowInstalled = Boolean(pkg.dependencies?.['@rainbow-me/rainbowkit']);
@@ -155,11 +156,13 @@ const items = [
     title: 'Finish the route migration and delete src/proxy.ts',
     // Two halves, and only one of them is a matter of work: the second needs a decision about
     // CORS and where rate limiting lives once the browser talks to kittiwake directly.
-    done: (routeFiles ? 0 : 1) + (proxyGone ? 1 : 0),
-    total: 2,
+    // Three parts now, because "delete src/proxy.ts" turned out to have a decision in front of it
+    // and an enabling change in another repository. Counting it as one thing hid both.
+    done: (routeFiles ? 0 : 1) + (proxyDecided ? 1 : 0) + (proxyGone ? 1 : 0),
+    total: 3,
     detail: `${routeFiles ? 'src/app/api still exists' : 'no route files'}; ${
-      proxyGone ? 'proxy.ts deleted' : 'src/proxy.ts still forwarding'
-    }`,
+      proxyDecided ? 'decided: delete once CORS is live' : 'no decision recorded'
+    }; ${proxyGone ? 'proxy.ts deleted' : 'src/proxy.ts still forwarding'}`,
   },
   {
     id: 2,
