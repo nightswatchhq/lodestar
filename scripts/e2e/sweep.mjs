@@ -2,6 +2,7 @@
 //
 //   node scripts/e2e/sweep.mjs                      # production
 //   LODESTAR_BASE=http://localhost:3000 node ...    # anywhere else
+//   node scripts/e2e/sweep.mjs --ci                 # exit non-zero on a hard signal
 //
 // `pages.spec.ts` covers ten of forty-two pages, and six of those only assert that no error
 // boundary rendered and that the body has more than four hundred characters. #114 is the reason
@@ -10,12 +11,19 @@
 //
 // So this reports what a page is actually showing rather than whether it threw: how much text, how
 // many placeholder glyphs against how many real figures, and what the console said. It prints a
-// table and exits 0 either way. It is a thing to read, not a gate - the gate is the spec file, and
-// what this finds should end up there.
+// table and, by default, exits 0 either way. It is a thing to read, not a gate - the gate is the
+// spec file, and what this finds should end up there.
+//
+// `--ci` gives it teeth, but only on signals that cannot be argued with: a bad status, an error
+// boundary, a page with almost nothing on it, a console error. **The placeholder heuristic never
+// fails a build.** It is the useful half of this script and it is also the half that is sometimes
+// wrong - `/compare` is correctly all dashes - and a check that fires on a judgement call is the
+// one people learn to scroll past. Those show up in the table for a human to read.
 
 import { chromium } from '@playwright/test';
 
 const BASE = process.env.LODESTAR_BASE ?? 'https://www.lodestar-dashboard.com';
+const CI = process.argv.includes('--ci');
 
 /** Dynamic routes need a real subject; a 404 page is not evidence about the template. */
 const SUBJECT = {
@@ -131,4 +139,27 @@ console.log(`${rows.length} pages, ${suspicious} worth looking at\n`);
 for (const r of rows.filter((x) => x.errors.length)) {
   console.log(`${r.path}`);
   for (const e of r.errors.slice(0, 4)) console.log(`    ${e}`);
+}
+
+// What `--ci` is allowed to fail on. Deliberately not the placeholder count: see the header.
+const hard = rows.filter(
+  (r) => r.status >= 400 || r.status === 0 || r.boundary || r.chars < 400 || r.errors.length > 0,
+);
+
+if (CI) {
+  if (hard.length === 0) {
+    console.log('no hard signals: every page answered, rendered, and logged nothing.\n');
+    process.exit(0);
+  }
+  console.log(`${hard.length} page(s) with a hard signal:`);
+  for (const r of hard) {
+    const why = [
+      r.status >= 400 || r.status === 0 ? `HTTP ${r.status}` : null,
+      r.boundary ? 'error boundary' : null,
+      r.chars < 400 ? 'almost no content' : null,
+      r.errors.length ? `${r.errors.length} console error(s)` : null,
+    ].filter(Boolean);
+    console.log(`  ${r.path}: ${why.join(', ')}`);
+  }
+  process.exit(1);
 }
