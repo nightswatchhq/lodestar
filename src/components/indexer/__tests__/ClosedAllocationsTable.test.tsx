@@ -21,12 +21,21 @@ function alloc(overrides: Partial<ClosedAllocation> = {}): ClosedAllocation {
     subgraphDeployment: {
       id: '0xdeployment',
       ipfsHash: 'QmDeploymentHashAAAAAA',
-      versions: [{ subgraph: { metadata: { displayName: 'My Subgraph' } } }],
+      displayName: 'My Subgraph',
     },
     ...overrides,
   };
 }
 
+/**
+ * This suite passed for months while the table it covers rendered no names at all.
+ *
+ * The fixture below used to carry a populated `versions[0].subgraph.metadata.displayName`, because
+ * that is the shape the component read. The route sent `versions: []` for every allocation - 82
+ * open and 500 closed on the profile that found it - so the name was null on the live page and
+ * "My Subgraph" here. A test of a component is not a test of the pipeline, which is the second time
+ * that sentence has been written down in this repo.
+ */
 describe('ClosedAllocationsTable', () => {
   it('renders the deployment display name and links to the subgraph', () => {
     render(<ClosedAllocationsTable allocations={[alloc()]} />);
@@ -57,7 +66,7 @@ describe('ClosedAllocationsTable', () => {
 
   it('falls back to the deployment id when no display name exists', () => {
     render(<ClosedAllocationsTable allocations={[alloc({
-      subgraphDeployment: { id: '0xdeadbeef00000000000000000000000000000000', ipfsHash: 'QmX', versions: [] },
+      subgraphDeployment: { id: '0xdeadbeef00000000000000000000000000000000', ipfsHash: 'QmX', displayName: null },
     })]} />);
     // shortenAddress output of the id appears (no display name)
     expect(screen.getByText(/0xdead/i)).toBeInTheDocument();

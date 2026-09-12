@@ -16,7 +16,8 @@ export interface ClosedAllocation {
   subgraphDeployment: {
     id: string;
     ipfsHash: string;
-    versions: Array<{ subgraph: { metadata: { displayName: string } | null } | null }>;
+    /** Flat, as kittiwake sends it. Null means unnamed, and the row falls back to the hash. */
+    displayName: string | null;
   };
 }
 
@@ -40,7 +41,7 @@ export function ClosedAllocationsTable({ allocations }: { allocations: ClosedAll
         </thead>
         <tbody className="divide-y divide-[var(--border)]">
           {allocations.map((alloc) => {
-            const displayName = alloc.subgraphDeployment.versions?.[0]?.subgraph?.metadata?.displayName ?? null;
+            const displayName = alloc.subgraphDeployment.displayName;
             const ipfsHash = alloc.subgraphDeployment.ipfsHash ?? '';
             const rewards = weiToGRT(alloc.indexingRewards);
             const fees = weiToGRT(alloc.queryFeesCollected);
