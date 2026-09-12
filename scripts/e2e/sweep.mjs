@@ -25,17 +25,31 @@ import { chromium } from '@playwright/test';
 const BASE = process.env.LODESTAR_BASE ?? 'https://www.lodestar-dashboard.com';
 const CI = process.argv.includes('--ci');
 
-/** Dynamic routes need a real subject; a 404 page is not evidence about the template. */
+/**
+ * Dynamic routes need a real subject; a 404 page is not evidence about the template.
+ *
+ * And a subject with nothing on it is barely better. Every address here used to be
+ * `0x4e5c8777…`, an indexer, which has no delegations and no curation signals - so `/delegators/…`
+ * and `/curators/…` were swept against the one path through those pages that returns early and
+ * renders fine. Both were throwing an error boundary in production for anybody with a position,
+ * and this sweep opened them daily and saw nothing.
+ *
+ * A fixture chosen because it exists is not a fixture chosen because it is representative.
+ */
 const SUBJECT = {
   address: '0x4e5c87772c29381bcabc58c3f182b6633b5a274a',
+  /** Has a live delegated position. */
+  delegator: '0xa244c90fa973b485d6a63c8af33fc9bc06c40d7e',
+  /** Has nineteen curation signals. */
+  curator: '0xacbdc195a79ea9766204ad7e082f1b36a32c0db5',
   deployment: 'Qmbsc6XQWbiv4DfLVfaNciScqYLyDWUYjWzrFBbzzmRsMB',
   slug: 'amp-paper-trail',
 };
 
 const PAGES = [
   '/', '/activity', '/ai', '/blog', `/blog/${SUBJECT.slug}`, '/calculator', '/compare',
-  '/curate', '/curators', `/curators/${SUBJECT.address}`, '/data-services', '/delegate',
-  '/delegators', `/delegators/${SUBJECT.address}`, '/disassembly',
+  '/curate', '/curators', `/curators/${SUBJECT.curator}`, '/data-services', '/delegate',
+  '/delegators', `/delegators/${SUBJECT.delegator}`, '/disassembly',
   `/disassembly/${SUBJECT.deployment}`, '/dock/subgraphs', '/foghorn', '/grt-flow',
   '/indexers', `/indexers/${SUBJECT.address}`, `/indexers/${SUBJECT.address}/delegate`,
   '/indexing', '/migration', '/network', '/payments', `/payments/${SUBJECT.address}`,

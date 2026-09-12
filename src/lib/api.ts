@@ -8,6 +8,10 @@ import {
   type PaymentsOverview,
 } from './queries';
 import { normaliseEnrichedResponse, type EnrichedResponse } from './enriched-normalise';
+import {
+  normaliseDelegatorPortfolio,
+  normaliseCuratorPortfolio,
+} from './portfolio-normalise';
 import { parseResponse } from './contract';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
@@ -190,11 +194,14 @@ export async function fetchDelegatorPortfolio(address: string): Promise<Delegato
   const response = await fetch(`/api/portfolio?address=${encodeURIComponent(address)}&type=delegator`);
   if (!response.ok) throw new Error(`Delegator portfolio failed: ${response.status}`);
   // `delegator` is `Delegator | null` - an address that has never delegated is a null, not a fault.
-  return parseResponse('/api/portfolio?type=delegator', await response.json(), {
-    objects: ['data'],
-    present: ['data.delegator'],
-    pick: 'data',
-  });
+  // `stakes` sits beside it rather than inside it, which is the whole reason `portfolio-normalise`
+  // exists: asserting only `data.delegator` let a payload through that made the page throw.
+  const body = parseResponse<{ delegator: Record<string, unknown> | null; stakes: unknown[] }>(
+    '/api/portfolio?type=delegator',
+    await response.json(),
+    { objects: ['data'], present: ['data.delegator'], arrays: ['data.stakes'], pick: 'data' },
+  );
+  return normaliseDelegatorPortfolio(body);
 }
 
 /**
@@ -204,11 +211,12 @@ export async function fetchCuratorPortfolio(address: string): Promise<CuratorPor
   const response = await fetch(`/api/portfolio?address=${encodeURIComponent(address)}&type=curator`);
   if (!response.ok) throw new Error(`Curator portfolio failed: ${response.status}`);
   // `curator` is `Curator | null`, same as the delegator side.
-  return parseResponse('/api/portfolio?type=curator', await response.json(), {
-    objects: ['data'],
-    present: ['data.curator'],
-    pick: 'data',
-  });
+  const body = parseResponse<{ curator: Record<string, unknown> | null; signals: unknown[] }>(
+    '/api/portfolio?type=curator',
+    await response.json(),
+    { objects: ['data'], present: ['data.curator'], arrays: ['data.signals'], pick: 'data' },
+  );
+  return normaliseCuratorPortfolio(body);
 }
 
 /**
