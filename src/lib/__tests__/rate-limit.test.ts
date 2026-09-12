@@ -11,7 +11,6 @@ describe('rateLimit — tier limits', () => {
     ['/api/sql/query', 5],
     ['/api/cron/tap-provision', 20],
     ['/api/portfolio', 30],
-    ['/api/scuttlebutt/messages', 60],
     ['/api/indexer-status/0xabc', 20],
     ['/api/epochs', 400], // fallback - raised from 200 for the per-row fan-out on /indexers
   ])('reports the right limit for %s', async (path, limit) => {
@@ -66,10 +65,10 @@ describe('rateLimit — enforcement', () => {
 
   it('decrements remaining on each hit', async () => {
     const ip = freshIp();
-    const r1 = await rateLimit(ip, '/api/scuttlebutt/messages'); // 60
-    const r2 = await rateLimit(ip, '/api/scuttlebutt/messages');
-    expect(r1.remaining).toBe(59);
-    expect(r2.remaining).toBe(58);
+    const r1 = await rateLimit(ip, '/api/portfolio'); // 30
+    const r2 = await rateLimit(ip, '/api/portfolio');
+    expect(r1.remaining).toBe(29);
+    expect(r2.remaining).toBe(28);
   });
 
   it('isolates counters per IP', async () => {

@@ -82,12 +82,6 @@ export const MIGRATED: readonly string[] = [
   '/api/qos/capture',
   '/api/reo',
   '/api/rewards-history',
-  '/api/scuttlebutt/admin/login',
-  '/api/scuttlebutt/admin/messages',
-  '/api/scuttlebutt/bans',
-  '/api/scuttlebutt/messages',
-  '/api/scuttlebutt/messages/',
-  '/api/scuttlebutt/stream',
   '/api/service-census',
   '/api/sql/receipt',
   '/api/sql/catalog',
@@ -206,7 +200,6 @@ export type RouteState =
 export type Workstream =
   | 'data plane'
   | 'the Dock'
-  | 'Scuttlebutt'
   | 'the disassembler'
   | 'the SQL upper tier'
   | 'the long tail'
@@ -280,12 +273,6 @@ export const BACKEND_ONLY: readonly string[] = [
   '/api/qos/capture',
   '/api/reo',
   '/api/rewards-history',
-  '/api/scuttlebutt/admin/login',
-  '/api/scuttlebutt/admin/messages',
-  '/api/scuttlebutt/bans',
-  '/api/scuttlebutt/messages',
-  '/api/scuttlebutt/messages/[id]',
-  '/api/scuttlebutt/stream',
   '/api/service-census',
   '/api/sql/catalog',
   '/api/sql/named',
@@ -319,8 +306,6 @@ export const BACKEND_ONLY: readonly string[] = [
 const UNMIGRATED: readonly RouteRecord[] = [
   // ── The Dock: nightswatchhq/kittiwake#16 ──────────────────────────────────
                   
-  // ── Scuttlebutt: a rewrite rather than a port, kittiwake#17 ───────────────
-            
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
     
   // ── The SQL upper tier: kittiwake#19. catalog and query are already across. ─

@@ -40,7 +40,7 @@ const PAGES = [
   '/indexers', `/indexers/${SUBJECT.address}`, `/indexers/${SUBJECT.address}/delegate`,
   '/indexing', '/migration', '/network', '/payments', `/payments/${SUBJECT.address}`,
   '/poi', `/poi/${SUBJECT.deployment}`, '/privacy', '/profile', '/qos', '/revert',
-  '/scuttlebutt', '/sql', '/subgraphs', `/subgraphs/${SUBJECT.deployment}`, '/support',
+  '/sql', '/subgraphs', `/subgraphs/${SUBJECT.deployment}`, '/support',
   '/support/new', '/verify',
 ];
 

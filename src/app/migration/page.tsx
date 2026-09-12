@@ -25,7 +25,6 @@ const ISSUE = 'https://github.com/nightswatchhq/kittiwake/issues';
 /** What each block of work is waiting on, and the issue that tracks it. */
 const WORKSTREAM_NOTES: Partial<Record<Workstream, { issue: number; what: string }>> = {
   'the Dock': { issue: 16, what: 'Sessions are done and pinned against tokens the old service minted. Deploy-key storage, IPFS upload and the bounty lifecycle are not.' },
-  Scuttlebutt: { issue: 17, what: 'A rewrite rather than a port: a broadcast channel and axum SSE, not the Node stream translated line by line.' },
   'the disassembler': { issue: 18, what: 'Onto wasmtime with fuel and epoch limits, so a module that loops forever is stopped by the runtime rather than by a timeout wrapped around it.' },
   'the SQL upper tier': { issue: 19, what: 'Named queries and signed receipts. The receipt has to bind the block the nest had sealed through, or it is only checkable by someone who already trusts us.' },
   'the long tail': { issue: 20, what: 'Twenty-five routes with no common shape. To be triaged rather than worked through: porting a route nobody reads is worse than deleting it.' },
