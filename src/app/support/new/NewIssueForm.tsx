@@ -9,25 +9,14 @@ import { unavailableReason, useQueryState, type QueryState } from '@/hooks/useQu
 import { CHOOSER_URL, ISSUE_TEMPLATES, newIssueUrl } from '@/lib/graph-support-templates';
 import type { IssueForm, IssueFormField, IssueFormValues } from '@/lib/issue-form';
 import { cn } from '@/lib/utils';
-
-interface FormsResponse {
-  templates: IssueForm[];
-  canFile: boolean;
-  chooserUrl: string;
-}
+import { fetchIssueForms, fileIssue, IssueRejected, type IssueFormsResponse } from '@/lib/api';
 
 const INPUT_CLASS =
   'w-full rounded-lg border-[0.5px] border-[var(--border)] bg-[var(--bg-surface)] px-3.5 py-2.5 ' +
   'text-sm text-[var(--text)] placeholder:text-[var(--text-faint)] focus:border-[var(--border-mid)] focus:outline-none';
 
-async function loadForms(): Promise<FormsResponse> {
-  const res = await fetch('/api/issue-forms');
-  if (!res.ok) throw new Error('The issue forms could not be read.');
-  return res.json();
-}
-
 export default function NewIssueForm({ initialTitle = '' }: { initialTitle?: string }) {
-  const query = useQuery({ queryKey: ['graph-support-forms'], queryFn: loadForms });
+  const query = useQuery({ queryKey: ['graph-support-forms'], queryFn: fetchIssueForms });
   const state = useQueryState(query);
 
   const [title, setTitle] = useState(initialTitle);
@@ -69,27 +58,22 @@ export default function NewIssueForm({ initialTitle = '' }: { initialTitle?: str
     setSending(true);
     setErrors([]);
     try {
-      const res = await fetch('/api/file-issue', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template: chosen.file,
-          title,
-          values,
-          handle: handle.trim() || undefined,
-          website: honeypot,
-        }),
+      const issue = await fileIssue({
+        template: chosen.file,
+        title,
+        values,
+        handle: handle.trim() || undefined,
+        website: honeypot,
       });
-      const body = await res.json();
-      if (!res.ok) {
-        // Every unanswered field at once. One at a time would mean a round trip per field.
-        const all = Array.isArray(body.errors) ? body.errors.filter((e: unknown) => typeof e === 'string') : [];
-        setErrors(all.length > 0 ? all : [typeof body.error === 'string' ? body.error : 'The issue could not be filed.']);
-        return;
-      }
-      setFiled({ number: body.number, url: body.url });
-    } catch {
-      setErrors(['The issue could not be sent. Your answers are still here.']);
+      setFiled(issue);
+    } catch (e) {
+      // A refusal names the fields it wants; anything else is the request not arriving, and the
+      // difference matters because only one of the two is worth trying again unchanged.
+      setErrors(
+        e instanceof IssueRejected
+          ? e.reasons
+          : ['The issue could not be sent. Your answers are still here.'],
+      );
     } finally {
       setSending(false);
     }
@@ -459,7 +443,7 @@ function Fallback({
  * The links underneath work either way, which is exactly why this has to be said: a reader who is
  * not told would take the bounce-out for the design rather than for a fault.
  */
-function fallbackReason(state: QueryState<FormsResponse>): string | undefined {
+function fallbackReason(state: QueryState<IssueFormsResponse>): string | undefined {
   if (state.kind === 'ready') {
     return state.data.canFile
       ? undefined

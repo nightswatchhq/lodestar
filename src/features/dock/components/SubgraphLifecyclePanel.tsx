@@ -22,6 +22,7 @@ import { isAddress, getAddress } from 'viem';
 import { CONTRACTS } from '@/lib/wallet';
 import { cn } from '@/lib/utils';
 import type { StudioSubgraph } from '@/lib/studio/types';
+import { useUpdateSubgraph, useUploadMetadata } from '@/features/dock/api';
 
 // GNS lifecycle ABI — kept local so the inline publish ABI in dock/page.tsx
 // stays untouched. GNS is itself the ERC-721 for subgraph NFTs, hence
@@ -58,25 +59,25 @@ const GNS_LIFECYCLE_ABI = [
 ] as const;
 
 /**
- * Throws when the record does not land, which used to be swallowed.
+ * Record the change against the Dock's copy, once the chain has it.
  *
- * The transaction is on chain by the time this runs, so a failure here is not the action failing:
- * it is Lodestar's copy going out of date, and the message has to say which of the two happened or
- * the reader will assume the transfer reverted.
+ * Both of this panel's requests were written out here inline, beside a module that already had
+ * them: `useUpdateSubgraph` and `useUploadMetadata` in `features/dock/api.ts`, the file whose whole
+ * purpose is being the one place a Dock call is written down. So the same two routes had two
+ * implementations, and only the module's went through `studioFetch` - which reads kittiwake's
+ * `{ error, message }` envelope in preference to the bare `{ error }` the Next handlers sent. The
+ * copy here reported `HTTP 500` where the module reports what the route actually said.
+ *
+ * The transaction is on chain by the time this runs, so a failure is not the action failing: it is
+ * Lodestar's copy going out of date, and the message has to say which of the two happened or the
+ * reader will assume the transfer reverted. `recordFailed` below is that sentence.
  */
-async function apiPatch(id: number, body: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`/api/studio/subgraphs/${id}`, {
-    method: 'PATCH',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(
-      `The transaction went through, but Lodestar could not record it (HTTP ${res.status}). ` +
-        'The chain is the source of truth; this panel may show stale details until it refreshes.',
-    );
-  }
+function recordFailed(e: unknown): string {
+  const said = e instanceof Error ? e.message : String(e);
+  return (
+    `The transaction went through, but Lodestar could not record it: ${said}. ` +
+    'The chain is the source of truth; this panel may show stale details until it refreshes.'
+  );
 }
 
 type ActionKind = 'metadata' | 'transfer' | 'deprecate';
@@ -125,6 +126,9 @@ function LifecycleModal({
   // Typed confirmation for deprecation.
   const [deprecateConfirm, setDeprecateConfirm] = useState('');
 
+  const updateSubgraph = useUpdateSubgraph();
+  const uploadMetadata = useUploadMetadata();
+
   /**
    * The ceremony, which this panel used to spell out itself.
    *
@@ -139,16 +143,27 @@ function LifecycleModal({
     onMined: async () => {
       if (kind === 'metadata') {
         const patch = { display_name: displayName || null, description: description || null };
-        await apiPatch(sg.id, patch);
+        try {
+          await updateSubgraph.mutateAsync({ id: sg.id, patch });
+        } catch (e) {
+          throw new Error(recordFailed(e));
+        }
         onUpdated({ ...sg, ...patch });
       } else if (kind === 'transfer') {
         // The NFT belongs to someone else now, so the local publish link goes and the subgraph
         // reverts to a draft in the Dock. There is no dedicated "transferred" column.
-        await apiPatch(sg.id, {
-          published_subgraph_id: '',
-          version_label: null,
-          last_published_deployment_id: null,
-        });
+        try {
+          await updateSubgraph.mutateAsync({
+            id: sg.id,
+            patch: {
+              published_subgraph_id: '',
+              version_label: null,
+              last_published_deployment_id: null,
+            },
+          });
+        } catch (e) {
+          throw new Error(recordFailed(e));
+        }
         onUpdated({
           ...sg,
           published_subgraph_id: null,
@@ -189,16 +204,10 @@ function LifecycleModal({
     setUploadError('');
     setUploading(true);
     try {
-      const res = await fetch('/api/studio/metadata', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName, description }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.subgraphMetaBytes32) {
-        throw new Error(data.error ?? 'IPFS upload failed');
-      }
+      const data = await uploadMetadata.mutateAsync({ displayName, description });
+      // A 200 that carries no hash is not an upload. Without this the write goes ahead with
+      // `undefined` where the metadata pointer belongs.
+      if (!data.subgraphMetaBytes32) throw new Error('The upload returned no metadata hash.');
       tx.write({
         address: CONTRACTS.gns,
         abi: GNS_LIFECYCLE_ABI,

@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import type { ContractStepStatus, MinedReceipt } from '@/hooks/useContractStep';
 
@@ -52,13 +53,18 @@ function openAt(
   step.status = status;
   step.error = error;
   step.txHash = status === 'idle' || status === 'wallet' ? undefined : '0xabc';
+  // The panel calls the Dock's own client now rather than writing the two requests out again, so
+  // it needs the provider those hooks live under.
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const view = render(
-    <SubgraphLifecyclePanel
-      sg={SUBGRAPH}
-      displayName="A subgraph"
-      description="does things"
-      onUpdated={vi.fn()}
-    />,
+    <QueryClientProvider client={qc}>
+      <SubgraphLifecyclePanel
+        sg={SUBGRAPH}
+        displayName="A subgraph"
+        description="does things"
+        onUpdated={vi.fn()}
+      />
+    </QueryClientProvider>,
   );
   fireEvent.click(screen.getByRole('button', { name: kind }));
   return view;
@@ -66,7 +72,7 @@ function openAt(
 
 beforeEach(() => {
   mockFetch.mockReset();
-  mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+  mockFetch.mockResolvedValue({ ok: true, status: 200, statusText: 'OK', json: async () => ({}) });
   step.status = 'idle';
   step.error = null;
   step.txHash = undefined;
@@ -91,12 +97,41 @@ describe('the record kept after the transaction', () => {
     // The `.catch(() => {})` this replaced meant a 500 here and a 200 here were the same screen.
     // The transaction is already on chain, so the message has to separate the two or the reader
     // concludes the transfer reverted.
-    mockFetch.mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error',
+      json: async () => ({}),
+    });
     openAt('Transfer Ownership', 'done');
 
     const run = step.onMined?.({ transactionHash: '0xabc', status: 'success', logs: [] });
-    await expect(run).rejects.toThrow(/could not record it \(HTTP 500\)/);
+    await expect(run).rejects.toThrow(/could not record it/);
     await expect(run).rejects.toThrow(/transaction went through/i);
+    await expect(run).rejects.toThrow(/chain is the source of truth/i);
+  });
+
+  /**
+   * Why going through `studioFetch` is worth the provider.
+   *
+   * kittiwake answers `{ error: "<code>", message: "<what went wrong>" }` where the code is a
+   * machine token. The copy of this request that used to live in the panel reported the status and
+   * nothing else, so the owner of a subgraph got "HTTP 409" where the route had said what the
+   * conflict was.
+   */
+  it('surfaces what the route said rather than the status code', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: async () => ({ error: 'conflict', message: 'That subgraph belongs to someone else.' }),
+    });
+    openAt('Transfer Ownership', 'done');
+
+    const run = step.onMined?.({ transactionHash: '0xabc', status: 'success', logs: [] });
+    await expect(run).rejects.toThrow(/belongs to someone else/);
+    // Not the machine token, which is what reading `error` first would have shown.
+    await expect(run).rejects.not.toThrow(/conflict\./);
   });
 
   it('records the transfer when the PATCH succeeds', async () => {
