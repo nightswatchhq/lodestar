@@ -16,6 +16,29 @@
 import { CONTRACTS, LIVENESS, PAGES, HEALTH } from './contracts.mjs';
 
 const BASE = argOf('--base') ?? process.env.LODESTAR_BASE ?? 'https://www.lodestar-dashboard.com';
+
+/**
+ * The API is on its own host.
+ *
+ * `src/proxy.ts` used to forward `/api/…` from the dashboard's origin, so `BASE + path` reached
+ * the backend. With the proxy deleted those paths are 404s that answer with Next's HTML error
+ * page - which is why this reported `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` on
+ * 33 checks rather than anything about the data.
+ *
+ * Pages still come from `BASE`; only `/api/…` moves. Derived from `BASE` rather than hardcoded so
+ * `--base` against a preview or a local build still reaches the right pair.
+ */
+const API_BASE =
+  argOf('--api-base') ??
+  process.env.LODESTAR_API_BASE ??
+  (BASE.includes('lodestar-dashboard.com')
+    ? 'https://api.lodestar-dashboard.com'
+    : BASE);
+
+/** Where a path is served from: the API host for `/api/…`, the dashboard for everything else. */
+function urlFor(path) {
+  return (path.startsWith('/api/') ? API_BASE : BASE) + path;
+}
 const ALERT = process.argv.includes('--alert');
 const TIMEOUT_MS = Number(process.env.E2E_TIMEOUT_MS ?? 60000);
 const UA = { 'User-Agent': 'lodestar-e2e/1.0 (+monitoring)' };
@@ -35,7 +58,7 @@ async function once(path) {
   const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   const started = Date.now();
   try {
-    const res = await fetch(BASE + path, { headers: UA, signal: ctl.signal });
+    const res = await fetch(urlFor(path), { headers: UA, signal: ctl.signal });
     const text = await res.text();
     return { status: res.status, text, ms: Date.now() - started };
   } finally {
@@ -292,7 +315,7 @@ async function harvest() {
 }
 
 const t0 = Date.now();
-console.log(`lodestar e2e against ${BASE}\n`);
+console.log(`lodestar e2e against ${BASE} (api: ${API_BASE})\n`);
 const params = await harvest();
 await checkHealth();
 for (const c of CONTRACTS) {
