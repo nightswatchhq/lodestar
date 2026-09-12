@@ -1,6 +1,16 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
+ * The API is on its own host now.
+ *
+ * `src/proxy.ts` used to forward `/api/…` from the dashboard's origin, so `request.get('/api/poi')`
+ * reached the backend through `baseURL`. With the proxy deleted that path is a 404 on the
+ * dashboard and this failed on the first run after the deletion - correctly, and for a reason that
+ * had nothing to do with the page it is named for.
+ */
+const API = process.env.LODESTAR_API_BASE ?? 'https://api.lodestar-dashboard.com';
+
+/**
  * What a person actually sees. Every assertion here is about *rendered data*, never about the HTML
  * shell - the app is client-rendered, so a shell check passes on a page that shows nothing.
  *
@@ -140,7 +150,7 @@ test('a POI deployment page renders epochs rather than a failed read', async ({ 
   // changes, so hardcoding one is a test that rots; and the index renders its links inside a panel
   // Playwright reads as hidden, so locating one there tests the index's layout rather than this
   // page. What is under test is the detail route.
-  const index = await request.get('/api/poi');
+  const index = await request.get(`${API}/api/poi`);
   expect(index.ok(), `/api/poi returned ${index.status()}`).toBe(true);
   const body = await index.json();
   const list = body.data ?? body;
@@ -156,10 +166,16 @@ test('a POI deployment page renders epochs rather than a failed read', async ({ 
   // before the 400 had even landed. It passed against a deliberately broken URL.
   //
   // So: settle, then assert nothing was refused.
-  await page.waitForLoadState('networkidle').catch(() => {
-    // A hung page is itself the symptom: a refused CID leaves the query retrying and networkidle
-    // never arrives. Swallowed so the assertions below report it rather than a timeout stack.
-  });
+  // `networkidle` with its own budget, not the test's.
+  //
+  // The `.catch` below was meant to let the assertions speak instead of a timeout stack, and could
+  // not: `waitForLoadState` had no timeout of its own, so it waited the whole 90-second test budget
+  // and the test died before reaching a single assertion. The failure it reported was "Target page
+  // has been closed", which says nothing about POIs.
+  //
+  // A hung page is still the symptom worth catching - a refused CID leaves the query retrying and
+  // networkidle never arrives - so it is given ten seconds and then the assertions run regardless.
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
   await page.waitForTimeout(1500);
   expect(failed, `the POI detail read was refused: ${failed.join(', ')}`).toHaveLength(0);
 
