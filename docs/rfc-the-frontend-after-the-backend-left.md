@@ -81,6 +81,52 @@ kittiwake by the same argument that moved everything else, and it is the only op
 Lodestar genuinely frontend-only. But it is real Rust work and it should not hide inside a "3 to 6
 weeks" estimate.
 
+### Decided, 2026-09-12: none of the three. `next/og` is not what it looks like.
+
+**The premise of the whole section was wrong, and checking it took four minutes.**
+
+`next/og` is a re-export. The whole of `node_modules/next/og.js` is:
+
+```js
+module.exports = require('./dist/server/og/image-response')
+```
+
+and that module dynamically imports `next/dist/compiled/@vercel/og/index.node.js`. `ImageResponse`
+is `@vercel/og`'s class - satori for layout, resvg-wasm for encoding - vendored into Next rather
+than belonging to it. Nothing about it needs a React Server Component, an App Router, or a Next
+build.
+
+Verified rather than reasoned about: calling that vendored module from plain `node`, with no Next
+runtime anywhere, returns a real 1200x630 PNG with `content-type: image/png`. The whole test was ten
+lines and it is the difference between a week of Rust and an afternoon.
+
+**So the five routes become five functions, and the 988 lines of JSX in them do not change.**
+
+- `import { ImageResponse } from 'next/og'` becomes `from '@vercel/og'`, five times.
+- The files move from `src/app/**/opengraph-image.tsx` to `api/og/*.ts`, which Vercel serves beside
+  a static bundle without a framework. The `api/` convention predates Next and does not require it.
+- Two of them declare `export const runtime = 'nodejs'`. Both declarations are stale: they were
+  added when those cards read Postgres and Redis directly, and since `og-data.ts` they read the API
+  like everything else. Neither route uses a Node-only API - the whole path is `fetch`,
+  `AbortController` and `setTimeout` - so both declarations go.
+
+### What this costs, stated plainly
+
+It **does not** make the repository serverless-free. Five functions is not zero functions, and a
+static bundle plus five functions is a different claim from "a static bundle". Anyone who wanted
+Stage 2 to mean "nothing but files on a CDN" should know that this does not deliver that, and
+nothing short of option (3) - static cards, losing the per-entity numbers - would.
+
+It does not lock us to Vercel either. satori and resvg-wasm are ordinary packages; the same five
+functions run on any Node or edge host, and that is worth knowing before the separate question of
+whether to leave Vercel gets asked.
+
+And option (1) stays available. If kittiwake should own image generation on principle, that argument
+is unchanged - what has changed is that it is no longer the price of admission for Stage 2, so it can
+be argued on its merits rather than because a migration is blocked behind it.
+
+**Stage 2 is unblocked.** That was the only thing this section was gating.
+
 ## Why not the other candidates
 
 **SvelteKit and SolidStart** are technically viable. `@wagmi/core` and `viem` are framework-agnostic,
@@ -140,7 +186,10 @@ layer that makes any future move cheap. Add Playwright smoke tests for the four 
 because those are the only paths the Vitest suite cannot cover and the only ones where a migration
 regression would be expensive.
 
-**Stage 1a: decide `next/og`.** Size the kittiwake image service. This gates Stage 2.
+**Stage 1a: decide `next/og`.** ~~Size the kittiwake image service.~~ **Decided 2026-09-12: not
+needed.** `next/og` re-exports a vendored `@vercel/og`, which renders a PNG from plain node with no
+Next runtime - checked, not assumed. The five routes become five `api/og/*.ts` functions with their
+JSX unchanged. See the section above. **Stage 2 is no longer gated on this.**
 
 **Stage 2, only if Stage 1 leaves the App Router still causing agent errors.** Scaffold Vite + React
 + TanStack Router, move pages one to one, replace the Next imports enumerated above, keep wagmi,
@@ -152,7 +201,9 @@ price.
 
 ## Open questions
 
-- Which `next/og` option, and is the kittiwake image service worth its own RFC?
+- ~~Which `next/og` option, and is the kittiwake image service worth its own RFC?~~ Settled: the
+  five routes move as they are. Whether kittiwake *should* own image generation on principle is now
+  an ordinary question rather than a blocker, and it does not need answering to start Stage 2.
 - Do we want to leave Vercel at all, or keep it for preview deploys and serve the static bundle from
   there? The migration does not require leaving, and the two decisions should not be bundled.
 - Recharts is heavier than uPlot or ECharts by some margin. That is a larger bundle win than the

@@ -96,6 +96,10 @@ const walletCovered = WALLET_FLOWS.filter((f) =>
   new RegExp(f.replace(/ /g, '[ -]?'), 'i').test(walletSpec),
 );
 
+const RFC = 'docs/rfc-the-frontend-after-the-backend-left.md';
+const ogDecided =
+  existsSync(RFC) && /^### Decided, \d{4}-\d{2}-\d{2}:/m.test(readFileSync(RFC, 'utf8'));
+
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const rainbowInstalled = Boolean(pkg.dependencies?.['@rainbow-me/rainbowkit']);
 const rainbowUsed = sources.some((f) => /rainbow/i.test(readFileSync(f, 'utf8')));
@@ -157,11 +161,14 @@ const items = [
   {
     id: 5,
     title: 'Stage 1a: decide what happens to next/og',
-    // Nothing to count until a decision exists, so this is 0 or 1 and stays 0 until it is written
-    // down somewhere. Five server-rendered routes is the size of the thing being decided.
-    done: 0,
+    // A decision counts when it is written down where the next person will find it, which is the
+    // RFC that posed the question. Reading the file rather than hardcoding a 1 means this goes
+    // back to 0 if somebody deletes the section, which is the correct behaviour.
+    done: ogDecided ? 1 : 0,
     total: 1,
-    detail: `${ogRoutes.length} server-rendered OpenGraph routes, no decision recorded`,
+    detail: ogDecided
+      ? `decided: the ${ogRoutes.length} routes move to api/og as @vercel/og functions; Stage 2 unblocked`
+      : `${ogRoutes.length} server-rendered OpenGraph routes, no decision recorded`,
   },
 ];
 
