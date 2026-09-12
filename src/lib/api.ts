@@ -22,6 +22,18 @@ import type { ServiceCensus } from '@/lib/service-census';
 import type { RequirementsJson } from '@/lib/operator-requirements';
 import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
 import type {
+  SubgraphSearchAnswer,
+  SubgraphSearchResult,
+} from '@/lib/contracts/subgraph-search';
+import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
+import type { DisassemblyReport } from '@/lib/disassembly/types';
+import type { DisassemblyDiff } from '@/lib/disassembly/diff';
+import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
+import type { EnrichedIndexer } from '@/lib/enriched';
+import type { SupportArchive } from '@/lib/graph-support';
+import { summariseNodeHealth } from '@/lib/node-health';
+import type { NodeHealthResponse, NodeSyncSummary } from '@/lib/node-health';
+import type {
   DelegationEvent,
   IndexerDispute,
   REOStatusResponse,
@@ -832,4 +844,180 @@ export async function fetchENSName(address: string): Promise<{ ensName: string |
   const response = await fetch(`/api/ens?address=${encodeURIComponent(address)}`);
   if (!response.ok) throw new Error(`ENS lookup failed: ${response.status}`);
   return parseResponse('/api/ens', await response.json(), { present: ['ensName'] });
+}
+
+// ── The last of the reads that built their own requests ──────────────────────
+
+/**
+ * Search subgraphs by name.
+ *
+ * One fetcher for three call sites. The disassembly picker, `/subgraphs` and `/indexing` each had
+ * their own, and only the picker checked the status: without that a 500 becomes `json.data ?? []`,
+ * TanStack records a success, and the panel says the search found nothing.
+ */
+export async function fetchSubgraphSearch(q: string): Promise<SubgraphSearchAnswer> {
+  const response = await fetch(`/api/subgraph-search?q=${encodeURIComponent(q)}`);
+  if (!response.ok) throw new Error(`Subgraph search failed: ${response.status}`);
+  const body = parseResponse<{ data: SubgraphSearchResult[]; warmBacklog?: unknown }>(
+    '/api/subgraph-search',
+    await response.json(),
+    { arrays: ['data'] },
+  );
+  return {
+    hits: body.data,
+    warmBacklog: typeof body.warmBacklog === 'number' ? body.warmBacklog : null,
+  };
+}
+
+export async function fetchDisassembly(id: string): Promise<DisassemblyReport> {
+  const response = await fetch(`/api/disassembly?id=${encodeURIComponent(id)}`);
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    // The route explains itself on a 4xx - an unknown hash, a manifest it could not fetch - and
+    // that sentence is worth more to a reader than the status code on its own.
+    throw new Error(body?.error ?? `Disassembly failed: ${response.status}`);
+  }
+  return parseResponse('/api/disassembly', body, {
+    objects: ['data', 'data.manifest', 'data.scorecard'],
+    arrays: ['data.dataSources'],
+    pick: 'data',
+  });
+}
+
+export async function fetchDisassemblyDiff(
+  a: string,
+  b: string,
+): Promise<{ diff: DisassemblyDiff; base: DisassemblyReport; target: DisassemblyReport }> {
+  const response = await fetch(
+    `/api/disassembly/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`,
+  );
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.error ?? `Disassembly diff failed: ${response.status}`);
+  return parseResponse('/api/disassembly/diff', body, {
+    objects: ['data', 'data.diff', 'data.base', 'data.target'],
+    pick: 'data',
+  });
+}
+
+/** Chains an indexer has stopped serving, keyed by indexer address. */
+export async function fetchDroppedChains(): Promise<Record<string, string[]>> {
+  const response = await fetch('/api/dropped-chains');
+  if (!response.ok) throw new Error(`Dropped chains failed: ${response.status}`);
+  return parseResponse('/api/dropped-chains', await response.json(), {
+    objects: ['data'],
+    pick: 'data',
+  });
+}
+
+export async function fetchIndexerRevenue(
+  address: string,
+  windowDays: number,
+): Promise<IndexerRevenue> {
+  const response = await fetch(
+    `/api/indexer/${encodeURIComponent(address)}/revenue?window=${windowDays}`,
+  );
+  if (!response.ok) throw new Error(`Indexer revenue failed: ${response.status}`);
+  return parseResponse('/api/indexer/revenue', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.daily'],
+    present: ['data.total_grt'],
+    pick: 'data',
+  });
+}
+
+export async function fetchIndexerPnl(
+  address: string,
+  params: { windowDays: number; grtPrice?: number; chain?: string },
+): Promise<IndexerPnl> {
+  const qs = new URLSearchParams({ window: String(params.windowDays) });
+  if (params.grtPrice != null) qs.set('price', String(params.grtPrice));
+  if (params.chain) qs.set('chain', params.chain);
+  const response = await fetch(`/api/indexer/${encodeURIComponent(address)}/pnl?${qs}`);
+  if (!response.ok) throw new Error(`Indexer P&L failed: ${response.status}`);
+  // `net_usd` is the headline and it is a subtraction: a missing `infra_cost_usd` would render a
+  // loss-making indexer as profitable rather than as unknown.
+  return parseResponse('/api/indexer/pnl', await response.json(), {
+    objects: ['data', 'data.pnl', 'data.costModel', 'data.defaultChainCosts'],
+    present: ['data.pnl.revenue_usd', 'data.pnl.infra_cost_usd', 'data.pnl.net_usd'],
+    pick: 'data',
+  });
+}
+
+/**
+ * Two candidate indexers for a delegation, or the single best one.
+ *
+ * Same route, two shapes, decided by `count`: without it the route answers one recommendation at
+ * the top level, with it a list under `candidates`.
+ */
+export async function fetchDelegateRecommendation(prefs: {
+  returns: number;
+  stability: number;
+  safety: number;
+  network: number;
+}): Promise<RecommendResponse> {
+  const response = await fetch(`/api/delegate/recommend?${new URLSearchParams(
+    Object.fromEntries(Object.entries(prefs).map(([k, v]) => [k, String(v)])),
+  )}`);
+  if (!response.ok) throw new Error(await response.text());
+  return parseResponse('/api/delegate/recommend', await response.json(), {
+    objects: ['indexer'],
+    arrays: ['reasons'],
+    present: ['score'],
+  });
+}
+
+export async function fetchDelegateCandidates(
+  prefs: { returns: number; stability: number; safety: number; network: number },
+  count: number,
+): Promise<{ candidates: Array<{ indexer: EnrichedIndexer; score: number; reasons: string[] }> }> {
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(prefs).map(([k, v]) => [k, String(v)])),
+  );
+  qs.set('count', String(count));
+  const response = await fetch(`/api/delegate/recommend?${qs}`);
+  if (!response.ok) throw new Error(await response.text());
+  return parseResponse('/api/delegate/recommend', await response.json(), {
+    arrays: ['candidates'],
+  });
+}
+
+/**
+ * The graph-support archive.
+ *
+ * No `refetchInterval` at the hook: the route caches for fifteen minutes and the write-ups do not
+ * move, so polling would only spend GitHub's rate limit.
+ */
+export async function fetchGraphSupport(): Promise<SupportArchive> {
+  const response = await fetch('/api/support');
+  if (!response.ok) {
+    // The route answers 503 with a reason rather than an empty archive, so surface it.
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.error ?? `graph-support fetch failed: ${response.status}`);
+  }
+  return parseResponse('/api/support', await response.json(), {
+    arrays: ['issues'],
+    present: ['fetchedAt'],
+  });
+}
+
+/**
+ * One indexer node's status endpoint, summarised.
+ *
+ * The raw body is one row per deployment and there were 4,889 of them on the node this was found
+ * on, so the summary is what crosses into the component rather than the list.
+ */
+export async function fetchNodeHealth(
+  url: string,
+  address: string,
+): Promise<NodeSyncSummary> {
+  const response = await fetch(
+    `/api/indexer-node-health?url=${encodeURIComponent(url)}&addr=${encodeURIComponent(address)}`,
+  );
+  if (!response.ok) throw new Error(`Node health failed: ${response.status}`);
+  const body = parseResponse<NodeHealthResponse>('/api/indexer-node-health', await response.json(), {
+    objects: ['data'],
+    present: ['data.reachable'],
+    pick: 'data',
+  });
+  return summariseNodeHealth(body);
 }

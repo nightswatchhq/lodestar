@@ -19,6 +19,13 @@ import type {
   SignalExposure,
 } from '@/lib/disassembly/types';
 import type { DisassemblyDiff, HandlerDiffEntry, HandlerStatus } from '@/lib/disassembly/diff';
+import {
+  fetchSubgraphSearch,
+  fetchDisassembly,
+  fetchDisassemblyDiff,
+  fetchIndexingStatus,
+} from '@/lib/api';
+import type { DeploymentIndexingStatus as DeploymentHealth } from '@/lib/indexing-status-shape';
 import { riskPriority, worstFlagLevel, type RiskPriority } from '@/lib/disassembly/priority';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
@@ -73,14 +80,6 @@ const DECODE_ISSUE_6683 = 'https://github.com/graphprotocol/graph-node/issues/66
 const DECODE_ISSUE_6461 = 'https://github.com/graphprotocol/graph-node/issues/6461';
 
 /** Minimal slice of /api/indexing-status used to label silent vs loud failure. */
-interface DeploymentHealth {
-  totalIndexers: number;
-  syncedCount: number;
-  healthyCount: number;
-  failedCount: number;
-  unreachableCount: number;
-}
-
 // The Graph's own GNS / network subgraph — 6 data sources, reads IPFS metadata.
 const SAMPLE_ID = 'QmQKXcNQQRdUvNRMGJiE2idoTu9fo5F5MRtKztH4WyKxED';
 
@@ -89,11 +88,6 @@ function short(hash: string, head = 8, tail = 6): string {
 }
 
 const VERIFY_HOSTS = ['github.com', 'gitlab.com', 'bitbucket.org'];
-
-interface ApiResponse {
-  data?: DisassemblyReport;
-  error?: string;
-}
 
 type Mode = 'inspect' | 'compare';
 
@@ -160,12 +154,6 @@ export function DisassemblyClient({ initialId }: { initialId?: string }) {
   );
 }
 
-interface SubgraphSearchResult {
-  id: string;
-  metadata: { displayName: string; description: string | null } | null;
-  currentVersion: { subgraphDeployment: { ipfsHash: string; signalledTokens: string; stakedTokens: string } } | null;
-}
-
 const QM_HASH_RE = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
 
 // A searchable subgraph picker: type a name to get a dropdown of matches (by
@@ -191,23 +179,11 @@ function SubgraphPicker({
 
   const isFullHash = QM_HASH_RE.test(value.trim());
 
-  const searchQuery = useQuery<{ hits: SubgraphSearchResult[]; warmBacklog: number | null }>({
+  const searchQuery = useQuery({
     queryKey: ['subgraph-search', debounced],
     enabled: debounced.length >= 2 && !QM_HASH_RE.test(debounced),
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      const r = await fetch(`/api/subgraph-search?q=${encodeURIComponent(debounced)}`);
-      // Without this a 500 becomes `json.data ?? []`, react-query records a success, and the panel
-      // says the search found nothing.
-      if (!r.ok) throw new Error(`Subgraph search failed: ${r.status}`);
-      const json: { data?: SubgraphSearchResult[]; warmBacklog?: number | null } = await r.json();
-      // The backlog rides along with the hits rather than in its own state, so the message and the
-      // list it explains can never be from different answers. kittiwake#8.
-      return {
-        hits: json.data ?? [],
-        warmBacklog: typeof json.warmBacklog === 'number' ? json.warmBacklog : null,
-      };
-    },
+    queryFn: () => fetchSubgraphSearch(debounced),
   });
 
   const searchState = useQueryState(searchQuery);
@@ -280,16 +256,11 @@ function InspectPanel({ initialId }: { initialId?: string }) {
     }
   }, [initialId]);
 
-  const { data, isFetching, error } = useQuery<DisassemblyReport>({
+  const { data, isFetching, error } = useQuery({
     queryKey: ['disassembly', target],
     enabled: target.length > 0,
     staleTime: 60 * 60 * 1000,
-    queryFn: async () => {
-      const r = await fetch(`/api/disassembly?id=${encodeURIComponent(target)}`);
-      const json: ApiResponse = await r.json();
-      if (!r.ok || !json.data) throw new Error(json.error ?? 'Failed to disassemble subgraph');
-      return json.data;
-    },
+    queryFn: () => fetchDisassembly(target),
   });
 
   const submit = (e: React.FormEvent) => {
@@ -366,11 +337,6 @@ function ShareLink({ id }: { id: string }) {
   );
 }
 
-interface DiffApiResponse {
-  data?: { diff: DisassemblyDiff; base: DisassemblyReport; target: DisassemblyReport };
-  error?: string;
-}
-
 function ComparePanel() {
   const [inputA, setInputA] = useState('');
   const [inputB, setInputB] = useState('');
@@ -388,16 +354,11 @@ function ComparePanel() {
     }
   }, []);
 
-  const { data, isFetching, error } = useQuery<DiffApiResponse['data']>({
+  const { data, isFetching, error } = useQuery({
     queryKey: ['disassembly-diff', pair?.a, pair?.b],
     enabled: !!pair,
     staleTime: 60 * 60 * 1000,
-    queryFn: async () => {
-      const r = await fetch(`/api/disassembly/diff?a=${encodeURIComponent(pair!.a)}&b=${encodeURIComponent(pair!.b)}`);
-      const json: DiffApiResponse = await r.json();
-      if (!r.ok || !json.data) throw new Error(json.error ?? 'Failed to compare subgraphs');
-      return json.data;
-    },
+    queryFn: () => fetchDisassemblyDiff(pair!.a, pair!.b),
   });
 
   const submit = (e: React.FormEvent) => {
@@ -471,16 +432,15 @@ function Report({ report }: { report: DisassemblyReport }) {
   // health — it's what tells silent data loss (indexers healthy) from a loud
   // deterministic failure. Lazy + gated so page load and clean deployments pay nothing.
   const hasDivergent = dataSources.some((d) => d.decodeAudit?.status === 'divergent');
-  const { data: decodeHealth } = useQuery<DeploymentHealth | null>({
-    queryKey: ['decode-health', report.deploymentId],
+  // It used to swallow a failed read into `null`, and `DecodeHealthNote` renders nothing for a
+  // null. So the one call whose job is telling silent data loss from a loud failure went quiet in
+  // exactly the way it exists to detect: a divergence with no verdict beside it, indistinguishable
+  // from a divergence nobody had anything to say about.
+  const { data: decodeHealth, isError: healthUnread } = useQuery({
+    queryKey: ['indexingStatus', report.deploymentId],
     enabled: hasDivergent,
     staleTime: 60_000,
-    queryFn: async () => {
-      const res = await fetch(`/api/indexing-status/${report.deploymentId}`);
-      if (!res.ok) return null;
-      const json = (await res.json()) as { data?: DeploymentHealth };
-      return json.data ?? null;
-    },
+    queryFn: () => fetchIndexingStatus(report.deploymentId),
   });
 
   return (
@@ -546,7 +506,9 @@ function Report({ report }: { report: DisassemblyReport }) {
 
       {/* Per data source */}
       <div className="space-y-3">
-        {dataSources.map((ds, i) => <DataSourceBlock key={`${ds.name}-${i}`} ds={ds} health={decodeHealth} />)}
+        {dataSources.map((ds, i) => (
+          <DataSourceBlock key={`${ds.name}-${i}`} ds={ds} health={decodeHealth} healthUnread={healthUnread} />
+        ))}
       </div>
 
       {/* Caveats */}
@@ -627,7 +589,15 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-function DataSourceBlock({ ds, health }: { ds: DataSourceReport; health?: DeploymentHealth | null }) {
+function DataSourceBlock({
+  ds,
+  health,
+  healthUnread,
+}: {
+  ds: DataSourceReport;
+  health?: DeploymentHealth | null;
+  healthUnread?: boolean;
+}) {
   return (
     <Card>
       <details>
@@ -676,7 +646,9 @@ function DataSourceBlock({ ds, health }: { ds: DataSourceReport; health?: Deploy
             </Collapsible>
           )}
 
-          {ds.decodeAudit && <DecodeAuditPanel audit={ds.decodeAudit} health={health} />}
+          {ds.decodeAudit && (
+            <DecodeAuditPanel audit={ds.decodeAudit} health={health} healthUnread={healthUnread} />
+          )}
         </div>
       </details>
     </Card>
@@ -685,7 +657,15 @@ function DataSourceBlock({ ds, health }: { ds: DataSourceReport; health?: Deploy
 
 // ── ethereum.decode compatibility audit (graph-node 0.42 alloy migration) ─────
 
-function DecodeAuditPanel({ audit, health }: { audit: DecodeAudit; health?: DeploymentHealth | null }) {
+function DecodeAuditPanel({
+  audit,
+  health,
+  healthUnread,
+}: {
+  audit: DecodeAudit;
+  health?: DeploymentHealth | null;
+  healthUnread?: boolean;
+}) {
   const divergent = audit.status === 'divergent';
 
   // Collapsed by default when there's nothing wrong; forced open when divergent.
@@ -732,7 +712,7 @@ function DecodeAuditPanel({ audit, health }: { audit: DecodeAudit; health?: Depl
               <strong>alloy rejects (≥0.42)</strong> — <code className="font-mono">ethereum.decode</code> returns <code className="font-mono">null</code> for these on modern graph-node.
             </p>
 
-            <DecodeHealthNote health={health} />
+            <DecodeHealthNote health={health} healthUnread={healthUnread} />
 
             <div className="space-y-2">
               {audit.findings.map((f, i) => <DecodeFindingCard key={i} f={f} />)}
@@ -779,7 +759,22 @@ function DecodeFindingCard({ f }: { f: DecodeFinding }) {
 }
 
 /** Silent-vs-loud annotation from live indexing health, when available. */
-function DecodeHealthNote({ health }: { health?: DeploymentHealth | null }) {
+function DecodeHealthNote({
+  health,
+  healthUnread,
+}: {
+  health?: DeploymentHealth | null;
+  healthUnread?: boolean;
+}) {
+  if (healthUnread) {
+    return (
+      <p className="text-[11px] text-[var(--amber)] mt-2">
+        Live indexing health could not be read, so there is nothing here saying whether this
+        divergence is losing data quietly or failing loudly. That is a gap in the evidence, not a
+        verdict of either.
+      </p>
+    );
+  }
   if (!health || health.totalIndexers === 0) return null;
 
   const alive = health.totalIndexers - health.unreachableCount;

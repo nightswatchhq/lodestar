@@ -3,7 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { useSubgraphDeployments, useChainLag } from '@/hooks/useNetworkStats';
+import { fetchSubgraphSearch } from '@/lib/api';
+import type { SubgraphSearchResult } from '@/lib/contracts/subgraph-search';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn, weiToGRT, formatGRT, shortenAddress } from '@/lib/utils';
@@ -13,18 +16,6 @@ import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 // ---------------------------------------------------------------------------
 // Types for subgraph name search
 // ---------------------------------------------------------------------------
-
-interface SubgraphSearchResult {
-  id: string;
-  metadata: { displayName: string; description: string | null } | null;
-  currentVersion: {
-    subgraphDeployment: {
-      ipfsHash: string;
-      signalledTokens: string;
-      stakedTokens: string;
-    };
-  } | null;
-}
 
 // ---------------------------------------------------------------------------
 // Chain name mapping — graph-node network IDs → human-readable labels
@@ -209,40 +200,37 @@ function ChainHealthPanel() {
 // Search hook — queries the network subgraph for subgraphs by name
 // ---------------------------------------------------------------------------
 
+/**
+ * Search subgraphs by name, debounced.
+ *
+ * The old version set the results to `[]` on a bad status and again in a bare `catch`, so a search
+ * that could not run and a search that matched nothing rendered the same sentence: "No subgraphs
+ * found matching …", which is a claim about what is deployed made because we could not reach our
+ * own backend. `/subgraphs` fixed exactly this and left a comment saying so; this page kept it.
+ */
 function useSubgraphSearch(query: string) {
-  const [results, setResults] = useState<SubgraphSearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [debounced, setDebounced] = useState('');
 
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    const trimmed = query.trim();
-    if (trimmed.length < 2 || trimmed.startsWith('Qm') || trimmed.startsWith('bafy')) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- debounced async search — intentional
-      setResults([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/subgraph-search?q=${encodeURIComponent(trimmed)}`);
-        if (!res.ok) { setResults([]); return; }
-        const json = await res.json();
-        setResults(json.data ?? []);
-      } catch {
-        setResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    const id = setTimeout(() => setDebounced(query.trim()), 300);
+    return () => clearTimeout(id);
   }, [query]);
 
-  return { results, isSearching };
+  const enabled =
+    debounced.length >= 2 && !debounced.startsWith('Qm') && !debounced.startsWith('bafy');
+
+  const { data, isFetching, isError, error } = useQuery({
+    queryKey: ['subgraph-search', debounced],
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => fetchSubgraphSearch(debounced),
+  });
+
+  return {
+    results: data?.hits ?? [],
+    isSearching: enabled && isFetching,
+    searchError: isError ? (error instanceof Error ? error.message : 'The search could not be run.') : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +240,7 @@ function useSubgraphSearch(query: string) {
 export default function IndexingStatusPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
-  const { results: searchResults, isSearching } = useSubgraphSearch(search);
+  const { results: searchResults, isSearching, searchError } = useSubgraphSearch(search);
   const deploymentsQuery = useSubgraphDeployments({
     first: 20,
     orderBy: 'stakedTokens',
@@ -340,6 +328,10 @@ export default function IndexingStatusPage() {
                   <div className="w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
                   <span className="text-xs text-[var(--text-muted)]">Searching...</span>
                 </div>
+              ) : searchError ? (
+                <p className="text-xs text-[var(--amber)] py-2 px-1">
+                  {searchError} That is not the same as finding nothing.
+                </p>
               ) : searchResults.length > 0 ? (
                 <div className="space-y-1">
                   {searchResults.map((sg) => {

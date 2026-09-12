@@ -139,6 +139,35 @@ export interface FeedEvent {
   diff_patch_count: number;
 }
 
+/** One probe round: the question, who was asked, and how far apart the answers were. */
+export interface ProbeDetail {
+  probe: {
+    id: string;
+    deployment_id: string;
+    block_hash: string;
+    block_number: number;
+    query_category: string;
+    query_text: string;
+    dispatched_at: string;
+  };
+  observations: Array<{
+    indexer_address: string;
+    response_hash: string | null;
+    latency_ms: number | null;
+    meta_block_number: number | null;
+    meta_block_hash: string | null;
+    http_status: number | null;
+    error_class: string | null;
+    stake_weight: number;
+  }>;
+  divergence: {
+    cluster_count: number;
+    diff_patches: unknown[];
+    largest_by_count: { hash: string; size: number };
+    largest_by_stake: { hash: string; weight: number };
+  } | null;
+}
+
 // ── Fetchers (via the /api/foghorn proxy) ─────────────────────────────────────
 
 async function foghornGet<T>(path: string): Promise<T> {
@@ -194,6 +223,16 @@ export const fetchVerdicts = (params: { kind?: string; severity?: string; limit?
   const qs = q.toString();
   return foghornGet<{ verdicts: Verdict[]; count: number }>(`verdicts${qs ? `?${qs}` : ''}`);
 };
+
+/**
+ * One probe round in full.
+ *
+ * Through `foghornGet` like everything else here. The page had its own `fetch('/api/foghorn/…')`
+ * beside this helper, which is the same request written twice in one repository, and only one of
+ * the two would have got the next change to how the proxy is called.
+ */
+export const fetchProbeDetail = (id: string) =>
+  foghornGet<ProbeDetail>(`probe/${encodeURIComponent(id)}`);
 
 export const fetchSybilClusters = () =>
   foghornGet<{ clusters: SybilCluster[]; count: number }>('sybil');

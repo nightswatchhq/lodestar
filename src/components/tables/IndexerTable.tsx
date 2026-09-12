@@ -38,6 +38,8 @@ import type { EnrichedIndexer } from '@/lib/enriched';
 const PAGE_SIZE = 25;
 const ROW_HEIGHT_PX = 73;
 import { cooldownRemainingDays } from '@/lib/network-math';
+import { fetchDroppedChains, fetchNodeHealth } from '@/lib/api';
+import { MIN_DEPLOYMENTS_TO_JUDGE, type NodeSyncSummary } from '@/lib/node-health';
 import { Card } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
@@ -105,14 +107,7 @@ function foghornFlagsFor(
 }
 
 // Module-level cache so repeated renders / page navigations don't re-fetch
-interface SyncHealth {
-  reachable: boolean;
-  totalDeployments: number;
-  syncedCount: number;
-  worstBlocksBehind?: number;
-}
-
-const syncHealthCache = new Map<string, SyncHealth>();
+const syncHealthCache = new Map<string, NodeSyncSummary>();
 
 // Dropped chains — fetched once for all indexers via a shared promise
 let droppedChainsPromise: Promise<Record<string, string[]>> | null = null;
@@ -123,10 +118,7 @@ function getDroppedChains(): Promise<Record<string, string[]>> {
     // *and* every success, because nothing here kept the response long enough to tell them apart.
     droppedChainsPromise = (async () => {
       try {
-        const res = await fetch('/api/dropped-chains');
-        if (!res.ok) return {};
-        const body = (await res.json()) as { data?: Record<string, string[]> };
-        return body.data ?? {};
+        return await fetchDroppedChains();
       } catch {
         return {};
       }
@@ -141,7 +133,9 @@ function getDroppedChains(): Promise<Record<string, string[]>> {
  * Nodes with <3 deployments or unreachable nodes are silently skipped.
  */
 function SyncDot({ address, url }: { address: string; url: string | null }) {
-  const [health, setHealth] = useState(syncHealthCache.get(address) ?? null);
+  const [health, setHealth] = useState<NodeSyncSummary | null>(
+    syncHealthCache.get(address) ?? null,
+  );
   const fetching = useRef(false);
 
   useEffect(() => {
@@ -151,15 +145,9 @@ function SyncDot({ address, url }: { address: string; url: string | null }) {
     // it did before. The difference is that a 500 no longer reaches `data` as an error envelope.
     void (async () => {
       try {
-        const res = await fetch(
-          `/api/indexer-node-health?url=${encodeURIComponent(url)}&addr=${encodeURIComponent(address)}`,
-        );
-        if (!res.ok) return;
-        const body = (await res.json()) as { data?: SyncHealth };
-        if (body.data) {
-          syncHealthCache.set(address, body.data);
-          setHealth(body.data);
-        }
+        const summary = await fetchNodeHealth(url, address);
+        syncHealthCache.set(address, summary);
+        setHealth(summary);
       } catch {
         // A node that cannot be reached is not a badge. Deliberate: see above.
       } finally {
@@ -169,15 +157,17 @@ function SyncDot({ address, url }: { address: string; url: string | null }) {
   }, [address, url, health]);
 
   if (!url || health === null) return null;
-  if (!health.reachable || health.totalDeployments < 3) return null;
-
-  const syncedPct = Math.round((health.syncedCount / health.totalDeployments) * 100);
-  if (syncedPct >= 85) return null;
+  // `syncedPct` is null when there was nothing to divide by. It used to be `undefined /
+  // undefined`, and because `undefined < 3` is false the guard above let it through: the badge
+  // rendered "NaN%", and its tooltip said "NaN% of deployments at chain head".
+  if (!health.reachable || health.totalDeployments < MIN_DEPLOYMENTS_TO_JUDGE) return null;
+  const syncedPct = health.syncedPct;
+  if (syncedPct === null || syncedPct >= 85) return null;
 
   const isCritical = syncedPct < 50;
   const color = isCritical ? 'var(--red-text)' : 'var(--amber)';
   const behind = health.worstBlocksBehind;
-  const lagText = behind ? `, up to ${behind.toLocaleString()} blocks behind` : '';
+  const lagText = behind ? `, up to ${behind.toLocaleString('en-GB')} blocks behind` : '';
   const tipBody = `${syncedPct}% of deployments at chain head${lagText}. View the indexer profile for per-subgraph detail.`;
 
   return (

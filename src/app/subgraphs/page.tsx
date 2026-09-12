@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
 import { useSubgraphDeployments, useSubgraphDeployments30d, useManifestAnalysis } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
+import { fetchSubgraphSearch } from '@/lib/api';
 import type { ComplexityCategory } from '@/lib/manifest';
 import { emptySearchMessage } from '@/lib/search-backlog';
 
@@ -193,11 +194,9 @@ function SubgraphDirectory() {
     setSearchLoading(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/subgraph-search?q=${encodeURIComponent(searchQuery)}`);
-        if (!res.ok) throw new Error(`The search could not be run (HTTP ${res.status}).`);
-        const json = await res.json();
-        setSearchResults(json.data ?? []);
-        setWarmBacklog(typeof json.warmBacklog === 'number' ? json.warmBacklog : null);
+        const { hits, warmBacklog } = await fetchSubgraphSearch(searchQuery);
+        setSearchResults(hits);
+        setWarmBacklog(warmBacklog);
         setSearchError(null);
       } catch (e) {
         // The old catch set the results to `[]`, so a search that could not run and a search that
