@@ -32,6 +32,13 @@ import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
 import type { EnrichedIndexer } from '@/lib/enriched';
 import type { SupportArchive } from '@/lib/graph-support';
 import type { IssueForm } from '@/lib/issue-form';
+import type {
+  SqlCatalog,
+  QueryResult,
+  NamedQueryDef,
+  NamedResult,
+  Receipt,
+} from '@/lib/contracts/sql';
 import { summariseNodeHealth } from '@/lib/node-health';
 import type { NodeHealthResponse, NodeSyncSummary } from '@/lib/node-health';
 import type {
@@ -1087,4 +1094,99 @@ export async function fileIssue(body: {
   // A 200 with no number is not a filed issue. Without this the page renders "Filed as #" and
   // links to `/support/undefined`, which is a confirmation of something that did not happen.
   return parseResponse('/api/file-issue', answered, { present: ['number', 'url'] });
+}
+
+// ── The SQL tier ─────────────────────────────────────────────────────────────
+
+/**
+ * The dataset catalogue.
+ *
+ * A 503 is not an error here: it is how the route says this deployment has no SQL tier, and the
+ * body carries `available: false` to say so in words. Every other bad status is.
+ */
+export async function fetchSqlCatalog(): Promise<SqlCatalog> {
+  const response = await fetch('/api/sql/catalog');
+  if (!response.ok && response.status !== 503) {
+    throw new Error(`SQL catalog failed: ${response.status}`);
+  }
+  return parseResponse('/api/sql/catalog', await response.json(), {
+    present: ['available'],
+    arrays: ['datasets'],
+  });
+}
+
+/** Thrown when a query is refused, carrying what the route said about it. */
+export class SqlRefused extends Error {}
+
+export async function runSqlQuery(dataset: string, q: string): Promise<QueryResult> {
+  const response = await fetch('/api/sql/query', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dataset, q }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new SqlRefused(body?.error ?? `Request failed (${response.status}).`);
+  }
+  // `degraded` and `truncated` are the two flags the table renders a warning from. A body missing
+  // them reads as a complete, undegraded answer, which is the one thing a query tool must not
+  // claim on its own authority.
+  return parseResponse('/api/sql/query', body, {
+    arrays: ['rows'],
+    present: ['count', 'truncated', 'degraded'],
+  });
+}
+
+export async function fetchNamedQueries(): Promise<{ queries: NamedQueryDef[] }> {
+  const response = await fetch('/api/sql/named');
+  if (!response.ok) throw new Error(`Named queries failed: ${response.status}`);
+  return parseResponse('/api/sql/named', await response.json(), { arrays: ['queries'] });
+}
+
+export async function runNamedQuery(
+  name: string,
+  args: Record<string, string>,
+): Promise<NamedResult> {
+  const response = await fetch('/api/sql/named', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, args }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new SqlRefused(body?.error ?? `Request failed (${response.status}).`);
+  }
+  return parseResponse('/api/sql/named', body, {
+    arrays: ['rows'],
+    present: ['count', 'sql'],
+  });
+}
+
+/**
+ * A signed receipt for a named query.
+ *
+ * The check matters more here than anywhere else on this page. The caller writes whatever comes
+ * back to a file called `receipt-….json` and hands it to somebody, so a 200 carrying anything at
+ * all became a receipt as far as the download was concerned. A file with no signature in it is not
+ * a receipt; it is a JSON document that will be refused by `/verify` weeks later, with nothing to
+ * say why. Assert the three things a verifier needs before calling it one.
+ */
+export async function issueSqlReceipt(
+  name: string,
+  args: Record<string, string>,
+): Promise<Receipt> {
+  const response = await fetch('/api/sql/receipt', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, args }),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new SqlRefused(body?.error ?? `Request failed (${response.status}).`);
+  }
+  return parseResponse('/api/sql/receipt', body, {
+    objects: ['body'],
+    arrays: ['rows'],
+    present: ['signature', 'pubkey', 'body.result_hash'],
+  });
 }

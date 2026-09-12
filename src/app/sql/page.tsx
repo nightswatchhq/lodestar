@@ -7,51 +7,17 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import {
+  fetchSqlCatalog,
+  runSqlQuery,
+  fetchNamedQueries,
+  runNamedQuery,
+  issueSqlReceipt,
+  SqlRefused,
+} from '@/lib/api';
+import type { QueryResult, NamedResult } from '@/lib/contracts/sql';
 
 // ── Types, mirroring /api/sql/catalog and /api/sql/query ─────────────────────
-
-interface CatalogColumn {
-  name: string;
-  type: string;
-  indexed: boolean;
-}
-
-interface CatalogTable {
-  name: string;
-  alias: string;
-  event: string;
-  columns: CatalogColumn[];
-}
-
-interface CatalogDataset {
-  id: string;
-  label: string;
-  chain: string;
-  description: string;
-  sample: string;
-  available: boolean;
-  archival?: boolean;
-  tableCount: number;
-  tables: CatalogTable[];
-  error?: string;
-}
-
-interface QueryResult {
-  dataset: string;
-  count: number;
-  rows: Record<string, unknown>[];
-  truncated: boolean;
-  degraded: boolean;
-  degradedTables: string[];
-  tipUnavailable: boolean;
-  provenance: {
-    as_of?: number | null;
-    sealed_through?: number | null;
-    source?: string;
-    registry_hash?: string | null;
-    nid?: string | null;
-  } | null;
-}
 
 // ── Cells ────────────────────────────────────────────────────────────────────
 
@@ -127,11 +93,7 @@ export default function SqlPage() {
 
   const catalog = useQuery({
     queryKey: ['sql-catalog'],
-    queryFn: async (): Promise<{ available: boolean; datasets: CatalogDataset[] }> => {
-      const res = await fetch('/api/sql/catalog');
-      if (!res.ok && res.status !== 503) throw new Error('catalog unavailable');
-      return res.json();
-    },
+    queryFn: fetchSqlCatalog,
     staleTime: 5 * 60_000,
   });
 
@@ -147,20 +109,10 @@ export default function SqlPage() {
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch('/api/sql/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset: datasetId, q: sql }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? `Request failed (${res.status}).`);
-        setResult(null);
-      } else {
-        setResult(json as QueryResult);
-      }
-    } catch {
-      setError('Could not reach the query API.');
+      setResult(await runSqlQuery(datasetId, sql));
+    } catch (e) {
+      // A refusal is the route explaining itself; anything else did not reach it.
+      setError(e instanceof SqlRefused ? e.message : 'Could not reach the query API.');
       setResult(null);
     } finally {
       setRunning(false);
@@ -406,28 +358,6 @@ export default function SqlPage() {
 
 // ── The named-query tier ─────────────────────────────────────────────────────
 
-interface NamedQueryParam {
-  name: string;
-  type: 'int' | 'address';
-  description: string;
-}
-
-interface NamedQueryDef {
-  name: string;
-  dataset: string;
-  description: string;
-  params: NamedQueryParam[];
-  sql: string;
-}
-
-interface NamedResult {
-  query: string;
-  sql: string;
-  count: number;
-  rows: Record<string, unknown>[];
-  provenance: { as_of?: number | null } | null;
-}
-
 /**
  * The other door. A caller sends a name and typed arguments; it never sends SQL.
  *
@@ -444,11 +374,7 @@ function NamedQueries() {
 
   const list = useQuery({
     queryKey: ['named-queries'],
-    queryFn: async (): Promise<{ queries: NamedQueryDef[] }> => {
-      const res = await fetch('/api/sql/named');
-      if (!res.ok) throw new Error('unavailable');
-      return res.json();
-    },
+    queryFn: fetchNamedQueries,
     staleTime: 30 * 60_000,
   });
 
@@ -460,20 +386,9 @@ function NamedQueries() {
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch('/api/sql/named', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: active.name, args }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error ?? `Request failed (${res.status}).`);
-        setResult(null);
-      } else {
-        setResult(json as NamedResult);
-      }
-    } catch {
-      setError('Could not reach the API.');
+      setResult(await runNamedQuery(active.name, args));
+    } catch (e) {
+      setError(e instanceof SqlRefused ? e.message : 'Could not reach the API.');
       setResult(null);
     } finally {
       setRunning(false);
@@ -599,25 +514,21 @@ function TakeAReceipt({ name, args }: { name: string; args: Record<string, strin
     setIssuing(true);
     setIssueError(null);
     try {
-      const res = await fetch('/api/sql/receipt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, args }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        setIssueError(json.error ?? `Request failed (${res.status}).`);
-        return;
-      }
-      const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+      // `issueSqlReceipt` refuses a body with no signature, so nothing unsigned reaches the blob.
+      // It used to write whatever came back to a file called `receipt-….json`, which is how an
+      // answer with no signature in it became something a reader would carry around as one.
+      const receipt = await issueSqlReceipt(name, args);
+      const blob = new Blob([JSON.stringify(receipt, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `receipt-${name}-${args.before_block ?? 'pinned'}.json`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      setIssueError('Could not reach the receipt API.');
+    } catch (e) {
+      setIssueError(
+        e instanceof SqlRefused ? e.message : 'Could not reach the receipt API.',
+      );
     } finally {
       setIssuing(false);
     }

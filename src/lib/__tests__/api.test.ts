@@ -40,6 +40,10 @@ import {
   fetchIssueForms,
   fileIssue,
   IssueRejected,
+  fetchSqlCatalog,
+  runSqlQuery,
+  issueSqlReceipt,
+  SqlRefused,
 } from '@/lib/api';
 
 const mockFetch = vi.fn();
@@ -712,5 +716,77 @@ describe('filing a support issue', () => {
     await expect(fileIssue({ template: 't', title: 'x', values: {}, website: '' })).resolves.toEqual(
       { number: 141, url: 'https://github.com/x/141' },
     );
+  });
+});
+
+describe('the SQL tier', () => {
+  /**
+   * A 503 here is the route saying this deployment has no SQL tier, with `available: false` in the
+   * body to say it in words. Treating it as an error would turn a deliberate answer into a page
+   * that looks broken.
+   */
+  it('lets a 503 through, because that is how the route says there is no tier', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ available: false, datasets: [] }, 503));
+    await expect(fetchSqlCatalog()).resolves.toMatchObject({ available: false });
+  });
+
+  it('does not let any other bad status through', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'nope' }, 500));
+    await expect(fetchSqlCatalog()).rejects.toThrow('500');
+  });
+
+  /**
+   * `degraded` and `truncated` are the two flags the results table draws a warning from. A body
+   * without them renders as a complete, undegraded answer - which is the one thing a query tool
+   * must not claim on its own authority.
+   */
+  it('refuses a result that does not say whether it is complete', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ rows: [], count: 0, truncated: false }));
+    await expect(runSqlQuery('d', 'SELECT 1')).rejects.toThrow('degraded');
+  });
+
+  it('carries the route\'s own words back when a query is refused', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'no such table: factoryz' }, 400));
+    const err = await runSqlQuery('d', 'SELECT 1').catch((e) => e);
+    expect(err).toBeInstanceOf(SqlRefused);
+    expect(err.message).toBe('no such table: factoryz');
+  });
+
+  /**
+   * The one that matters most on this page.
+   *
+   * The caller writes whatever comes back to a file called `receipt-….json` and hands it to
+   * somebody. So a 200 carrying anything at all became a receipt as far as the download was
+   * concerned - and a file with no signature in it is not a receipt, it is a JSON document that
+   * `/verify` will refuse weeks later with nothing to say why.
+   */
+  it('refuses to call an unsigned answer a receipt', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ body: { result_hash: '0xabc' }, rows: [], pubkey: 'k' }),
+    );
+    await expect(issueSqlReceipt('q', {})).rejects.toThrow('signature');
+
+    mockFetch.mockResolvedValue(
+      jsonResponse({ body: { result_hash: '0xabc' }, rows: [], signature: 's' }),
+    );
+    await expect(issueSqlReceipt('q', {})).rejects.toThrow('pubkey');
+  });
+
+  /**
+   * A receipt names the public half of the key that signed it, and the verifier checks against
+   * that rather than one it has memorised. That is what let the issuer key be rotated on
+   * 12 September without invalidating anything already in circulation, so `pubkey` travelling
+   * with the signature is load-bearing rather than decorative.
+   */
+  it('hands back a receipt that carries its own key', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        body: { result_hash: '0xabc', row_count: 0, dataset: 'd', query: 'SELECT 1' },
+        rows: [],
+        pubkey: 'bd3b3313',
+        signature: 'sig',
+      }),
+    );
+    await expect(issueSqlReceipt('q', {})).resolves.toMatchObject({ pubkey: 'bd3b3313' });
   });
 });
