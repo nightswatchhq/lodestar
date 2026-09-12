@@ -98,11 +98,21 @@ for (const path of PAGES) {
   let status = 0;
   let text = '';
   try {
-    const res = await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 45_000 });
+    // `domcontentloaded`, not `networkidle`.
+    //
+    // `/indexers` fetches node health for every row, and one of those answers is 4,889 deployment
+    // statuses, so the network does not go idle inside forty-five seconds. The sweep reported that
+    // page as `HTTP 0; almost no content; 1 console error` - and `--ci` fails on exactly those
+    // signals, so a page answering 200 in 0.67 seconds would have paged somebody.
+    //
+    // A check that fires on a healthy page is the one people learn to scroll past, which is the
+    // same reason the placeholder heuristic below is not allowed to fail a build.
+    const res = await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 45_000 });
     status = res?.status() ?? 0;
-    // Client-rendered: the shell arrives first and the figures follow, so read after the network
-    // settles and then give the last render a moment.
-    await page.waitForTimeout(1500);
+    // Client-rendered: the shell arrives first and the figures follow. Waiting a fixed moment is
+    // cruder than waiting for the network, and it is the version that does not lie about a page
+    // that is merely busy.
+    await page.waitForTimeout(12_000);
     text = (await page.locator('body').innerText()).replace(/\s+/g, ' ');
   } catch (e) {
     errors.push(`navigation: ${String(e).slice(0, 120)}`);
