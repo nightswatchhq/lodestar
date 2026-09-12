@@ -143,10 +143,22 @@ export type ProbeVerdict =
   | 'paywalled'
   /** Answered, but not with anything a consumer could use. A dead container still returns 404. */
   | 'http_error'
+  /** The connection was actively refused: the host is there, nothing is listening on the port. */
+  | 'refused'
   | 'unreachable'
   | 'timeout'
   /** The provider registered without advertising anywhere to call. */
   | 'no_endpoint';
+
+/**
+ * Every verdict must have a sentence, and this is the type that enforces it.
+ *
+ * `refused` was missing from the union while kittiwake had been emitting it all along, so a panel
+ * indexing a `Record<ProbeVerdict, string>` by it got `undefined` and rendered an empty column -
+ * a provider whose host is refusing connections shown as nothing to report. A label table declared
+ * with this type will not compile once a verdict is added, which is the whole point of declaring it.
+ */
+export type VerdictLabels = Record<ProbeVerdict, string>;
 
 export interface ProviderProbe extends CensusProvider {
   verdict: ProbeVerdict;

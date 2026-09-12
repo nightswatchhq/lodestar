@@ -8,6 +8,7 @@ import { arbitrum } from 'wagmi/chains';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCuratorPortfolio } from '@/hooks/useNetworkStats';
+import { fetchSubgraphDeployments } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -421,15 +422,6 @@ function MyPositionsTab({ address }: { address: string }) {
 // Discover tab
 // ---------------------------------------------------------------------------
 
-interface Deployment {
-  id: string;
-  ipfsHash: string;
-  signalledTokens: string;
-  stakedTokens: string;
-  queryFeesAmount: string;
-  indexerAllocations: { id: string }[];
-  versions: { subgraph: { metadata: { displayName: string } | null } }[];
-}
 
 function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | null }) {
   const [signalTarget, setSignalTarget] = useState<{ id: string; name: string } | null>(null);
@@ -438,26 +430,26 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
 
   const discover = useQueryState(useQuery({
     queryKey: ['curate-discover'],
-    queryFn: async () => {
-      const res = await fetch('/api/subgraph-deployments?first=100&orderBy=queryFeesAmount&orderDirection=desc');
-      if (!res.ok) throw new Error(`Deployments failed: ${res.status}`);
-      return res.json() as Promise<{ data: Deployment[] }>;
-    },
+    queryFn: () =>
+      fetchSubgraphDeployments({
+        first: 100,
+        orderBy: 'queryFeesAmount',
+        orderDirection: 'desc',
+      }),
     staleTime: 5 * 60 * 1000,
   }));
   const data = discover.kind === 'ready' ? discover.data : undefined;
   const isLoading = discover.kind === 'loading';
 
   const ranked = useMemo(() => {
-    if (!data?.data) return [];
-    return data.data
+    if (!data) return [];
+    return data
       .map((d) => ({
         ...d,
         score: computeOpportunityScore(d.queryFeesAmount, d.signalledTokens),
         queryFeesGRT: weiToGRT(d.queryFeesAmount),
         signalledGRT: weiToGRT(d.signalledTokens),
         stakedGRT: weiToGRT(d.stakedTokens),
-        displayName: d.versions?.[0]?.subgraph?.metadata?.displayName ?? null,
         activeIndexers: d.indexerAllocations.length,
       }))
       .filter((d) => d.stakedGRT > 0)
@@ -478,24 +470,19 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
 
   const { data: specificData, isFetching: specificFetching } = useQuery({
     queryKey: ['deployment-lookup', search],
-    queryFn: async () => {
-      const res = await fetch(`/api/subgraph-deployments?hash=${encodeURIComponent(search)}`);
-      if (!res.ok) throw new Error(`Deployment lookup failed: ${res.status}`);
-      return res.json() as Promise<{ data: Deployment[] }>;
-    },
+    queryFn: () => fetchSubgraphDeployments({ hash: search }),
     enabled: isExactHash && filteredBeforeFetch.length === 0 && !isLoading,
     staleTime: 60_000,
   });
 
   const filtered = useMemo(() => {
     if (filteredBeforeFetch.length > 0) return filteredBeforeFetch;
-    if (specificData?.data?.length) return specificData.data.map((d) => ({
+    if (specificData?.length) return specificData.map((d) => ({
       ...d,
       score: computeOpportunityScore(d.queryFeesAmount, d.signalledTokens),
       queryFeesGRT: weiToGRT(d.queryFeesAmount),
       signalledGRT: weiToGRT(d.signalledTokens),
       stakedGRT: weiToGRT(d.stakedTokens),
-      displayName: (d as { displayName?: string | null }).displayName ?? null,
       activeIndexers: d.indexerAllocations.length,
     }));
     return filteredBeforeFetch;
@@ -517,11 +504,11 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
   // Once the specific lookup resolves (from Dock routing), auto-open signal modal
   useEffect(() => {
     if (!highlightDeployment || autoOpened.current) return;
-    if (specificData?.data?.length) {
+    if (specificData?.length) {
       autoOpened.current = true;
-      const d = specificData.data[0];
+      const d = specificData[0];
       // eslint-disable-next-line react-hooks/set-state-in-effect -- responding to wagmi tx-receipt / URL params — intentional
-      setSignalTarget({ id: d.id, name: (d as { displayName?: string | null }).displayName ?? shortenAddress(d.ipfsHash, 6) });
+      setSignalTarget({ id: d.id, name: d.displayName ?? shortenAddress(d.ipfsHash, 6) });
     } else if (specificData !== undefined && !specificFetching) {
       autoOpened.current = true;
       setSignalTarget({ id: ipfsHashToBytes32(highlightDeployment), name: shortenAddress(highlightDeployment, 6) });

@@ -27,6 +27,9 @@ import {
   fetchSubgraphCuration,
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
+  fetchServiceCensus,
+  fetchQosCapture,
+  fetchGrtFlow,
 } from '@/lib/api';
 
 const mockFetch = vi.fn();
@@ -135,6 +138,14 @@ describe('api: URL building', () => {
     expect(url).toContain('first=3');
     expect(url).toContain('orderDirection=asc');
     expect(url).not.toContain('skip=');
+  });
+
+  it('passes the deployment hash through as a lookup', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await fetchSubgraphDeployments({ hash: 'Qm/needs+escaping' });
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      '/api/subgraph-deployments?hash=Qm%2Fneeds%2Bescaping',
+    );
   });
 
   it('builds delegation-flows URL with compare flag', async () => {
@@ -456,5 +467,92 @@ describe('api: fetchWithRetry backoff', () => {
     await vi.advanceTimersByTimeAsync(50);
     await assertion;
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * The name is in the payload; the question is whether anything notices when it stops being.
+ *
+ * `/curate` declared its own row type beside an `as Promise<T>` cast and read the display name down
+ * `versions[0].subgraph.metadata.displayName`, a path kittiwake has never sent. A cast is a claim
+ * rather than a check, so nothing failed: every row in the Discover table rendered a shortened IPFS
+ * hash, and the search box, which filters on the name, matched nothing by name at all. The same
+ * file's by-hash lookup read the flat `displayName` and was right, which is how one endpoint ended
+ * up rendering two different ways in one component.
+ */
+describe('subgraph deployments carry a name', () => {
+  const row = {
+    id: '0xabc',
+    ipfsHash: 'Qmbsc6XQWbiv4DfLVfaNciScqYLyDWUYjWzrFBbzzmRsMB',
+    signalledTokens: '1',
+    stakedTokens: '2',
+    queryFeesAmount: '3',
+    createdAt: 1758745880,
+    displayName: 'uniswap-v4-base-3',
+    categories: [],
+    curatorSignals: [],
+    indexerAllocations: [],
+  };
+
+  it('hands back the flat displayName the route sends', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [row] }));
+    const [first] = await fetchSubgraphDeployments({ first: 1 });
+    expect(first.displayName).toBe('uniswap-v4-base-3');
+  });
+
+  it('refuses a row with no displayName rather than letting the table go anonymous', async () => {
+    const { displayName: _dropped, ...nameless } = row;
+    mockFetch.mockResolvedValue(jsonResponse({ data: [nameless] }));
+    await expect(fetchSubgraphDeployments({ first: 1 })).rejects.toThrow('displayName');
+  });
+
+  it('refuses the nested shape /curate used to believe in', async () => {
+    const { displayName: _dropped, ...nested } = row;
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: [{ ...nested, versions: [{ subgraph: { metadata: { displayName: 'Alpha' } } }] }],
+      }),
+    );
+    await expect(fetchSubgraphDeployments({ first: 1 })).rejects.toThrow('displayName');
+  });
+
+  it('accepts a deployment that genuinely has no name', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: [{ ...row, displayName: null }] }));
+    const [first] = await fetchSubgraphDeployments({ first: 1 });
+    expect(first.displayName).toBeNull();
+  });
+});
+
+/**
+ * The three panels that used to fetch for themselves, each with its own copy of the payload type.
+ */
+describe('panels that no longer fetch for themselves', () => {
+  it('unwraps the census envelope and refuses one with no services', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ data: { headline: { services: 5 }, benchmark: null, services: [] } }),
+    );
+    await expect(fetchServiceCensus()).resolves.toMatchObject({ services: [] });
+
+    mockFetch.mockResolvedValue(jsonResponse({ data: { headline: {}, benchmark: null } }));
+    await expect(fetchServiceCensus()).rejects.toThrow('data.services');
+  });
+
+  it('refuses a QoS capture with no coverage, which is the figure it is divided by', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { concentration: {} } }));
+    await expect(fetchQosCapture()).rejects.toThrow('data.coverage');
+  });
+
+  it('throws on a bad status instead of parsing the error body as flow data', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'nest busy' }, 503));
+    await expect(fetchGrtFlow()).rejects.toThrow('503');
+  });
+
+  it('keeps a null supplyBreakdown, which is a real answer when the L1 read fails', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: { supply: 1, issuancePerBlock: 2, supplyBreakdown: null, counts: {}, params: {} },
+      }),
+    );
+    await expect(fetchGrtFlow()).resolves.toMatchObject({ supplyBreakdown: null });
   });
 });

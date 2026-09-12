@@ -166,11 +166,14 @@ describe('fetchDeploymentNames', () => {
     expect(JSON.parse(init.body)).toEqual({ hashes: ['QmA'] });
   });
 
-  it('degrades to an empty map when the route is unavailable', async () => {
-    // Names are decoration; the surrounding table must still render. This is the one place a
-    // silent empty is right, and it is why /api/subgraph-names may safely 503.
+  it('rejects when the route is unavailable, rather than answering "no names"', async () => {
+    // The table must still render without names, and it does: both callers destructure
+    // `data: names = {}`, so a rejected query draws exactly the hashes an empty map would.
+    // What changes is that the failure is now recorded somewhere instead of being spent
+    // silently - a route answering 503 for a month used to be indistinguishable from a set of
+    // deployments nobody had named.
     respond({ error: 'No API key configured' }, 503);
-    await expect(fetchDeploymentNames(['QmA'])).resolves.toEqual({});
+    await expect(fetchDeploymentNames(['QmA'])).rejects.toThrow('503');
   });
 
   it('tolerates a response with no data field', async () => {

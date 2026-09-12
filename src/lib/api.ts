@@ -16,6 +16,10 @@ import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activi
 import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
 import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
 import type { Agreement, AgreementStatus } from '@/lib/dips-agreements';
+import type { GrtFlowData } from '@/lib/contracts/grt-flow';
+import type { Concentration } from '@/lib/concentration';
+import type { ServiceCensus } from '@/lib/service-census';
+import type { RequirementsJson } from '@/lib/operator-requirements';
 
 /** What `/api/dips` answers. `available: false` when the contracts are not configured. */
 export interface DipsStatusResponse {
@@ -182,12 +186,7 @@ export async function fetchCuratorPortfolio(address: string): Promise<CuratorPor
 /**
  * Fetch subgraph deployments via GET endpoint
  */
-export async function fetchSubgraphDeployments(params: {
-  first?: number;
-  skip?: number;
-  orderBy?: string;
-  orderDirection?: 'asc' | 'desc';
-} = {}): Promise<{
+export interface SubgraphDeployment {
   id: string;
   ipfsHash: string;
   signalledTokens: string;
@@ -196,18 +195,32 @@ export async function fetchSubgraphDeployments(params: {
   createdAt: number;
   indexerAllocations: { id: string }[];
   curatorSignals: { id: string }[];
+  /** Flat, as kittiwake sends it. It is not nested under `versions[0].subgraph.metadata`. */
   displayName: string | null;
   categories: string[];
-}[]> {
+}
+
+export async function fetchSubgraphDeployments(params: {
+  first?: number;
+  skip?: number;
+  orderBy?: string;
+  orderDirection?: 'asc' | 'desc';
+  /** Exact IPFS hash. The route answers with the one deployment, or none. */
+  hash?: string;
+} = {}): Promise<SubgraphDeployment[]> {
   const qs = new URLSearchParams();
   if (params.first) qs.set('first', String(params.first));
   if (params.skip) qs.set('skip', String(params.skip));
   if (params.orderBy) qs.set('orderBy', params.orderBy);
   if (params.orderDirection) qs.set('orderDirection', params.orderDirection);
+  if (params.hash) qs.set('hash', params.hash);
   const response = await fetch(`/api/subgraph-deployments?${qs}`);
   if (!response.ok) throw new Error(`Deployments fetch failed: ${response.status}`);
   return parseResponse('/api/subgraph-deployments', await response.json(), {
-    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens'] },
+    // `displayName` is load-bearing and easy to lose: `/curate` read it down a `versions[0]`
+    // path the route has never sent, and rendered a shortened hash for every row instead. If it
+    // stops arriving, this should say so rather than let the table quietly go anonymous again.
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'displayName'] },
     pick: 'data',
   });
 }
@@ -633,6 +646,74 @@ export async function fetchHorizonActivity(limit = 25): Promise<ActivityEvent[]>
   if (!response.ok) throw new Error(`Horizon activity failed: ${response.status}`);
   return parseResponse('/api/horizon/activity', await response.json(), {
     arrays: ['data'],
+    pick: 'data',
+  });
+}
+
+// ── More panels that used to fetch for themselves ────────────────────────────
+//
+// Same reason as the block above, and the same class of defect turned up doing it. Each of these
+// had its response shape written out again at the call site, as an inline `as Promise<T>` cast on
+// `res.json()`. A cast is a claim, not a check: nothing compares it against what the route sends,
+// so two call sites in one file believed different things about the same payload and only one of
+// them was right. `/curate` read `displayName` down a `versions[0].subgraph.metadata` path that
+// kittiwake has never sent, so every row in the Discover table rendered a shortened IPFS hash
+// instead of the name sitting in the body, and searching by name matched nothing.
+
+/** The provider census, read from the registries on Arbitrum One and then actually called. */
+export interface ServiceCensusResponse {
+  headline: {
+    services: number;
+    withAnyProvider: number;
+    withAnyServing: number;
+    registered: number;
+    serving: number;
+  };
+  benchmark: RequirementsJson | null;
+  services: ServiceCensus[];
+}
+
+/**
+ * One census read for the whole page.
+ *
+ * `ProviderCensus` and `RegistryVsReality` both sat on the query key `['service-census']` with a
+ * fetcher and a payload type each. TanStack dedupes the request by key, so whichever mounted first
+ * decided what the other one got, and the two declared types had already drifted: one of them knew
+ * about the `refused` verdict and the other rendered it as an empty column.
+ */
+export async function fetchServiceCensus(): Promise<ServiceCensusResponse> {
+  const response = await fetch('/api/service-census');
+  if (!response.ok) throw new Error(`Service census failed: ${response.status}`);
+  return parseResponse('/api/service-census', await response.json(), {
+    objects: ['data', 'data.headline'],
+    arrays: ['data.services'],
+    pick: 'data',
+  });
+}
+
+/** How concentrated query serving is, and over how much of the allocated set it was measured. */
+export interface QosCapture {
+  concentration: Concentration;
+  coverage: { allocated_indexers: number; measured_indexers: number };
+}
+
+export async function fetchQosCapture(): Promise<QosCapture> {
+  const response = await fetch('/api/qos/capture');
+  if (!response.ok) throw new Error(`QoS capture failed: ${response.status}`);
+  return parseResponse('/api/qos/capture', await response.json(), {
+    objects: ['data', 'data.concentration', 'data.coverage'],
+    pick: 'data',
+  });
+}
+
+export async function fetchGrtFlow(): Promise<GrtFlowData> {
+  const response = await fetch('/api/grt-flow');
+  if (!response.ok) throw new Error(`GRT flow failed: ${response.status}`);
+  // `supplyBreakdown` is legitimately null when the L1 read fails, so it is not asserted; `counts`
+  // and `params` are what every figure on the page is divided by.
+  return parseResponse('/api/grt-flow', await response.json(), {
+    objects: ['data', 'data.counts', 'data.params'],
+    present: ['data.supply', 'data.issuancePerBlock'],
     pick: 'data',
   });
 }

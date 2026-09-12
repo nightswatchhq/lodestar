@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
+import { fetchServiceCensus } from '@/lib/api';
+import type { ProbeVerdict, VerdictLabels } from '@/lib/service-census';
 
 /**
  * Registry versus reality for Dispatch.
@@ -18,57 +20,23 @@ import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQuer
  * reader is not looking at.
  */
 
-/** kittiwake's vocabulary, which is finer than the one this component used to read. */
-type Verdict =
-  /** Answered 2xx-3xx. */
-  | 'serving'
-  /** Answered 402 to a paywalled probe: up, and asking to be paid. Serving, just not to us. */
-  | 'paywalled'
-  /** Answered a non-2xx. The host is up; the service is not. */
-  | 'http_error'
-  /** Registered with no endpoint at all. */
-  | 'no_endpoint'
-  /** Connection refused. */
-  | 'refused'
-  /** No connection: DNS or TLS. */
-  | 'unreachable'
-  /** Opened and never answered. */
-  | 'timeout';
-
-const VERDICT_LABEL: Record<Verdict, string> = {
-  serving: 'serving',
-  paywalled: 'paywalled',
-  http_error: 'HTTP error',
-  no_endpoint: 'no endpoint',
-  refused: 'refused',
-  unreachable: 'unreachable',
-  timeout: 'timeout',
-};
-
 /**
  * What counts as alive, matching `census.rs` rather than guessing.
  *
  * A 402 is a service that answered and wants paying, which is a different thing from a dead host
  * and the distinction is the whole point of this panel.
  */
-const ALIVE = new Set<Verdict>(['serving', 'paywalled']);
+const ALIVE = new Set<ProbeVerdict>(['serving', 'paywalled']);
 
-interface CensusProvider {
-  address: string;
-  endpoint: string | null;
-  verdict: Verdict;
-  httpStatus: number | null;
-  latencyMs: number | null;
-}
-
-interface CensusService {
-  id: string;
-  name: string;
-  registered: number;
-  serving: number;
-  lying: number;
-  providers: CensusProvider[];
-}
+const VERDICT_LABEL: VerdictLabels = {
+  serving: 'serving',
+  paywalled: 'paywalled',
+  http_error: 'HTTP error',
+  refused: 'refused',
+  no_endpoint: 'no endpoint',
+  unreachable: 'unreachable',
+  timeout: 'timeout',
+};
 
 function shortAddr(a: string) {
   return `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -76,13 +44,9 @@ function shortAddr(a: string) {
 
 export function RegistryVsReality() {
   const query = useQueryState(
-    useQuery<{ data: { services: CensusService[] } }>({
+    useQuery({
       queryKey: ['service-census'],
-      queryFn: async () => {
-        const r = await fetch('/api/service-census');
-        if (!r.ok) throw new Error(`census failed: ${r.status}`);
-        return r.json();
-      },
+      queryFn: fetchServiceCensus,
       refetchInterval: 300_000,
       staleTime: 240_000,
       retry: 1,
@@ -116,7 +80,7 @@ export function RegistryVsReality() {
     );
   }
 
-  const service = query.data.data.services.find((s) => s.id === 'dispatch');
+  const service = query.data.services.find((s) => s.id === 'dispatch');
   if (!service) {
     return (
       <div>
@@ -170,7 +134,7 @@ export function RegistryVsReality() {
                 )}
                 {' · '}
                 <span className={alive ? 'text-[var(--green)]' : 'text-[var(--amber)]'}>
-                  {VERDICT_LABEL[p.verdict] ?? p.verdict}
+                  {VERDICT_LABEL[p.verdict]}
                 </span>
                 {alive && p.latencyMs !== null ? ` ${p.latencyMs}ms` : ''}
               </div>
