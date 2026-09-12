@@ -38,10 +38,25 @@ const THE_TYPED_SURFACE = [
   'src/lib/api.ts',
   'src/lib/foghorn.ts',
   'src/features/dock/api.ts',
+  // The one page that fetches on the server, where a relative URL is not a URL. It goes through
+  // `serverApiUrl`, so it obeys the same switch as everything else.
+  'src/app/support/[number]/page.tsx',
 ];
 
 const ROOTS = ['src'];
-const FETCH_CALL = /fetch\(\s*['"`]\/api\//g;
+
+/**
+ * Two spellings, because there are now two ways to write a request.
+ *
+ * `fetch('/api/…')` is the original. `apiUrl('/api/…')` arrived with `api-origin.ts` when the
+ * browser started calling `api.lodestar-dashboard.com` directly, and it is a way past a guard that
+ * only knew the first - the same hole the swallow guard had when `.catch(() => {})` was rewritten
+ * as `try`/`catch` and three call sites walked out of its sight without anything changing about
+ * whether failures reached anybody.
+ *
+ * A refactor a guard cannot follow is a guard that expires quietly.
+ */
+const FETCH_CALL = /(?:fetch|apiUrl|serverApiUrl)\(\s*['"`]\/api\//g;
 
 /**
  * Strip comments: a path mentioned in prose is not a call site.
