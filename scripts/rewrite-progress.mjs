@@ -114,9 +114,14 @@ const WALLET_PATTERNS = {
  * Both times the fix was to read what the code does rather than what it says about itself.
  */
 const walletTitles = existsSync('scripts/e2e/wallet.spec.ts')
-  ? [...readFileSync('scripts/e2e/wallet.spec.ts', 'utf8').matchAll(/^test\(\s*'([^']+)'/gm)].map(
-      (m) => m[1],
-    )
+  // Both quote styles. Single-quote only missed `test("… somebody else's portfolio")`, which is
+  // double-quoted precisely because it contains an apostrophe - so the one title most likely to
+  // need the other quote was the one the pattern could not see, and the count read 6 for 7 tests.
+  ? [
+      ...readFileSync('scripts/e2e/wallet.spec.ts', 'utf8').matchAll(
+        /^test\(\s*(?:'([^']+)'|"([^"]+)")/gm,
+      ),
+    ].map((m) => m[1] ?? m[2])
   : [];
 // The denominator stays at the five the RFC named. Counting three out of three covered would be
 // moving the goalposts to where the ball landed, which is the move this script exists to prevent.
