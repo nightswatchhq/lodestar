@@ -4,7 +4,7 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { redirect } from 'next/navigation';
-import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments } from '@/hooks/useNetworkStats';
 import {
   weiToGRT,
   formatGRT,
@@ -22,6 +22,7 @@ import { FoghornScorecard } from '@/components/foghorn/FoghornScorecard';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
 import { useIndexerAllocationsQos } from '@/hooks/useFoghorn';
 import { calculateDelegationCapacity } from '@/lib/rewards';
+import { reoStatusOrUnknown, reoSourceOrHeuristic } from '@/lib/contracts/indexer-signals';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -39,73 +40,6 @@ import { ParameterHistory } from '@/components/ParameterHistory';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
-interface IndexerDetail {
-  id: string;
-  account: {
-    id: string;
-    defaultDisplayName: string | null;
-    operators?: { id: string }[] | null;
-    metadata?: { displayName?: string | null; description?: string | null; website?: string | null } | null;
-  };
-  stakedTokens: string;
-  lockedTokens?: string;
-  delegatedTokens: string;
-  delegatedThawingTokens?: string;
-  allocatedTokens: string;
-  tokenCapacity: string;
-  allocationCount: number;
-  indexingRewardCut: number;
-  queryFeeCut: number;
-  rewardsEarned: string;
-  queryFeesCollected: string;
-  delegatorShares: string;
-  delegatorParameterCooldown: number;
-  lastDelegationParameterUpdate: number;
-  url: string | null;
-  geoHash: string | null;
-  createdAt: number;
-  // Horizon metrics
-  indexingRewardEffectiveCut?: string;
-  overDelegationDilution?: string;
-  ownStakeRatio?: string;
-  delegatedStakeRatio?: string;
-  indexerRewardsOwnGenerationRatio?: string;
-  provisionedTokens?: string;
-  allocations: Array<{
-    id: string;
-    allocatedTokens: string;
-    createdAtEpoch: number;
-    subgraphDeployment: {
-      id: string;
-      ipfsHash: string;
-      signalledTokens: string;
-      stakedTokens: string;
-      /** Flat, as kittiwake sends it. Null means unnamed, and the row falls back to the hash. */
-      displayName: string | null;
-    };
-  }>;
-  closedAllocations?: ClosedAllocation[];
-  delegators: Array<{
-    id: string;
-    stakedTokens: string;
-    shareAmount: string;
-    delegator: { id: string };
-  }>;
-}
-
-function useIndexerDetails(address: string) {
-  return useQuery<IndexerDetail | null>({
-    queryKey: ['indexerDetails', address],
-    queryFn: async () => {
-      const response = await fetch(`/api/indexer/${encodeURIComponent(address.toLowerCase())}`);
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-      const json = await response.json();
-      return json.data?.indexer ?? null;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 export default function IndexerDetailPage({
   params,
 }: {
@@ -119,7 +53,7 @@ export default function IndexerDetailPage({
     redirect('/indexers');
   }
 
-  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetails(address);
+  const { data: indexer, isPending, fetchStatus, error } = useIndexerDetail(address);
   const { data: priceData } = useGRTPrice();
   const { data: networkData } = useNetworkStats();
   const provisions = useQueryState(useIndexerProvisions(address));
@@ -259,9 +193,9 @@ export default function IndexerDetailPage({
   }, 0) ?? 0;
 
   const indexerScore: IndexerScore | null = reoData?.status ? calculateIndexerScore({
-    reoStatus: reoData.status.status === 'unknown' ? 'unknown' : reoData.status.status,
+    reoStatus: reoStatusOrUnknown(reoData.status.status),
     reoDaysRemaining: reoData.status.daysRemaining ?? null,
-    reoSource: reoData.status.source ?? 'heuristic',
+    reoSource: reoSourceOrHeuristic(reoData.status.source),
     selfStakeGRT: selfStake,
     lastDelegationParameterUpdate: indexer.lastDelegationParameterUpdate,
     delegatorParameterCooldown: indexer.delegatorParameterCooldown,
@@ -375,7 +309,9 @@ export default function IndexerDetailPage({
                     <p className="text-[11px] text-[var(--text-muted)] mb-2">
                       Direct read from the on-chain REO oracle contract.
                     </p>
-                    {reoData.status.daysRemaining !== undefined && reoData.status.daysRemaining > 0 && (
+                    {/* `!= null`: the field is null when the oracle has no attestation, and the
+                        old `!== undefined` let that through to a comparison rather than skipping. */}
+                    {reoData.status.daysRemaining != null && reoData.status.daysRemaining > 0 && (
                       <p className="text-[11px] text-[var(--text-faint)]">
                         Next renewal in ~{reoData.status.daysRemaining.toFixed(1)} days
                       </p>
@@ -621,7 +557,7 @@ export default function IndexerDetailPage({
                 ) : (
                   <div className="space-y-3">
                     {/* Renewal timing — informational only; the badge above is the verdict */}
-                    {reoData.status.daysRemaining !== undefined && reoData.status.renewalTimestamp > 0 && reoData.status.daysRemaining > 0 && (
+                    {reoData.status.daysRemaining != null && (reoData.status.renewalTimestamp ?? 0) > 0 && reoData.status.daysRemaining > 0 && (
                       <div>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-sm text-[var(--text-muted)]">Next renewal</span>
@@ -629,7 +565,7 @@ export default function IndexerDetailPage({
                             ~{reoData.status.daysRemaining.toFixed(1)} days
                           </span>
                         </div>
-                        {reoData.status.eligibilityPeriod && (
+                        {reoData.status.eligibilityPeriod != null && reoData.status.eligibilityPeriod > 0 && (
                           <ProgressBar
                             value={Math.max(0, Math.min(100, (reoData.status.daysRemaining / (reoData.status.eligibilityPeriod / 86400)) * 100))}
                             variant="teal"
@@ -637,14 +573,14 @@ export default function IndexerDetailPage({
                         )}
                       </div>
                     )}
-                    {reoData.status.renewalTimestamp === 0 && (
+                    {!reoData.status.renewalTimestamp && (
                       <p className="text-sm text-[var(--text-muted)]">
                         No renewal on record: the oracle has not yet posted an eligibility attestation for this indexer.
                       </p>
                     )}
                     {/* Timestamps */}
                     <div className="grid grid-cols-2 gap-3 text-[11px]">
-                      {reoData.status.renewalTimestamp > 0 && (
+                      {reoData.status.renewalTimestamp != null && reoData.status.renewalTimestamp > 0 && (
                         <div>
                           <p className="text-[var(--text-faint)]">Last renewed</p>
                           <p className="text-[var(--text)] font-mono">
@@ -652,7 +588,7 @@ export default function IndexerDetailPage({
                           </p>
                         </div>
                       )}
-                      {reoData.status.renewalTimestamp > 0 && reoData.status.expiresAt > 0 && (
+                      {(reoData.status.renewalTimestamp ?? 0) > 0 && reoData.status.expiresAt != null && reoData.status.expiresAt > 0 && (
                         <div>
                           <p className="text-[var(--text-faint)]">Renewal due</p>
                           <p className="text-[var(--text)] font-mono">

@@ -32,6 +32,20 @@ vi.mock('@/lib/api', () => ({
   fetchSubgraphCuration: vi.fn(),
   fetchSubgraphSchema: vi.fn(),
   fetchCuratorLeaderboard: vi.fn(),
+  // Seven hooks used to build their own URL and parse their own body. They call these now, so the
+  // URL and the shape are asserted in `lib/__tests__/api.test.ts` where the fetchers live, and
+  // what is left to assert here is what a hook is for: the key, the gating, and passing the
+  // arguments through.
+  fetchIndexerDetail: vi.fn(),
+  fetchSubgraphHistory: vi.fn(),
+  fetchSubgraphVersions: vi.fn(),
+  fetchIndexerDisputes: vi.fn(),
+  fetchREOStatus: vi.fn(),
+  fetchDelegationEvents: vi.fn(),
+  fetchENSName: vi.fn(),
+  fetchAprProvenance: vi.fn(),
+  fetchDeveloperActivity: vi.fn(),
+  fetchChainLag: vi.fn(),
 }));
 
 import * as api from '@/lib/api';
@@ -46,6 +60,7 @@ import {
   useRecentDelegations,
   useNetworkDelegations,
   useIndexerDisputes,
+  useIndexerDetail,
   useGRTPrice,
   useTVL,
   useIndexers,
@@ -209,47 +224,47 @@ describe('useEpochInfo (transform logic)', () => {
   });
 });
 
-describe('raw-fetch hooks', () => {
-  it('useRecentDelegations unwraps json.data.delegationEvents', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ data: { delegationEvents: [{ id: 'e1' }] } }), { status: 200 }),
-    );
+describe('hooks that used to fetch for themselves', () => {
+  it('useRecentDelegations asks for this indexer and hands back the events', async () => {
+    vi.mocked(api.fetchDelegationEvents).mockResolvedValue({ events: [{ id: 'e1' }] } as never);
     const { result } = renderHook(() => useRecentDelegations('0xIndexer'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual([{ id: 'e1' }]);
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('indexer=0xIndexer'));
+    expect(api.fetchDelegationEvents).toHaveBeenCalledWith({ indexer: '0xIndexer', first: 100 });
   });
 
-  it('useRecentDelegations defaults to [] when data is missing', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }));
-    const { result } = renderHook(() => useRecentDelegations('0xabc'), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual([]);
-  });
-
-  it('useRecentDelegations throws on a non-ok response', async () => {
-    mockFetch.mockResolvedValue(new Response('nope', { status: 500 }));
+  it('useRecentDelegations surfaces a failed read rather than an empty feed', async () => {
+    // It used to end `json.data?.delegationEvents ?? []`, so a 200 with a renamed field drew an
+    // empty activity panel - "nobody has delegated to this indexer" - from a route that answered.
+    vi.mocked(api.fetchDelegationEvents).mockRejectedValue(new Error('delegation-events changed'));
     const { result } = renderHook(() => useRecentDelegations('0xabc'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
 
-  it('useNetworkDelegations includes the indexer param only when provided', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ data: { delegationEvents: [] } }), { status: 200 }),
-    );
+  it('useNetworkDelegations passes the indexer through only when there is one', async () => {
+    vi.mocked(api.fetchDelegationEvents).mockResolvedValue({ events: [] } as never);
     const { result } = renderHook(() => useNetworkDelegations('0xWithIndexer'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('indexer=0xWithIndexer');
-    expect(url).toContain('first=50');
+    expect(api.fetchDelegationEvents).toHaveBeenCalledWith({ indexer: '0xWithIndexer', first: 50 });
   });
 
-  it('useIndexerDisputes lowercases the address in the URL', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ disputes: [] }), { status: 200 }));
+  it('useIndexerDisputes hands back the list itself, not an envelope', async () => {
+    vi.mocked(api.fetchIndexerDisputes).mockResolvedValue([] as never);
     const { result } = renderHook(() => useIndexerDisputes('0xABCDEF'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(mockFetch).toHaveBeenCalledWith('/api/indexer-disputes/0xabcdef');
-    expect(result.current.data).toEqual({ disputes: [] });
+    expect(api.fetchIndexerDisputes).toHaveBeenCalledWith('0xABCDEF');
+    expect(result.current.data).toEqual([]);
+  });
+
+  it('useIndexerDetail is idle without an address and shares one key with both pages', async () => {
+    const off = renderHook(() => useIndexerDetail(''), { wrapper: wrapper() });
+    expect(off.result.current.fetchStatus).toBe('idle');
+    expect(api.fetchIndexerDetail).not.toHaveBeenCalled();
+
+    vi.mocked(api.fetchIndexerDetail).mockResolvedValue({ id: '0xabc' } as never);
+    const on = renderHook(() => useIndexerDetail('0xabc'), { wrapper: wrapper() });
+    await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
+    expect(on.result.current.data).toEqual({ id: '0xabc' });
   });
 });
 
@@ -445,47 +460,43 @@ describe('enabled-gated query hooks (no arg → idle, arg → fetch)', () => {
   });
 });
 
-describe('raw-fetch enabled-gated hooks', () => {
-  it('useREOStatus is idle for empty address and unwraps json on fetch', async () => {
+describe('enabled-gated hooks that used to fetch for themselves', () => {
+  it('useREOStatus is idle for an empty address and passes the address through', async () => {
     const off = renderHook(() => useREOStatus(''), { wrapper: wrapper() });
     expect(off.result.current.fetchStatus).toBe('idle');
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(api.fetchREOStatus).not.toHaveBeenCalled();
 
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ status: 'eligible' }), { status: 200 }));
+    vi.mocked(api.fetchREOStatus).mockResolvedValue({ status: { status: 'eligible' } } as never);
     const on = renderHook(() => useREOStatus('0xreo'), { wrapper: wrapper() });
     await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
-    expect(on.result.current.data).toEqual({ status: 'eligible' });
-    expect(mockFetch).toHaveBeenCalledWith('/api/reo?address=0xreo');
+    expect(api.fetchREOStatus).toHaveBeenCalledWith('0xreo');
   });
 
-  it('useREOStatus throws on a non-ok response', async () => {
-    mockFetch.mockResolvedValue(new Response('nope', { status: 500 }));
+  it('useREOStatus surfaces a failed read', async () => {
+    vi.mocked(api.fetchREOStatus).mockRejectedValue(new Error('reo-down'));
     const { result } = renderHook(() => useREOStatus('0xreo'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isError).toBe(true));
   });
 
-  it('useENSName returns { ensName: null } on a non-ok response (no throw)', async () => {
-    mockFetch.mockResolvedValue(new Response('nope', { status: 404 }));
+  it('useENSName surfaces a failed lookup rather than answering "no name"', async () => {
+    // It used to swallow a non-ok into `{ ensName: null }`. Both render the shortened address, so
+    // the page looks the same either way; only one of them can tell you the resolver is down.
+    vi.mocked(api.fetchENSName).mockRejectedValue(new Error('ens 502'));
     const { result } = renderHook(() => useENSName('0xens'), { wrapper: wrapper() });
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual({ ensName: null });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 
   it('useENSName returns the resolved name on success', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ ensName: 'foo.eth' }), { status: 200 }));
+    vi.mocked(api.fetchENSName).mockResolvedValue({ ensName: 'foo.eth' } as never);
     const { result } = renderHook(() => useENSName('0xens'), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual({ ensName: 'foo.eth' });
   });
 
-  it('useNetworkDelegations omits the indexer param when none is given', async () => {
-    mockFetch.mockResolvedValue(
-      new Response(JSON.stringify({ data: { delegationEvents: [] } }), { status: 200 }),
-    );
+  it('useNetworkDelegations omits the indexer when none is given', async () => {
+    vi.mocked(api.fetchDelegationEvents).mockResolvedValue({ events: [] } as never);
     const { result } = renderHook(() => useNetworkDelegations(), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    const url = mockFetch.mock.calls[0][0] as string;
-    expect(url).toContain('first=50');
-    expect(url).not.toContain('indexer=');
+    expect(api.fetchDelegationEvents).toHaveBeenCalledWith({ indexer: undefined, first: 50 });
   });
 });

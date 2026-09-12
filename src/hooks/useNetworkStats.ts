@@ -32,7 +32,28 @@ import {
   fetchSubgraphCuration,
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
+  fetchIndexerDetail,
+  fetchSubgraphHistory,
+  fetchSubgraphVersions,
+  fetchIndexerDisputes,
+  fetchREOStatus,
+  fetchDelegationEvents,
+  fetchENSName,
 } from '@/lib/api';
+import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
+import type { DelegationEvent } from '@/lib/contracts/indexer-signals';
+
+// Re-exported because every consumer of these hooks imports the shape alongside the hook, and the
+// types now live beside the fetchers rather than here.
+export type {
+  SubgraphHistoryPoint,
+  SubgraphVersion,
+  IndexerDispute,
+  DelegationEvent,
+  REOStatus,
+  REOStatusResponse,
+} from '@/lib/contracts/indexer-signals';
+export type { IndexerDetail, ActiveAllocation, ClosedAllocation } from '@/lib/contracts/indexer-detail';
 
 const FIVE_MINUTES = 1000 * 60 * 5;
 const TEN_MINUTES = 1000 * 60 * 10;
@@ -207,6 +228,22 @@ export function useSubgraphDeployments30d(enabled = true) {
 }
 
 /**
+ * The whole indexer profile.
+ *
+ * Both indexer pages had a private `useIndexerDetails` of their own, on this same query key and
+ * with a narrower declared type on one side. They were already sharing one cached object; only the
+ * paperwork disagreed.
+ */
+export function useIndexerDetail(address: string) {
+  return useQuery<IndexerDetail | null>({
+    queryKey: ['indexerDetails', address],
+    queryFn: () => fetchIndexerDetail(address),
+    staleTime: FIVE_MINUTES,
+    enabled: !!address,
+  });
+}
+
+/**
  * Hook for per-chain sync health, including chain liveness — whether the head
  * is still advancing. Every other staleness signal is relative to chain head and
  * therefore reports perfect health when the chain itself stops.
@@ -282,18 +319,6 @@ export function useSubgraphCuration(hash: string | null) {
   });
 }
 
-export interface SubgraphHistoryPoint {
-  date: string;
-  signalGrt: number;
-  stakeGrt: number;
-}
-
-async function fetchSubgraphHistory(hash: string): Promise<{ history: SubgraphHistoryPoint[] }> {
-  const res = await fetch(`/api/subgraph-history/${hash}`);
-  if (!res.ok) throw new Error('Failed to fetch subgraph history');
-  const json = await res.json();
-  return json.data;
-}
 
 export function useSubgraphHistory(hash: string | null) {
   return useQuery({
@@ -305,22 +330,7 @@ export function useSubgraphHistory(hash: string | null) {
   });
 }
 
-export interface SubgraphVersion {
-  version: number;
-  label: string | null;
-  createdAt: number;
-  ipfsHash: string;
-  signalledTokens: string;
-  stakedTokens: string;
-  isCurrent: boolean;
-}
 
-async function fetchSubgraphVersions(hash: string): Promise<{ subgraphId: string | null; versions: SubgraphVersion[] }> {
-  const res = await fetch(`/api/subgraph-versions/${hash}`);
-  if (!res.ok) throw new Error('Failed to fetch subgraph versions');
-  const json = await res.json();
-  return json.data;
-}
 
 export function useSubgraphVersions(hash: string | null) {
   return useQuery({
@@ -332,27 +342,11 @@ export function useSubgraphVersions(hash: string | null) {
   });
 }
 
-export interface IndexerDispute {
-  id: string;
-  dispute_type: string | null;
-  fisherman: string | null;
-  allocation_id: string | null;
-  deployment_id: string | null;
-  status: string | null;
-  tokens_slashed_grt: string | null;
-  tokens_burned_grt: string | null;
-  created_at: string | null;
-  closed_at: string | null;
-}
 
 export function useIndexerDisputes(address: string) {
   return useQuery({
     queryKey: ['indexerDisputes', address],
-    queryFn: async () => {
-      const res = await fetch(`/api/indexer-disputes/${address.toLowerCase()}`);
-      if (!res.ok) throw new Error('Failed to fetch disputes');
-      return (await res.json()) as { disputes: IndexerDispute[] };
-    },
+    queryFn: () => fetchIndexerDisputes(address),
     staleTime: FIVE_MINUTES,
     enabled: !!address,
     retry: 1,
@@ -365,11 +359,7 @@ export function useIndexerDisputes(address: string) {
 export function useREOStatus(address: string) {
   return useQuery({
     queryKey: ['reoStatus', address],
-    queryFn: async () => {
-      const res = await fetch(`/api/reo?address=${address}`);
-      if (!res.ok) throw new Error('Failed to fetch REO status');
-      return res.json();
-    },
+    queryFn: () => fetchREOStatus(address),
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
     enabled: !!address,
@@ -380,25 +370,12 @@ export function useREOStatus(address: string) {
  * Hook for recent delegation events on an indexer
  * Sources from Paolo Diomede's delegation events subgraph for discrete event data
  */
-export interface DelegationEvent {
-  id: string;
-  eventType: string;
-  indexer: string;
-  delegator: string;
-  tokens: string;
-  timestamp: string;
-  txHash: string;
-}
 
 export function useRecentDelegations(indexerAddress: string) {
   return useQuery<DelegationEvent[]>({
     queryKey: ['recentDelegations', indexerAddress],
-    queryFn: async () => {
-      const response = await fetch(`/api/delegation-events?indexer=${encodeURIComponent(indexerAddress)}&first=100`);
-      if (!response.ok) throw new Error('Failed to fetch delegation events');
-      const json = await response.json();
-      return json.data?.delegationEvents ?? [];
-    },
+    queryFn: async () =>
+      (await fetchDelegationEvents({ indexer: indexerAddress, first: 100 })).events,
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
     enabled: !!indexerAddress,
@@ -414,14 +391,7 @@ export function useNetworkDelegations(indexerAddress?: string) {
   // when it's nuthatch-backed (RFC-0011 pilot). `source` is undefined on the subgraph path.
   return useQuery<{ events: DelegationEvent[]; source?: 'nuthatch' | 'subgraph' }>({
     queryKey: ['networkDelegations', indexerAddress ?? ''],
-    queryFn: async () => {
-      const params = new URLSearchParams({ first: '50' });
-      if (indexerAddress) params.set('indexer', indexerAddress);
-      const response = await fetch(`/api/delegation-events?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch delegation events');
-      const json = await response.json();
-      return { events: json.data?.delegationEvents ?? [], source: json.data?.source };
-    },
+    queryFn: () => fetchDelegationEvents({ indexer: indexerAddress, first: 50 }),
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
   });
@@ -459,11 +429,7 @@ export function useCuratorPortfolio(address: string | undefined) {
 export function useENSName(address: string) {
   return useQuery<{ ensName: string | null }>({
     queryKey: ['ensName', address],
-    queryFn: async () => {
-      const res = await fetch(`/api/ens?address=${address}`);
-      if (!res.ok) return { ensName: null };
-      return res.json();
-    },
+    queryFn: () => fetchENSName(address),
     staleTime: ONE_HOUR,
     enabled: !!address,
   });

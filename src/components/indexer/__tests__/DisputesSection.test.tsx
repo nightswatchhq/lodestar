@@ -8,10 +8,16 @@ vi.mock('next/link', () => ({
 }));
 
 // Mock the hook so the section renders synchronously with controlled data.
-let mockData: { disputes: IndexerDispute[] };
+let mockData: IndexerDispute[] | undefined;
 let mockLoading = false;
+let mockError: Error | undefined;
 vi.mock('@/hooks/useNetworkStats', () => ({
-  useIndexerDisputes: () => ({ data: mockData, isLoading: mockLoading }),
+  useIndexerDisputes: () => ({
+    data: mockData,
+    isLoading: mockLoading,
+    isError: mockError !== undefined,
+    error: mockError,
+  }),
 }));
 
 import { DisputesSection } from '../DisputesSection';
@@ -26,15 +32,32 @@ function dispute(over: Partial<IndexerDispute> = {}): IndexerDispute {
 }
 
 describe('DisputesSection', () => {
+  /**
+   * A read that did not come back is not a clean record.
+   *
+   * The section used to do `data?.disputes ?? []` and render "This indexer has never been disputed
+   * or slashed" off the back of it, which is an absolute claim about someone's record made on the
+   * strength of a request that failed.
+   */
+  it('says the record could not be read rather than declaring it clean', () => {
+    mockData = undefined;
+    mockLoading = false;
+    mockError = new Error('disputes 503');
+    render(<DisputesSection address="0x1" />);
+    expect(screen.getByText(/could not be read/i)).toBeInTheDocument();
+    expect(screen.queryByText(/never been disputed or slashed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Clean record')).not.toBeInTheDocument();
+  });
+
   it('shows a clean-record message when there are no disputes', () => {
-    mockData = { disputes: [] }; mockLoading = false;
+    mockData = []; mockLoading = false; mockError = undefined;
     render(<DisputesSection address="0x1" />);
     expect(screen.getByText(/never been disputed or slashed/i)).toBeInTheDocument();
     expect(screen.getByText('Clean record')).toBeInTheDocument();
   });
 
   it('renders a dispute row with type, status and slashed amount', () => {
-    mockData = { disputes: [dispute()] }; mockLoading = false;
+    mockData = [dispute()]; mockLoading = false; mockError = undefined;
     render(<DisputesSection address="0x1" />);
     expect(screen.getByText('Indexing')).toBeInTheDocument();
     expect(screen.getByText('Accepted')).toBeInTheDocument();
@@ -42,8 +65,9 @@ describe('DisputesSection', () => {
   });
 
   it('dashes out a zero slashed/burned amount', () => {
-    mockData = { disputes: [dispute({ tokens_slashed_grt: '0', tokens_burned_grt: '0', status: 'Rejected' })] };
+    mockData = [dispute({ tokens_slashed_grt: '0', tokens_burned_grt: '0', status: 'Rejected' })];
     mockLoading = false;
+    mockError = undefined;
     render(<DisputesSection address="0x1" />);
     expect(screen.getByText('Rejected')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);

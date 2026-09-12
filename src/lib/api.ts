@@ -20,6 +20,14 @@ import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import type { Concentration } from '@/lib/concentration';
 import type { ServiceCensus } from '@/lib/service-census';
 import type { RequirementsJson } from '@/lib/operator-requirements';
+import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
+import type {
+  DelegationEvent,
+  IndexerDispute,
+  REOStatusResponse,
+  SubgraphHistoryPoint,
+  SubgraphVersion,
+} from '@/lib/contracts/indexer-signals';
 
 /** What `/api/dips` answers. `available: false` when the contracts are not configured. */
 export interface DipsStatusResponse {
@@ -716,4 +724,112 @@ export async function fetchGrtFlow(): Promise<GrtFlowData> {
     present: ['data.supply', 'data.issuancePerBlock'],
     pick: 'data',
   });
+}
+
+// ── The hooks that used to fetch for themselves ──────────────────────────────
+//
+// Seven inline fetchers lived in `useNetworkStats.ts` and two more, identical and separately
+// written, in the two indexer pages. All of them checked the status, which is why they were not in
+// the last sweep; none of them checked the shape, which is the failure #114 actually was. Several
+// ended `json.data?.x ?? []`, so a 200 carrying a renamed field rendered as "nothing happened"
+// rather than as a contract change.
+
+export async function fetchIndexerDetail(address: string): Promise<IndexerDetail | null> {
+  const response = await fetch(`/api/indexer/${encodeURIComponent(address.toLowerCase())}`);
+  if (!response.ok) throw new Error(`Indexer detail failed: ${response.status}`);
+  const body = await response.json();
+  // An address nobody has staked against is a real answer, and the route says so with a null
+  // indexer rather than a 404. Only a body with no `data` at all is a broken contract.
+  if (body?.data?.indexer == null) {
+    // Validate the envelope, then answer null: a body with no `data` is a broken contract, and a
+    // `data` carrying a null indexer is the route saying nobody has staked at this address.
+    parseResponse('/api/indexer', body, { present: ['data'] });
+    return null;
+  }
+  return parseResponse('/api/indexer', body, {
+    objects: ['data', 'data.indexer', 'data.indexer.account'],
+    arrays: ['data.indexer.allocations', 'data.indexer.delegators'],
+    present: ['data.indexer.stakedTokens', 'data.indexer.delegatedTokens'],
+    pick: 'data.indexer',
+  });
+}
+
+export async function fetchSubgraphHistory(
+  hash: string,
+): Promise<{ history: SubgraphHistoryPoint[] }> {
+  const response = await fetch(`/api/subgraph-history/${encodeURIComponent(hash)}`);
+  if (!response.ok) throw new Error(`Subgraph history failed: ${response.status}`);
+  return parseResponse('/api/subgraph-history', await response.json(), {
+    arrays: ['data.history'],
+    pick: 'data',
+  });
+}
+
+export async function fetchSubgraphVersions(
+  hash: string,
+): Promise<{ subgraphId: string | null; versions: SubgraphVersion[] }> {
+  const response = await fetch(`/api/subgraph-versions/${encodeURIComponent(hash)}`);
+  if (!response.ok) throw new Error(`Subgraph versions failed: ${response.status}`);
+  // A deployment nobody published through the GNS has a null `subgraphId` and no versions, which
+  // is an ordinary answer: assert the key is there, not that it has anything in it.
+  return parseResponse('/api/subgraph-versions', await response.json(), {
+    present: ['data.subgraphId'],
+    arrays: ['data.versions'],
+    pick: 'data',
+  });
+}
+
+export async function fetchIndexerDisputes(address: string): Promise<IndexerDispute[]> {
+  const response = await fetch(`/api/indexer-disputes/${encodeURIComponent(address.toLowerCase())}`);
+  if (!response.ok) throw new Error(`Indexer disputes failed: ${response.status}`);
+  // No envelope on this one, and no disputes is the usual answer.
+  return parseResponse('/api/indexer-disputes', await response.json(), {
+    arrays: ['disputes'],
+    pick: 'disputes',
+  });
+}
+
+export async function fetchREOStatus(address: string): Promise<REOStatusResponse> {
+  const response = await fetch(`/api/reo?address=${encodeURIComponent(address)}`);
+  if (!response.ok) throw new Error(`REO status failed: ${response.status}`);
+  // `status.status` carries "unknown" when the oracle has nothing for this address, so the object
+  // must be there even though its contents may say nothing useful.
+  return parseResponse('/api/reo', await response.json(), {
+    objects: ['status'],
+    present: ['status.status', 'status.oracleStale'],
+  });
+}
+
+export async function fetchDelegationEvents(params: {
+  indexer?: string;
+  first?: number;
+}): Promise<{ events: DelegationEvent[]; source?: 'nuthatch' | 'subgraph' }> {
+  const qs = new URLSearchParams({ first: String(params.first ?? 50) });
+  if (params.indexer) qs.set('indexer', params.indexer);
+  const response = await fetch(`/api/delegation-events?${qs}`);
+  if (!response.ok) throw new Error(`Delegation events failed: ${response.status}`);
+  // This used to end `json.data?.delegationEvents ?? []`, so a renamed field drew an empty
+  // activity feed - "nobody has delegated" - from a route that had answered perfectly well.
+  const body = parseResponse<{ delegationEvents: DelegationEvent[]; source?: string }>(
+    '/api/delegation-events',
+    await response.json(),
+    { arrays: ['data.delegationEvents'], pick: 'data' },
+  );
+  return {
+    events: body.delegationEvents,
+    source: body.source as 'nuthatch' | 'subgraph' | undefined,
+  };
+}
+
+/**
+ * An ENS name, or null because there is not one.
+ *
+ * It throws on a failed lookup rather than answering null. Both render the same thing - callers
+ * fall back to the shortened address either way - but only one of them can tell you the resolver
+ * has been down for a week.
+ */
+export async function fetchENSName(address: string): Promise<{ ensName: string | null }> {
+  const response = await fetch(`/api/ens?address=${encodeURIComponent(address)}`);
+  if (!response.ok) throw new Error(`ENS lookup failed: ${response.status}`);
+  return parseResponse('/api/ens', await response.json(), { present: ['ensName'] });
 }
