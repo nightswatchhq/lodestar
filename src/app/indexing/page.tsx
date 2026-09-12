@@ -3,11 +3,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useSubgraphDeployments } from '@/hooks/useNetworkStats';
+import { useSubgraphDeployments, useChainLag } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { cn, weiToGRT, formatGRT, shortenAddress } from '@/lib/utils';
-import type { ChainLagData } from '@/lib/chain-lag';
 import { formatStallDuration, type ChainLiveness } from '@/lib/chain-liveness';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
@@ -58,34 +57,18 @@ function chainLabel(network: string): string {
 // Chain health hook
 // ---------------------------------------------------------------------------
 
-function useChainLag() {
-  const [data, setData] = useState<ChainLagData | null>(null);
-  const [loading, setLoading] = useState(true);
-  /** Set when the read failed, which is not the same as there being no chains to report. */
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('/api/chain-lag')
-      .then((r) => {
-        // The old version parsed the body whatever the status, so a 500 with a JSON error in it
-        // became `json.data ?? null` and the panel rendered as though no chain were lagging.
-        if (!r.ok) throw new Error(`Chain lag could not be read (HTTP ${r.status}).`);
-        return r.json();
-      })
-      .then((json) => setData(json.data ?? null))
-      .catch((e) => setError(e instanceof Error ? e.message : 'Chain lag could not be read.'))
-      .finally(() => setLoading(false));
-  }, []);
-
-  return { data, loading, error };
-}
+// The hook lives in `useNetworkStats` and is shared with the network page; this file had a second
+// copy built on `useEffect` and three pieces of state, which refetched on every mount and cached
+// nothing. Two implementations of one read is how the two ended up disagreeing about what a failure
+// means, and the surviving one keeps its `data` under an envelope rather than dropping it.
 
 // ---------------------------------------------------------------------------
 // Chain health panel
 // ---------------------------------------------------------------------------
 
 function ChainHealthPanel() {
-  const { data, loading, error } = useChainLag();
+  const { data: envelope, isPending: loading, error } = useChainLag();
+  const data = envelope?.data ?? null;
   // Mount-stable "now" (ms) — keeps render pure (no Date.now() during render).
   const [nowMs] = useState(() => Date.now());
 
@@ -112,7 +95,10 @@ function ChainHealthPanel() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-[var(--text-muted)] py-2">
-            {error ?? 'No chain data yet. The cron job populates this every 30 minutes.'}
+            {/* A read that failed and a table with nothing in it are different sentences. */}
+            {error
+              ? `Chain lag could not be read: ${error.message}`
+              : 'No chain data yet. The cron job populates this every 30 minutes.'}
           </p>
         </CardContent>
       </Card>

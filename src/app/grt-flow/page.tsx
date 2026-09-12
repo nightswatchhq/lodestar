@@ -5,6 +5,8 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { formatGRT, formatNumber, cn } from '@/lib/utils';
+import { fetchGrtFlow } from '@/lib/api';
+import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import {
   GENESIS_SUPPLY,
   CONTRACT_GROUPS,
@@ -13,36 +15,6 @@ import {
   KEY_GIPS,
   CAVEATS,
 } from '@/lib/grt-flow-data';
-
-interface SupplyBreakdown {
-  l1TotalSupply: number;
-  l2TotalSupply: number;
-  bridgeEscrow: number;
-  globalSupply: number;
-}
-interface FlowData {
-  blockNumber: number | null;
-  supply: number;
-  globalSupply: number;
-  supplyBasis: 'onchain' | 'approx';
-  supplyBreakdown: SupplyBreakdown | null;
-  minted: number;
-  burned: number;
-  indexingRewards: number;
-  queryFees: number;
-  staked: number;
-  delegated: number;
-  signalled: number;
-  allocated: number;
-  issuancePerBlock: number;
-  annualIssuance: number;
-  issuanceRatePct: number;
-  counts: { indexers: number; stakedIndexers: number; delegators: number; curators: number; currentEpoch: number };
-  params: { protocolFeePct: number; curationTaxPct: number; delegationTaxPct: number; delegationRatio: number };
-}
-interface Resp {
-  data: FlowData;
-}
 
 function Section({ title, summary, children }: { title: string; summary?: string; children: React.ReactNode }) {
   return (
@@ -86,17 +58,11 @@ function FlowNode({ label, value, sub, tone = 'neutral' }: { label: string; valu
 }
 
 export default function GrtFlowPage() {
-  const { data, isLoading, isError } = useQuery<Resp>({
+  const { data: d, isLoading, isError } = useQuery<GrtFlowData>({
     queryKey: ['grtFlow'],
-    queryFn: async () => {
-      const r = await fetch('/api/grt-flow');
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    },
+    queryFn: fetchGrtFlow,
     staleTime: 30 * 60 * 1000,
   });
-
-  const d = data?.data;
   // Cumulative protocol issuance ≈ indexing rewards distributed (the honest issuance figure;
   // gross "minted" on L2 is dominated by bridge mints, so we do not headline it).
   const fmt = (g: number | undefined) => (g == null ? '—' : `${formatGRT(g)}`);

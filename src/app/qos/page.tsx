@@ -46,7 +46,8 @@ import { fetchQosFees, fetchQosConflicts } from '@/lib/foghorn';
 import { shortenAddress, cn } from '@/lib/utils';
 import { gradeVariant } from '@/lib/foghorn';
 import { useQuery } from '@tanstack/react-query';
-import type { Concentration, TierCapture } from '@/lib/concentration';
+import { fetchQosCapture } from '@/lib/api';
+import type { TierCapture } from '@/lib/concentration';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 /** A code line with a copy button. Local because it is used only here. */
@@ -271,15 +272,9 @@ export default function QosPage() {
   // exist: `/v1/indexers` returns ens_name in batch (same queryKey as the rest of the site, so this
   // is usually a cache hit), and useDeploymentNames batch-resolves subgraph names.
   const { data: roster } = useFoghornIndexers();
-  const { data: capture } = useQuery<{
-    data: { concentration: Concentration; coverage: { allocated_indexers: number; measured_indexers: number } };
-  }>({
+  const { data: capture } = useQuery({
     queryKey: ['qos', 'capture'],
-    queryFn: async () => {
-      const r = await fetch('/api/qos/capture');
-      if (!r.ok) throw new Error('capture unavailable');
-      return r.json();
-    },
+    queryFn: fetchQosCapture,
     staleTime: 15 * 60_000,
     retry: 0,
   });
@@ -295,8 +290,8 @@ export default function QosPage() {
     staleTime: 5 * 60_000,
     retry: 0,
   });
-  const conc = capture?.data.concentration;
-  const captureCoverage = capture?.data.coverage;
+  const conc = capture?.concentration;
+  const captureCoverage = capture?.coverage;
   const indexerNames = useMemo(() => {
     const m = new Map<string, string>();
     for (const ix of roster?.indexers ?? []) {

@@ -163,7 +163,15 @@ export const fetchNeedsAttention = (kind?: string) =>
     `needs-attention${kind ? `?kind=${encodeURIComponent(kind)}` : ''}`
   );
 
-/** Batch-resolve deployment IPFS hashes → subgraph display names (dashboard API). */
+/**
+ * Batch-resolve deployment IPFS hashes -> subgraph display names.
+ *
+ * Falling back to the raw hash is the right render when a name is unknown, and every caller
+ * already does that. What is not right is reaching it by returning an empty map from a failed
+ * request: a route answering 500 for a month then looks exactly like a set of deployments nobody
+ * has named. It throws instead, the callers' `data: names = {}` default renders the same hashes,
+ * and the failure is somewhere a person can see it.
+ */
 export const fetchDeploymentNames = async (
   hashes: string[]
 ): Promise<Record<string, string>> => {
@@ -173,7 +181,7 @@ export const fetchDeploymentNames = async (
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ hashes }),
   });
-  if (!res.ok) return {};
+  if (!res.ok) throw new Error(`Deployment names failed: ${res.status}`);
   const json = await res.json();
   return (json.data ?? {}) as Record<string, string>;
 };

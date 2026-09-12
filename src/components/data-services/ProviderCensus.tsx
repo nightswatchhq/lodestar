@@ -2,8 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
-import type { ServiceCensus, ProbeVerdict } from '@/lib/service-census';
-import type { RequirementsJson } from '@/lib/operator-requirements';
+import { fetchServiceCensus } from '@/lib/api';
+import type { VerdictLabels } from '@/lib/service-census';
 
 /**
  * The provider count for every service, read from chain, published because it is embarrassing.
@@ -16,10 +16,11 @@ import type { RequirementsJson } from '@/lib/operator-requirements';
  * The number that matters is not how many registered. It is how many answer.
  */
 
-const VERDICT_LABEL: Record<ProbeVerdict, string> = {
+const VERDICT_LABEL: VerdictLabels = {
   serving: 'answering',
   paywalled: 'answering (402, as designed)',
   http_error: 'registered, does not answer',
+  refused: 'registered, nothing listening',
   unreachable: 'registered, host unreachable',
   timeout: 'registered, timed out',
   no_endpoint: 'registered, advertises nothing',
@@ -27,28 +28,10 @@ const VERDICT_LABEL: Record<ProbeVerdict, string> = {
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-interface Payload {
-  data: {
-    services: ServiceCensus[];
-    benchmark: RequirementsJson | null;
-    headline: {
-      services: number;
-      withAnyProvider: number;
-      withAnyServing: number;
-      registered: number;
-      serving: number;
-    };
-  };
-}
-
 export function ProviderCensus() {
-  const { data, isLoading, isError } = useQuery<Payload>({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['service-census'],
-    queryFn: async () => {
-      const r = await fetch('/api/service-census');
-      if (!r.ok) throw new Error(`census failed: ${r.status}`);
-      return r.json();
-    },
+    queryFn: fetchServiceCensus,
     refetchInterval: 300_000,
     staleTime: 240_000,
     retry: 1,
@@ -67,7 +50,7 @@ export function ProviderCensus() {
     );
   }
 
-  const { services, headline, benchmark } = data.data;
+  const { services, headline, benchmark } = data;
 
   return (
     <Card className="mb-4">
