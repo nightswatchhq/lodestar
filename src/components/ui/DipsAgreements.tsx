@@ -3,14 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import type { Agreement, AgreementStatus } from '@/lib/dips-agreements';
+import { fetchDipsAgreements, type DipsAgreementsResponse } from '@/lib/api';
 
-interface AgreementsResponse {
-  available: boolean;
-  empty?: boolean;
-  agreements?: Agreement[];
-  counts?: Record<AgreementStatus, number>;
-  totalCollectedGrt?: number;
-}
 
 function shortId(id: string) {
   return id.length > 12 ? `${id.slice(0, 8)}…${id.slice(-4)}` : id;
@@ -56,14 +50,14 @@ const STATUS_LABEL: Record<AgreementStatus, string> = {
  * When the first agreement is accepted this appears on its own.
  */
 export function DipsAgreements() {
-  const { data, isLoading } = useQuery<{ data: AgreementsResponse }>({
+  const { data, isLoading } = useQuery<DipsAgreementsResponse>({
     queryKey: ['dips-agreements'],
-    queryFn: () => fetch('/api/dips/agreements').then((r) => r.json()),
+    queryFn: fetchDipsAgreements,
     refetchInterval: 300_000,
     staleTime: 240_000,
   });
 
-  const d = data?.data;
+  const d = data;
   if (isLoading || !d?.available || d.empty) return null;
 
   const agreements = d.agreements ?? [];

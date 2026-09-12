@@ -6,6 +6,7 @@ import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQuer
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, cn } from '@/lib/utils';
 import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
+import { fetchHorizonActivity } from '@/lib/api';
 
 // ── Event display config ────────────────────────────────────────────────────
 
@@ -39,9 +40,9 @@ const SLOW_MESSAGES = [
 export function HorizonActivity() {
   const [slowMessage, setSlowMessage] = useState<string | null>(null);
 
-  const query = useQuery<{ data: ActivityEvent[] }>({
+  const query = useQuery<ActivityEvent[]>({
     queryKey: ['horizon-activity'],
-    queryFn: () => fetch('/api/horizon/activity?limit=25').then((r) => r.json()),
+    queryFn: () => fetchHorizonActivity(25),
     refetchInterval: 30_000,
     staleTime: 25_000,
   });
@@ -57,7 +58,7 @@ export function HorizonActivity() {
     return () => clearTimeout(t);
   }, [isLoading]);
 
-  const events = data?.data ?? [];
+  const events = data ?? [];
   const lastUpdated = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString() : null;
 
   return (

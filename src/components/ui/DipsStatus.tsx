@@ -3,16 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
+import { fetchDipsStatus, type DipsStatusResponse } from '@/lib/api';
 
-interface DipsResponse {
-  available: boolean;
-  totalRate?: number;
-  agreementRate?: number;
-  live?: boolean;
-  allocations?: DipsAllocation[];
-  timeline?: DipsStep[];
-  lastConfiguredAt?: number | null;
-}
 
 function shortAddr(addr: string) {
   return addr.slice(0, 6) + '…' + addr.slice(-4);
@@ -36,14 +28,14 @@ function fmtDate(ts: number) {
  * panel that invents a zero here would be indistinguishable from one reporting a real one.
  */
 export function DipsStatus() {
-  const { data, isLoading } = useQuery<{ data: DipsResponse }>({
+  const { data, isLoading } = useQuery<DipsStatusResponse>({
     queryKey: ['dips-status'],
-    queryFn: () => fetch('/api/dips').then((r) => r.json()),
+    queryFn: fetchDipsStatus,
     refetchInterval: 300_000,
     staleTime: 240_000,
   });
 
-  const d = data?.data;
+  const d = data;
   if (isLoading || !d?.available) return null;
 
   const live = Boolean(d.live);

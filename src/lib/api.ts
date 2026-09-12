@@ -13,6 +13,29 @@ import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status-shape';
 import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activity';
+import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
+import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
+import type { Agreement, AgreementStatus } from '@/lib/dips-agreements';
+
+/** What `/api/dips` answers. `available: false` when the contracts are not configured. */
+export interface DipsStatusResponse {
+  available: boolean;
+  totalRate?: number;
+  agreementRate?: number;
+  live?: boolean;
+  allocations?: DipsAllocation[];
+  timeline?: DipsStep[];
+  lastConfiguredAt?: number | null;
+}
+
+/** What `/api/dips/agreements` answers. */
+export interface DipsAgreementsResponse {
+  available: boolean;
+  empty?: boolean;
+  agreements?: Agreement[];
+  counts?: Record<AgreementStatus, number>;
+  totalCollectedGrt?: number;
+}
 
 /**
  * Fetch network statistics via cached GET endpoint
@@ -572,6 +595,44 @@ export async function fetchCuratorLeaderboard(params: { first?: number; skip?: n
   if (!response.ok) throw new Error(`Curator leaderboard failed: ${response.status}`);
   return parseResponse('/api/curators', await response.json(), {
     rows: { data: ['id'] },
+    pick: 'data',
+  });
+}
+
+// ── Panels that used to fetch for themselves ─────────────────────────────────
+//
+// Three components called `fetch('/api/…').then((r) => r.json())` inline, with no status check
+// between them. A 500 became the error envelope parsed as data, `available` came back undefined,
+// and the panel returned null: the read failed and the page showed nothing, with nothing anywhere
+// saying so. `failed-reads-are-not-answers` exists to catch that and its pattern only matched the
+// `const r = await fetch(…)` form, so this shape walked past it.
+
+/** `available: false` is a real answer here: the DIPS contracts may simply not be configured. */
+export async function fetchDipsStatus(): Promise<DipsStatusResponse> {
+  const response = await fetch('/api/dips');
+  if (!response.ok) throw new Error(`DIPS status failed: ${response.status}`);
+  return parseResponse('/api/dips', await response.json(), {
+    objects: ['data'],
+    present: ['data.available'],
+    pick: 'data',
+  });
+}
+
+export async function fetchDipsAgreements(): Promise<DipsAgreementsResponse> {
+  const response = await fetch('/api/dips/agreements');
+  if (!response.ok) throw new Error(`DIPS agreements failed: ${response.status}`);
+  return parseResponse('/api/dips/agreements', await response.json(), {
+    objects: ['data'],
+    present: ['data.available'],
+    pick: 'data',
+  });
+}
+
+export async function fetchHorizonActivity(limit = 25): Promise<ActivityEvent[]> {
+  const response = await fetch(`/api/horizon/activity?limit=${limit}`);
+  if (!response.ok) throw new Error(`Horizon activity failed: ${response.status}`);
+  return parseResponse('/api/horizon/activity', await response.json(), {
+    arrays: ['data'],
     pick: 'data',
   });
 }
