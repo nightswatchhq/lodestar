@@ -87,13 +87,41 @@ const BYPASS_AT_START = 48;
 /** Five OpenGraph routes render on the server. A static bundle cannot, so this gates Stage 2. */
 const ogRoutes = sources.filter((f) => /opengraph-image\.tsx$/.test(f));
 
-/** The wallet paths Vitest cannot cover, which is the whole argument for smoke-testing them. */
-const WALLET_FLOWS = ['delegate', 'undelegate', 'signal', 'dock publish', 'dock lifecycle'];
-const walletSpec = existsSync('scripts/e2e/wallet.spec.ts')
-  ? readFileSync('scripts/e2e/wallet.spec.ts', 'utf8')
-  : '';
+/**
+ * The wallet paths Vitest cannot cover, which is the whole argument for smoke-testing them.
+ *
+ * What the spec reaches is each flow's entry: the wallet connects, the page renders its write
+ * surface, and nothing is dispatched. Asserting a *successful* dispatch needs a funded account or
+ * an interceptor in front of the Arbitrum RPC, and neither exists - see the note in
+ * `wallet.spec.ts`. So this counts flows whose entry is covered, not transactions proven.
+ */
+const WALLET_FLOWS = ['delegate', 'undelegate', 'curate', 'dock publish', 'dock lifecycle'];
+/** How `wallet.spec.ts` names each flow, where it names it at all. */
+const WALLET_PATTERNS = {
+  delegate: /delegate/i,
+  undelegate: /undelegate/i,
+  curate: /curate/i,
+  'dock publish': /dock/i,
+  'dock lifecycle': /lifecycle/i,
+};
+/**
+ * The TEST NAMES, not the file.
+ *
+ * Matching the file matched the doc comment at the top of it, which lists all five flows while
+ * explaining which of them the spec reaches - so prose about what is *not* covered counted as
+ * coverage, and this read 5/5. That is the second time in this script that a comment has been
+ * counted as the thing it describes; the first was a `fetch('/api/…')` quoted in a doc comment.
+ * Both times the fix was to read what the code does rather than what it says about itself.
+ */
+const walletTitles = existsSync('scripts/e2e/wallet.spec.ts')
+  ? [...readFileSync('scripts/e2e/wallet.spec.ts', 'utf8').matchAll(/^test\(\s*'([^']+)'/gm)].map(
+      (m) => m[1],
+    )
+  : [];
+// The denominator stays at the five the RFC named. Counting three out of three covered would be
+// moving the goalposts to where the ball landed, which is the move this script exists to prevent.
 const walletCovered = WALLET_FLOWS.filter((f) =>
-  new RegExp(f.replace(/ /g, '[ -]?'), 'i').test(walletSpec),
+  walletTitles.some((t) => WALLET_PATTERNS[f].test(t)),
 );
 
 const RFC = 'docs/rfc-the-frontend-after-the-backend-left.md';
@@ -154,9 +182,9 @@ const items = [
     title: 'Playwright smoke tests for the wallet flows',
     done: walletCovered.length,
     total: WALLET_FLOWS.length,
-    detail: walletSpec
-      ? `covered: ${walletCovered.join(', ') || 'none'}`
-      : 'scripts/e2e/wallet.spec.ts does not exist',
+    detail: walletTitles.length
+      ? `${walletTitles.length} tests; flows named: ${walletCovered.join(', ') || 'none'}`
+      : 'scripts/e2e/wallet.spec.ts has no tests',
   },
   {
     id: 5,
