@@ -31,12 +31,26 @@ import {
 const fetchMock = vi.fn();
 
 /** Answer every request with this body at this status. */
+/**
+ * A real `Response`, not a shape that resembles one.
+ *
+ * The hand-rolled stand-in had `ok`, `status` and `json` and nothing else, which was enough until
+ * `fetchShedAware` needed `clone()` to tell a shed request apart from a retired nest. It then
+ * failed with `first.clone is not a function` - a test fixture disagreeing with the type the code
+ * is handed, which is the same defect as `ClosedAllocationsTable`'s fixture claiming a `versions`
+ * field the route has never sent.
+ */
 function respond(body: unknown, status = 200) {
-  fetchMock.mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => body,
-  });
+  // A fresh `Response` per call, not one instance reused. A body can be read once, so a shared
+  // instance makes the second call in a test fail with "Body has already been read" - which looks
+  // like a bug in the code and is a bug in the fixture.
+  fetchMock.mockImplementation(
+    async () =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+  );
 }
 
 const urlOf = (call = 0) => String(fetchMock.mock.calls[call][0]);

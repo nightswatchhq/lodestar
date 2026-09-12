@@ -111,8 +111,10 @@ describe('one typed surface', () => {
     // Any `fetch(`, not `fetch('/api/…')`: `features/dock/api.ts` funnels every call through one
     // `studioFetch(url, init)` and so never writes a path literal, which is the whole point of it.
     for (const f of THE_TYPED_SURFACE) {
+      // `fetch(` or `fetchShedAware(` - the surface wraps its reads now, and matching only the
+      // bare spelling would call a module that stopped making requests one that still does.
       expect(
-        /\bfetch\(/.test(code(readFileSync(f, 'utf8'))),
+        /\bfetch(ShedAware)?\(/.test(code(readFileSync(f, 'utf8'))),
         `${f} is exempt as a typed client and no longer makes any request; it should not be exempt`,
       ).toBe(true);
     }

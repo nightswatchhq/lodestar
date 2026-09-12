@@ -3,6 +3,7 @@
 // reached through the /api/foghorn/[...path] proxy (which prepends /v1/).
 
 import { apiUrl } from './api-origin';
+import { fetchShedAware } from './shed';
 import type { BadgeVariant } from '@/components/ui/Badge';
 
 // ── Response types (match the Foghorn axum API) ──────────────────────────────
@@ -172,7 +173,7 @@ export interface ProbeDetail {
 // ── Fetchers (via the /api/foghorn proxy) ─────────────────────────────────────
 
 async function foghornGet<T>(path: string): Promise<T> {
-  const res = await fetch(apiUrl(`/api/foghorn/${path}`), { headers: { Accept: 'application/json' } });
+  const res = await fetchShedAware(apiUrl(`/api/foghorn/${path}`), { headers: { Accept: 'application/json' } });
   if (!res.ok) {
     // 503 = not configured, 502 = unreachable, 404 = no data yet
     throw new Error(`Foghorn ${path} failed: ${res.status}`);
@@ -206,7 +207,7 @@ export const fetchDeploymentNames = async (
   hashes: string[]
 ): Promise<Record<string, string>> => {
   if (hashes.length === 0) return {};
-  const res = await fetch(apiUrl('/api/subgraph-names'), {
+  const res = await fetchShedAware(apiUrl('/api/subgraph-names'), {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ hashes }),
