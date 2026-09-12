@@ -30,7 +30,7 @@ const passes = [];
 function fail(area, name, detail) { failures.push({ area, name, detail }); }
 function pass(name) { passes.push(name); }
 
-async function get(path) {
+async function once(path) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   const started = Date.now();
@@ -41,6 +41,39 @@ async function get(path) {
   } finally {
     clearTimeout(t);
   }
+}
+
+/**
+ * A refusal under load is the gate working, not the site being broken.
+ *
+ * kittiwake holds a fixed number of nest permits and sheds what it cannot serve, answering 503
+ * `nest_busy` or 429. That is the design: a heavy fold arriving while an ingest job holds permits
+ * is turned away rather than queued until everything is slow. Reporting one of those as an outage
+ * posts "Lodestar e2e: 1 failing" to a channel for a service that is behaving exactly as intended,
+ * and an alert that cries wolf is the one people learn to scroll past.
+ *
+ * It happened on 2026-09-12: `/api/apr-provenance/` shed one request, alerted, and answered 200 on
+ * each of three retries seconds later.
+ *
+ * So a shed request is retried once, after a pause long enough for the permits to come back.
+ * **Twice in a row is still a failure**, because sustained shedding is a real capacity problem and
+ * this must not be able to hide one. The same reasoning the browser suite already applies to 429s.
+ */
+const SHED_PAUSE_MS = 2500;
+
+function wasShed({ status, text }) {
+  if (status === 429) return true;
+  return status === 503 && /nest_busy|nest busy/.test(text);
+}
+
+async function get(path) {
+  const first = await once(path);
+  if (!wasShed(first)) return first;
+  await new Promise((r) => setTimeout(r, SHED_PAUSE_MS));
+  const second = await once(path);
+  // The second answer either way: if it was shed again the caller sees the 503 and fails, which
+  // is what a genuine capacity problem should look like.
+  return second;
 }
 
 /** Walk a dotted path. Returns `undefined` for any missing link rather than throwing. */
