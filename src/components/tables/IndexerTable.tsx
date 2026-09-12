@@ -105,16 +105,32 @@ function foghornFlagsFor(
 }
 
 // Module-level cache so repeated renders / page navigations don't re-fetch
-const syncHealthCache = new Map<string, { reachable: boolean; totalDeployments: number; syncedCount: number; worstBlocksBehind?: number }>();
+interface SyncHealth {
+  reachable: boolean;
+  totalDeployments: number;
+  syncedCount: number;
+  worstBlocksBehind?: number;
+}
+
+const syncHealthCache = new Map<string, SyncHealth>();
 
 // Dropped chains — fetched once for all indexers via a shared promise
 let droppedChainsPromise: Promise<Record<string, string[]>> | null = null;
 function getDroppedChains(): Promise<Record<string, string[]>> {
   if (!droppedChainsPromise) {
-    droppedChainsPromise = fetch('/api/dropped-chains')
-      .then((r) => r.json())
-      .then(({ data }) => (data ?? {}) as Record<string, string[]>)
-      .catch(() => ({} as Record<string, string[]>));
+    // The status is looked at, and a refusal still degrades to "no chains are marked dropped".
+    // That is the right outcome for a badge, and it was previously the outcome for every failure
+    // *and* every success, because nothing here kept the response long enough to tell them apart.
+    droppedChainsPromise = (async () => {
+      try {
+        const res = await fetch('/api/dropped-chains');
+        if (!res.ok) return {};
+        const body = (await res.json()) as { data?: Record<string, string[]> };
+        return body.data ?? {};
+      } catch {
+        return {};
+      }
+    })();
   }
   return droppedChainsPromise;
 }
@@ -131,16 +147,25 @@ function SyncDot({ address, url }: { address: string; url: string | null }) {
   useEffect(() => {
     if (!url || health !== null || fetching.current) return;
     fetching.current = true;
-    fetch(`/api/indexer-node-health?url=${encodeURIComponent(url)}&addr=${encodeURIComponent(address)}`)
-      .then((r) => r.json())
-      .then(({ data }) => {
-        if (data) {
-          syncHealthCache.set(address, data);
-          setHealth(data);
+    // Same shape, same reasoning: a probe that could not run leaves the badge off, which is what
+    // it did before. The difference is that a 500 no longer reaches `data` as an error envelope.
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/indexer-node-health?url=${encodeURIComponent(url)}&addr=${encodeURIComponent(address)}`,
+        );
+        if (!res.ok) return;
+        const body = (await res.json()) as { data?: SyncHealth };
+        if (body.data) {
+          syncHealthCache.set(address, body.data);
+          setHealth(body.data);
         }
-      })
-      .catch(() => {/* silent */})
-      .finally(() => { fetching.current = false; });
+      } catch {
+        // A node that cannot be reached is not a badge. Deliberate: see above.
+      } finally {
+        fetching.current = false;
+      }
+    })();
   }, [address, url, health]);
 
   if (!url || health === null) return null;

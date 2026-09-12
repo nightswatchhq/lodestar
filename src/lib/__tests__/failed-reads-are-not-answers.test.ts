@@ -30,12 +30,26 @@ const READS_ITS_OWN_FLAG: Record<string, string> = {
 };
 
 /**
- * Failures thrown away rather than handled.
+ * Failures thrown away rather than handled, in two spellings that need opposite treatment.
  *
  * `.catch(() => {})` on a promise nobody awaits is the shape that let a posted bounty exist on
- * chain with no row on the board, and a deploy answer "success" having recorded nothing.
+ * chain with no row on the board, and a deploy answer "success" having recorded nothing. It is
+ * matched against comment-stripped source, because this codebase quotes that exact string in doc
+ * comments describing bugs it has already fixed, and a mention in prose is not a call site.
+ *
+ * A bare `catch { }` is the same fault and was not matched at first, so rewriting three call sites
+ * from one spelling to the other moved every one of them out of this test's sight while changing
+ * nothing about whether the failure reached anybody. It is matched against **raw** source, because
+ * a comment inside the catch is precisely the reason on record this test is named for: stripping
+ * it first turns `catch { /* storage may be unavailable *\/ }` into `catch { }` and reports four
+ * documented decisions as oversights.
  */
-const SWALLOW = /\.catch\(\(\)\s*=>\s*\{\}\)/;
+const SWALLOW_PROMISE = /\.catch\(\(\)\s*=>\s*\{\}\)/;
+const SWALLOW_BLOCK = /\bcatch\s*(?:\([^)]*\))?\s*\{\s*\}/;
+
+function swallowsSilently(src: string): boolean {
+  return SWALLOW_PROMISE.test(code(src)) || SWALLOW_BLOCK.test(src);
+}
 
 /**
  * Swallows that are the right call, each with a reason somebody checked.
@@ -44,12 +58,8 @@ const SWALLOW = /\.catch\(\(\)\s*=>\s*\{\}\)/;
  * do not matter, and saying so in one line is the difference between a decision and an oversight.
  */
 const DELIBERATE: Record<string, string> = {
-  'src/components/tables/IndexerTable.tsx':
-    'two badges that render only when something is wrong. A failed probe shows nothing, which is also what a healthy indexer shows: the honest alternative would be a marker on most of eighty-seven rows during an outage, which is noise rather than information.',
   'src/app/blog/BlogIndex.tsx':
     'search keeps working on titles, excerpts and tags without the bodies; the degradation is invisible and harmless.',
-  'src/app/scuttlebutt/page.tsx':
-    'an admin-status probe. Failing leaves `isAdmin` false, which is the safe direction for a privilege check.',
 };
 
 function walk(dir: string): string[] {
@@ -101,8 +111,39 @@ describe('a failure has to reach somebody', () => {
     expect(offenders).toEqual([]);
   });
 
+  /**
+   * The same fault in the shape the test above could not see.
+   *
+   * `fetch(url).then((r) => r.json())` never binds a response to a name, so the pattern above -
+   * which keys on `const r = await fetch(…)` - walked straight past it. Three components were
+   * written that way and none of them checked a status: a 500 became the error envelope parsed as
+   * data, `available` came back undefined, and the panel returned null. The read failed and the
+   * page showed nothing, with nothing anywhere saying so.
+   *
+   * There is no name to look for an `.ok` on here, and that is the point: this form cannot check a
+   * status without first keeping the response, so finding it at all is finding the fault.
+   */
+  it('has no fetcher that throws the response away before looking at it', () => {
+    const inline = /fetch\([^)]*\)\s*\.then\(\s*\(?\s*\w+\s*\)?\s*=>\s*\w+\.json\(\)/;
+
+    const offenders = files.filter((f) => inline.test(code(readFileSync(f, 'utf8'))));
+
+    expect(
+      offenders,
+      'these read a body straight out of a `.then` without keeping the response, so nothing can ' +
+        'have looked at its status. Route them through `lib/api.ts`, which checks.',
+    ).toEqual([]);
+  });
+
   it('has no failure dropped on the floor without a reason on record', () => {
-    const offenders = files.filter((f) => SWALLOW.test(code(readFileSync(f, 'utf8'))) && !(f in DELIBERATE));
+    // **Raw source, not `code()`.** Every other check here strips comments first, because a path
+    // named in prose is not a call site. This one is the opposite: a comment inside the catch is
+    // precisely the reason on record that the test is named for, and stripping it first turns
+    // `catch { /* storage may be unavailable */ }` into `catch { }` and reports four documented
+    // decisions as oversights.
+    const offenders = files.filter(
+      (f) => swallowsSilently(readFileSync(f, 'utf8')) && !(f in DELIBERATE),
+    );
     expect(offenders).toEqual([]);
   });
 
@@ -112,7 +153,7 @@ describe('a failure has to reach somebody', () => {
     // it is: an entry excusing something that no longer exists.
     const stale = Object.keys(DELIBERATE).filter((f) => {
       if (!existsSync(f)) return true;
-      return !SWALLOW.test(code(readFileSync(f, 'utf8')));
+      return !swallowsSilently(readFileSync(f, 'utf8'));
     });
     expect(stale).toEqual([]);
   });

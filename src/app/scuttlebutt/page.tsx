@@ -65,10 +65,21 @@ export default function ScuttlebuttPage() {
 
   // Initial admin-status check.
   useEffect(() => {
-    fetch('/api/scuttlebutt/admin/login')
-      .then((r) => r.json())
-      .then((d) => setIsAdmin(!!d.admin))
-      .catch(() => {});
+    // A failed ask is not "you are not a moderator", and treating it as one is what happened: the
+    // route was bound POST-only when it moved, this answered 405, the `.catch` swallowed it, and a
+    // signed-in moderator was silently demoted by a refresh with nothing in the UI to say why
+    // (nightswatchhq/kittiwake#124). The status is looked at now, and a refusal leaves the flag
+    // alone rather than asserting the negative.
+    void (async () => {
+      try {
+        const res = await fetch('/api/scuttlebutt/admin/login');
+        if (!res.ok) return;
+        const body = (await res.json()) as { admin?: boolean };
+        setIsAdmin(!!body.admin);
+      } catch {
+        // Offline or refused: leave the flag as it was rather than claiming anything.
+      }
+    })();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time hydrate of saved name from localStorage — intentional
     setName(localStorage.getItem(NAME_KEY) ?? '');
   }, []);
