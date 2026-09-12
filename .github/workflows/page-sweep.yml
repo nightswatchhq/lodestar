@@ -1,0 +1,100 @@
+# Every page, weekly, looking for the failure a passing test suite cannot see.
+#
+# `e2e-monitor` runs the Playwright spec every fifteen minutes and is the thing that pages someone.
+# This is the wider, slower pass: it opens all forty pages and reports what each is actually
+# showing - content, figures against placeholder glyphs, console errors - rather than whether it
+# threw.
+#
+# It exists because on 2026-09-12 a hand-run sweep found two routes broken in production that
+# nothing in CI opened: every POI deployment page was refusing its own CID, and the Scuttlebutt
+# moderator check had been answering 405 since the route moved. Both had been live for a day, both
+# returned 200, and both were invisible to a green suite.
+#
+# Weekly rather than quarter-hourly: forty page loads against production is not a thing to do four
+# times an hour, and what this catches is drift rather than an outage. The outage job is the other
+# file.
+name: page sweep
+
+on:
+  schedule:
+    # Monday morning, so the report is waiting at the start of the week rather than decaying over
+    # a weekend nobody is reading.
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "base URL to sweep (defaults to production)"
+        required: false
+        type: string
+
+concurrency:
+  group: page-sweep
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    name: every page
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          version: 10
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: sweep every page
+        id: sweep
+        env:
+          LODESTAR_BASE: ${{ inputs.base || 'https://www.lodestar-dashboard.com' }}
+        # The table goes to the job summary whether or not anything failed, because the placeholder
+        # counts are the useful half and they never fail a build. `--ci` exits non-zero only on a
+        # bad status, an error boundary, an empty page, or a console error.
+        run: |
+          set -o pipefail
+          node scripts/e2e/sweep.mjs --ci | tee sweep.txt
+        continue-on-error: true
+
+      - name: put the table in the summary
+        if: always()
+        run: |
+          {
+            echo '## Page sweep'
+            echo
+            echo '```'
+            cat sweep.txt 2>/dev/null || echo '(the sweep produced no output)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: report a hard signal
+        if: steps.sweep.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${DISCORD_WEBHOOK_URL:-}" ] || { echo "no webhook configured; not alerting"; exit 0; }
+          # Only the lines naming a page and why, never the page text: a console error can carry a
+          # whole response body and this webhook posts to a channel.
+          detail="$(sed -n '/page(s) with a hard signal/,$p' sweep.txt | tail -n +2 | head -12)"
+          jq -n --arg c "🟠 **Lodestar page sweep found something**\n\n\`\`\`\n${detail}\n\`\`\`\nRun: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{content: ($c | .[0:1900]), username: "lodestar-sweep"}' > payload.json
+          curl -sS -f -X POST -H "Content-Type: application/json" -d @payload.json "$DISCORD_WEBHOOK_URL" \
+            || { echo "ALERT DELIVERY FAILED"; exit 1; }
+
+      # The job's own verdict, after the summary and the alert have had their turn. `continue-on-error`
+      # above is what lets those run; without this the sweep would be green on a broken page.
+      - name: fail if the sweep found a hard signal
+        if: steps.sweep.outcome == 'failure'
+        run: exit 1
