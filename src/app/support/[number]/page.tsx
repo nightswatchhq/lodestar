@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { serverApiUrl } from '@/lib/api-origin';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -14,11 +15,12 @@ import {
 import { renderThreadMarkdown, type SupportThread } from '@/lib/graph-support-thread';
 
 /**
- * Read the thread from our own origin rather than from kittiwake directly.
+ * Read the thread through whatever `api-origin` says, same as every client fetch.
  *
- * The edge rewrite in `proxy.ts` is what decides where `/api/support/*` is served from, and going
- * straight to `LODESTAR_API_ORIGIN` here would quietly opt this page out of that switch: clearing
- * the variable would roll every other route back and leave this one still pointed at the backend.
+ * It used to build `${proto}://${host}/api/…` deliberately, so that it went through the edge
+ * rewrite with everything else and clearing the switch rolled it back with the rest rather than
+ * leaving this one page pointed at the backend on its own. `serverApiUrl` keeps that property and
+ * makes it the same switch the browser now uses.
  */
 async function fetchThread(number: string): Promise<SupportThread | null> {
   const h = await headers();
@@ -26,7 +28,9 @@ async function fetchThread(number: string): Promise<SupportThread | null> {
   if (!host) return null;
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
 
-  const res = await fetch(`${proto}://${host}/api/support/${number}`, { cache: 'no-store' });
+  const res = await fetch(serverApiUrl(`/api/support/${number}`, { proto, host }), {
+    cache: 'no-store',
+  });
   if (!res.ok) return null;
   return res.json();
 }

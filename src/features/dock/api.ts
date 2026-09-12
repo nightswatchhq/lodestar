@@ -25,6 +25,7 @@
  * turns that into an error state a component has to render rather than a value it can ignore.
  */
 
+import { apiUrl } from '@/lib/api-origin';
 import {
   useMutation,
   useQuery,
@@ -48,7 +49,10 @@ import type {
  * the edge points these at kittiwake on another host.
  */
 export async function studioFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, credentials: 'include' });
+  // `credentials: 'include'` was already here and becomes load-bearing rather than defensive once
+  // this is cross-origin: the session cookie only travels with it, and the API only accepts it
+  // because `Access-Control-Allow-Credentials` is set against an exact origin.
+  const res = await fetch(apiUrl(url), { ...init, credentials: 'include' });
   if (!res.ok) {
     // Two envelopes, because these routes are mid-migration. The Next handlers answer
     // `{ error: "<what went wrong>" }`; kittiwake answers `{ error: "<code>", message: "<what went
