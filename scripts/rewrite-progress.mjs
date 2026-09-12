@@ -32,12 +32,36 @@ function files(dir, out = []) {
 const sources = ROOTS.flatMap((r) => files(r));
 const FETCH_CALL = /fetch\(\s*['"`]\/api\//g;
 
-/** Call sites that build their own request instead of going through `lib/api.ts`. */
+/**
+ * The modules that *are* the typed surface, and so cannot be bypassing it.
+ *
+ * `foghorn.ts` is `lib/api.ts` for the foghorn proxy: one `foghornGet` that every fetcher in the
+ * file goes through. Counting its two requests as call sites to move meant the number could never
+ * reach the bottom, and would have had somebody rewriting a client to call a client.
+ */
+const THE_TYPED_SURFACE = new Set(['src/lib/api.ts', 'src/lib/foghorn.ts']);
+
+/**
+ * Strip comments before counting: a path mentioned in prose is not a call site.
+ *
+ * This counter reported three requests in `foghorn.ts` when the file makes two. The third was
+ * `fetch('/api/foghorn/…')` quoted inside a doc comment explaining a request that had just been
+ * removed - so a comment about deleted code was being counted as the code. `kittiwake-routes.test`
+ * learned this and wrote it down; this script was written afterwards and did not read it.
+ *
+ * Block comments only where one opens a line, for the reason that file also records: a string
+ * literal containing `/*` starts a comment for a naive stripper and swallows the rest of the file.
+ */
+function code(src) {
+  return src.replace(/^[ \t]*\/\*[\s\S]*?\*\//gm, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+}
+
+/** Call sites that build their own request instead of going through the typed surface. */
 function bypassing() {
   const hits = [];
   for (const f of sources) {
-    if (f === 'src/lib/api.ts') continue;
-    const count = (readFileSync(f, 'utf8').match(FETCH_CALL) ?? []).length;
+    if (THE_TYPED_SURFACE.has(f)) continue;
+    const count = (code(readFileSync(f, 'utf8')).match(FETCH_CALL) ?? []).length;
     if (count) hits.push({ file: f, count });
   }
   return hits;
@@ -52,8 +76,13 @@ const bypassCalls = bypass.reduce((n, b) => n + b.count, 0);
  * Hardcoded rather than computed from git, because the interesting number is progress against the
  * size of the job as it was understood then, and a `git grep` at an old ref is a different thing
  * to maintain. Update it only if the baseline is genuinely re-measured, and say so when you do.
+ *
+ * Re-measured once, from 50 to 48, when the counter stopped counting commented-out requests and
+ * stopped counting `foghorn.ts` - which is a typed client rather than something bypassing one.
+ * Both halves of the fraction are counted the same way, which is the only thing that makes it mean
+ * anything.
  */
-const BYPASS_AT_START = 50;
+const BYPASS_AT_START = 48;
 
 /** Five OpenGraph routes render on the server. A static bundle cannot, so this gates Stage 2. */
 const ogRoutes = sources.filter((f) => /opengraph-image\.tsx$/.test(f));

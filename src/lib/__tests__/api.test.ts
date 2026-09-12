@@ -37,6 +37,9 @@ import {
   fetchREOStatus,
   fetchDelegationEvents,
   fetchENSName,
+  fetchIssueForms,
+  fileIssue,
+  IssueRejected,
 } from '@/lib/api';
 
 const mockFetch = vi.fn();
@@ -667,5 +670,47 @@ describe('the reads that moved out of the hooks', () => {
   it('keeps a null ENS name, which is the answer for an address without one', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ ensName: null }));
     await expect(fetchENSName('0xabc')).resolves.toEqual({ ensName: null });
+  });
+});
+
+describe('filing a support issue', () => {
+  it('keeps canFile false, which is what the live deployment says', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ templates: [], canFile: false, chooserUrl: 'https://x' }),
+    );
+    await expect(fetchIssueForms()).resolves.toMatchObject({ canFile: false });
+  });
+
+  it('refuses a forms body with no templates, which the composer maps over', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ canFile: true }));
+    await expect(fetchIssueForms()).rejects.toThrow('templates');
+  });
+
+  it('carries every unanswered field back at once', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ errors: ['Steps to reproduce is required', 'Version is required'] }, 422),
+    );
+    const err = await fileIssue({ template: 't', title: 'x', values: {}, website: '' }).catch((e) => e);
+    expect(err).toBeInstanceOf(IssueRejected);
+    expect((err as IssueRejected).reasons).toHaveLength(2);
+  });
+
+  /**
+   * A 200 with no number is not a filed issue. Without the check the page renders "Filed as #" and
+   * links to `/support/undefined` - a confirmation of something that did not happen, on the one
+   * screen whose entire job is confirming that it did.
+   */
+  it('refuses a success that carries no issue number', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+    await expect(
+      fileIssue({ template: 't', title: 'x', values: {}, website: '' }),
+    ).rejects.toThrow('number');
+  });
+
+  it('hands back the number and url when one lands', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ number: 141, url: 'https://github.com/x/141' }));
+    await expect(fileIssue({ template: 't', title: 'x', values: {}, website: '' })).resolves.toEqual(
+      { number: 141, url: 'https://github.com/x/141' },
+    );
   });
 });

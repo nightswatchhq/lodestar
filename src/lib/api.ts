@@ -31,6 +31,7 @@ import type { DisassemblyDiff } from '@/lib/disassembly/diff';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
 import type { EnrichedIndexer } from '@/lib/enriched';
 import type { SupportArchive } from '@/lib/graph-support';
+import type { IssueForm } from '@/lib/issue-form';
 import { summariseNodeHealth } from '@/lib/node-health';
 import type { NodeHealthResponse, NodeSyncSummary } from '@/lib/node-health';
 import type {
@@ -1020,4 +1021,70 @@ export async function fetchNodeHealth(
     pick: 'data',
   });
   return summariseNodeHealth(body);
+}
+
+// ── Filing a support issue ───────────────────────────────────────────────────
+
+/** The templates the composer offers, and whether it can file at all. */
+export interface IssueFormsResponse {
+  templates: IssueForm[];
+  canFile: boolean;
+  chooserUrl: string;
+}
+
+export async function fetchIssueForms(): Promise<IssueFormsResponse> {
+  const response = await fetch('/api/issue-forms');
+  if (!response.ok) throw new Error('The issue forms could not be read.');
+  // `canFile: false` is a real answer - it is what the route says when no token is configured, and
+  // it is what the live deployment says today. `templates` missing is not: the composer maps over
+  // it, and an absent list would take the page down rather than fall back to the links.
+  return parseResponse('/api/issue-forms', await response.json(), {
+    arrays: ['templates'],
+    present: ['canFile'],
+  });
+}
+
+/** What the route answers when an issue lands. */
+export interface FiledIssue {
+  number: number;
+  url: string;
+}
+
+/** Thrown when the route refuses the submission and says which fields it wants. */
+export class IssueRejected extends Error {
+  constructor(readonly reasons: string[]) {
+    super(reasons[0] ?? 'The issue could not be filed.');
+    this.name = 'IssueRejected';
+  }
+}
+
+export async function fileIssue(body: {
+  template: string;
+  title: string;
+  values: Record<string, unknown>;
+  handle?: string;
+  website: string;
+}): Promise<FiledIssue> {
+  const response = await fetch('/api/file-issue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const answered = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    // Every unanswered field at once. One at a time would mean a round trip per field.
+    const all = Array.isArray(answered?.errors)
+      ? answered.errors.filter((e: unknown): e is string => typeof e === 'string')
+      : [];
+    throw new IssueRejected(
+      all.length > 0
+        ? all
+        : [typeof answered?.error === 'string' ? answered.error : 'The issue could not be filed.'],
+    );
+  }
+
+  // A 200 with no number is not a filed issue. Without this the page renders "Filed as #" and
+  // links to `/support/undefined`, which is a confirmation of something that did not happen.
+  return parseResponse('/api/file-issue', answered, { present: ['number', 'url'] });
 }
