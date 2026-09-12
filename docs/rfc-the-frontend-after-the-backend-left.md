@@ -186,6 +186,37 @@ layer that makes any future move cheap. Add Playwright smoke tests for the four 
 because those are the only paths the Vitest suite cannot cover and the only ones where a migration
 regression would be expensive.
 
+**Stage 1b: decide `src/proxy.ts`.** **Decided 2026-09-12: delete it, once CORS is verified live.**
+Two of the three things it was thought to carry turned out not to be obstacles, and the real one was
+not on the list.
+
+*Rate limiting.* The file's own comment says what the edge limiter is worth: "this is PER-INSTANCE -
+Vercel may run many edge instances, so the effective global limit is roughly (configured limit x
+instance count)". kittiwake rate-limits every request through `budget!` with three tiers and a
+governor whose burst is clamped to the quota, on one box with one counter. **Deleting the proxy
+makes rate limiting stricter, not weaker**, which is the opposite of how this was written up.
+
+*`LODESTAR_EDGE_SECRET`.* Its only reader in this repository is `src/proxy.ts`. kittiwake's
+`client_ip` already handles browser to Caddy to kittiwake without it: Caddy sets `x-real-ip` from its
+own peer, which is the browser, and nothing upstream can forge it. The secret exists *because* the
+proxy does; delete one and the other has no purpose. That is the tenth environment variable out.
+
+*CORS, which nobody listed.* A browser on `www.lodestar-dashboard.com` calling
+`api.lodestar-dashboard.com` is cross-origin and kittiwake has never sent a CORS header - correctly,
+because every browser request currently arrives through the edge on the dashboard's own origin.
+nightswatchhq/kittiwake#130 adds the layer, off unless `[cors] allowed_origins` is configured, so it
+can ship before anything uses it.
+
+The order is: deploy CORS, prove with a curl carrying an `Origin` header that the response actually
+carries `Access-Control-Allow-Origin`, then delete the proxy and the secret. **Not before**, because
+a `CorsLayer` will not tell you afterwards what it was built to send, and the failure mode is every
+page in the dashboard breaking at once.
+
+One thing genuinely still open, and it is a posture question rather than a technical one: **Vercel
+preview deployments are on generated subdomains**, so they are not covered by an exact origin list.
+Either previews keep a proxy, or the list grows a pattern, or previews point at a separate
+deployment. Worth deciding deliberately rather than discovering when a preview goes blank.
+
 **Stage 1a: decide `next/og`.** ~~Size the kittiwake image service.~~ **Decided 2026-09-12: not
 needed.** `next/og` re-exports a vendored `@vercel/og`, which renders a PNG from plain node with no
 Next runtime - checked, not assumed. The five routes become five `api/og/*.ts` functions with their
