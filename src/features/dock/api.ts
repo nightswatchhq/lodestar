@@ -26,6 +26,7 @@
  */
 
 import { apiUrl } from '@/lib/api-origin';
+import { fetchShedAware } from '@/lib/shed';
 import {
   useMutation,
   useQuery,
@@ -52,7 +53,9 @@ export async function studioFetch<T>(url: string, init?: RequestInit): Promise<T
   // `credentials: 'include'` was already here and becomes load-bearing rather than defensive once
   // this is cross-origin: the session cookie only travels with it, and the API only accepts it
   // because `Access-Control-Allow-Credentials` is set against an exact origin.
-  const res = await fetch(apiUrl(url), { ...init, credentials: 'include' });
+  // Shed-aware like every other read. A Dock call refused because the gate was busy is not a Dock
+  // call that failed, and the difference used to reach the user as a panel with no data in it.
+  const res = await fetchShedAware(apiUrl(url), { ...init, credentials: 'include' });
   if (!res.ok) {
     // Two envelopes, because these routes are mid-migration. The Next handlers answer
     // `{ error: "<what went wrong>" }`; kittiwake answers `{ error: "<code>", message: "<what went
