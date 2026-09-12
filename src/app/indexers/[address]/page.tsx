@@ -80,7 +80,8 @@ interface IndexerDetail {
       ipfsHash: string;
       signalledTokens: string;
       stakedTokens: string;
-      versions: Array<{ subgraph: { metadata: { displayName: string } | null } | null }>;
+      /** Flat, as kittiwake sends it. Null means unnamed, and the row falls back to the hash. */
+      displayName: string | null;
     };
   }>;
   closedAllocations?: ClosedAllocation[];
@@ -893,7 +894,7 @@ export default function IndexerDetailPage({
                   {(statusData?.deployments ?? indexer.allocations.map((a) => ({
                     deploymentId: a.subgraphDeployment.id,
                     ipfsHash: a.subgraphDeployment.ipfsHash ?? '',
-                    displayName: a.subgraphDeployment.versions?.[0]?.subgraph?.metadata?.displayName ?? null,
+                    displayName: a.subgraphDeployment.displayName,
                     allocatedTokens: a.allocatedTokens,
                     signalledTokens: a.subgraphDeployment.signalledTokens,
                     stakedTokens: a.subgraphDeployment.stakedTokens,
