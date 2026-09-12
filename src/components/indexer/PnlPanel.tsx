@@ -15,6 +15,7 @@ import {
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, formatGRTFull, formatUSD, cn } from '@/lib/utils';
+import { fetchIndexerRevenue, fetchIndexerPnl } from '@/lib/api';
 
 const WINDOWS = [7, 30, 90, 365] as const;
 type Window = (typeof WINDOWS)[number];
@@ -79,32 +80,27 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
   const [chains, setChains] = useState<string[]>(DEFAULT_CHAINS);
 
   const addr = indexer.toLowerCase();
-  const priceQuery = grtPrice > 0 ? `&grtPrice=${grtPrice}` : '';
 
-  const revenue = useQuery<RevenueResponse>({
+  const revenue = useQuery({
     queryKey: ['indexerRevenue', addr, window],
-    queryFn: async () => {
-      const r = await fetch(`/api/indexer/${addr}/revenue?window=${window}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    },
+    queryFn: () => fetchIndexerRevenue(addr, window),
     staleTime: 5 * 60 * 1000,
   });
 
-  const pnl = useQuery<PnlResponse>({
+  const pnl = useQuery({
     queryKey: ['indexerPnl', addr, window, chains.join(','), grtPrice],
-    queryFn: async () => {
-      const chainParam = chains.length ? `&chains=${chains.join(',')}` : '';
-      const r = await fetch(`/api/indexer/${addr}/pnl?window=${window}${priceQuery}${chainParam}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    },
+    queryFn: () =>
+      fetchIndexerPnl(addr, {
+        windowDays: window,
+        grtPrice: grtPrice > 0 ? grtPrice : undefined,
+        chain: chains.length ? chains.join(',') : undefined,
+      }),
     staleTime: 5 * 60 * 1000,
   });
 
-  const daily = revenue.data?.data.daily ?? [];
-  const p = pnl.data?.data.pnl;
-  const defaultChains = pnl.data?.data.defaultChainCosts ?? {};
+  const daily = revenue.data?.daily ?? [];
+  const p = pnl.data?.pnl;
+  const defaultChains = pnl.data?.defaultChainCosts ?? {};
 
   const chartData = useMemo(
     () =>

@@ -4,46 +4,16 @@ import { use } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
+import { fetchProbeDetail } from '@/lib/foghorn';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
-interface ProbeDetail {
-  probe: {
-    id: string;
-    deployment_id: string;
-    block_hash: string;
-    block_number: number;
-    query_category: string;
-    query_text: string;
-    dispatched_at: string;
-  };
-  observations: Array<{
-    indexer_address: string;
-    response_hash: string | null;
-    latency_ms: number | null;
-    meta_block_number: number | null;
-    meta_block_hash: string | null;
-    http_status: number | null;
-    error_class: string | null;
-    stake_weight: number;
-  }>;
-  divergence: {
-    cluster_count: number;
-    diff_patches: unknown[];
-    largest_by_count: { hash: string; size: number };
-    largest_by_stake: { hash: string; weight: number };
-  } | null;
-}
 
 function useProbeDetail(id: string) {
-  return useQuery<ProbeDetail>({
+  return useQuery({
     queryKey: ['foghorn-probe', id],
-    queryFn: async () => {
-      const r = await fetch(`/api/foghorn/probe/${id}`);
-      if (!r.ok) throw new Error(`${r.status}`);
-      return r.json();
-    },
+    queryFn: () => fetchProbeDetail(id),
     staleTime: 30 * 60_000, // immutable after write
   });
 }

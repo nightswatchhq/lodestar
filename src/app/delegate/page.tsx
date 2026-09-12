@@ -8,6 +8,7 @@ import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { weiToGRT, cn } from '@/lib/utils';
+import { fetchDelegateRecommendation, fetchDelegateCandidates } from '@/lib/api';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
 import type { EnrichedIndexer } from '@/lib/enriched';
 
@@ -44,41 +45,18 @@ const DEFAULT_PREFS: Prefs = { returns: 5, stability: 5, safety: 5, network: 5 }
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
 function useRecommendation(prefs: Prefs) {
-  const params = new URLSearchParams({
-    returns:   String(prefs.returns),
-    stability: String(prefs.stability),
-    safety:    String(prefs.safety),
-    network:   String(prefs.network),
-  });
-
-  return useQuery<RecommendResponse>({
+  return useQuery({
     queryKey: ['delegate-recommend', prefs],
-    queryFn: async () => {
-      const res = await fetch(`/api/delegate/recommend?${params}`);
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
+    queryFn: () => fetchDelegateRecommendation(prefs),
     staleTime: 60_000,
     placeholderData: (prev) => prev, // keep previous result visible while re-fetching
   });
 }
 
 function useCandidates(prefs: Prefs, enabled: boolean) {
-  const params = new URLSearchParams({
-    returns:   String(prefs.returns),
-    stability: String(prefs.stability),
-    safety:    String(prefs.safety),
-    network:   String(prefs.network),
-    count:     '8',
-  });
-
-  return useQuery<{ candidates: Array<{ indexer: EnrichedIndexer; score: number; reasons: string[] }> }>({
+  return useQuery({
     queryKey: ['delegate-candidates', prefs],
-    queryFn: async () => {
-      const res = await fetch(`/api/delegate/recommend?${params}`);
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
+    queryFn: () => fetchDelegateCandidates(prefs, 8),
     staleTime: 60_000,
     enabled,
   });
