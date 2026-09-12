@@ -77,7 +77,9 @@ const OK = {
   epochs: { data: { epoches: [] } },
   indexers: { data: { indexers: [] } },
   provisions: { data: { provisions: [] } },
-  portfolio: { data: { delegator: null, curator: null } },
+  // `stakes` and `signals` sit beside the entity rather than inside it, which this fixture did not
+  // say and which is exactly what broke both portfolio pages in production.
+  portfolio: { data: { delegator: null, curator: null, stakes: [], signals: [] } },
   poiOverview: { data: { summary: { overallConsensusRate: 1 }, deployments: [] } },
   poiDeployment: { data: { deploymentId: 'Qm1', ipfsHash: 'Qm1', epochs: [] } },
   indexingStatus: { data: { deploymentId: 'Qm1', indexers: [] } },
@@ -788,5 +790,59 @@ describe('the SQL tier', () => {
       }),
     );
     await expect(issueSqlReceipt('q', {})).resolves.toMatchObject({ pubkey: 'bd3b3313' });
+  });
+});
+
+/**
+ * Both portfolio pages rendered an error boundary for every address that had a position.
+ *
+ * `/delegators/…` threw `stakes is not iterable` and `/curators/…` threw `Cannot read properties of
+ * undefined (reading 'map')`. Both worked for an address with nothing, because the page returns
+ * early on a null entity before it reaches the iteration - so every fixture and every sweep subject
+ * exercised the one path through those pages that works.
+ */
+describe('a portfolio with anything in it', () => {
+  it('refuses a delegator body with no stakes array, where the page iterates one', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { delegator: { id: '0xa' } } }));
+    await expect(fetchDelegatorPortfolio('0xa')).rejects.toThrow('data.stakes');
+  });
+
+  it('refuses a curator body with no signals array', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { curator: { id: '0xa' } } }));
+    await expect(fetchCuratorPortfolio('0xa')).rejects.toThrow('data.signals');
+  });
+
+  it('hands the page a delegator it can iterate', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          delegator: { id: '0xa', total_staked_tokens: '100', stakes_count: 1 },
+          stakes: [{ id: 's1', staked_tokens: '100', indexer: '0xix', indexing_reward_cut: '430000' }],
+        },
+      }),
+    );
+    const { delegator } = await fetchDelegatorPortfolio('0xa');
+    expect(delegator?.stakes).toHaveLength(1);
+    expect(delegator?.totalStakedTokens).toBe('100');
+    expect(delegator?.stakes[0].indexer.indexingRewardCut).toBe(430000);
+  });
+
+  it('hands the page a curator it can map over', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          curator: { id: '0xa', total_signalled_tokens: '9900' },
+          signals: [{ id: 'g1', signal: '9900', subgraph_deployment: '0xdep' }],
+        },
+      }),
+    );
+    const { curator } = await fetchCuratorPortfolio('0xa');
+    expect(curator?.signals.map((s) => s.signal)).toEqual(['9900']);
+    expect(curator?.totalSignalledTokens).toBe('9900');
+  });
+
+  it('still answers null for an address that has never done either', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { delegator: null, stakes: [] } }));
+    await expect(fetchDelegatorPortfolio('0xa')).resolves.toEqual({ delegator: null });
   });
 });
