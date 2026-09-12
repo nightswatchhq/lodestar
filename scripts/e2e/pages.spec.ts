@@ -174,27 +174,6 @@ test('a POI deployment page renders epochs rather than a failed read', async ({ 
   ).toBe(true);
 });
 
-/**
- * The board's moderator-status check, which answered 405 after the route moved with only POST
- * bound. Its caller swallows the failure, so a signed-in moderator was demoted by a refresh and
- * the page looked entirely normal. nightswatchhq/kittiwake#124.
- *
- * Asserted on the request rather than on the controls, because the controls are correctly absent
- * for the anonymous visitor this test is: what must not happen is the question failing to be asked.
- */
-test('the board can ask whether you are a moderator', async ({ page }) => {
-  const rejected: string[] = [];
-  page.on('response', (r) => {
-    const u = r.url();
-    if (r.status() >= 400 && u.includes('/api/scuttlebutt/')) {
-      rejected.push(`${r.status()} ${r.request().method()} ${u.split('/api')[1]}`);
-    }
-  });
-  await page.goto('/scuttlebutt');
-  await page.waitForTimeout(3000);
-  expect(rejected, `the board made requests the backend refused: ${rejected.join(', ')}`).toHaveLength(0);
-});
-
 // Widened from six to sixteen after a sweep of all forty pages on 2026-09-12 found two routes
 // broken in production that nothing here opened. This is the floor - up, no boundary, no console
 // errors, some content - and it is deliberately not a data assertion: the tests above carry those

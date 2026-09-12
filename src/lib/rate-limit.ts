@@ -15,11 +15,6 @@ const LIMITS: Array<[RegExp, number]> = [
   [/^\/api\/indexer-status\//, 20],
   [/^\/api\/portfolio/, 30],
   [/^\/api\/feed/, 20],
-  // Source verification spins a sandbox microVM + full build per call — very
-  // Scuttlebutt: chatty by nature, but the in-route flood guard is the real
-  // throttle. The SSE stream is long-lived (one request), so this mainly bounds
-  // POST/GET history calls.
-  [/^\/api\/scuttlebutt\//, 60],
   // Public SQL. Every call is an analytical query against the Helsinki box, which also runs the
   // Lodestar Oracle, dips-nest and the data-service gateway — so the thing being rationed is not
   // bandwidth but the CPU those depend on. Five a minute is enough to explore a dataset and not
