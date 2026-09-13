@@ -227,5 +227,25 @@ rates and fees. `checks/parity-2026-09-07.sql` covers all 288 and passes on the 
   adaptive window grew to 4,000 blocks and hit the fetch budget 53 times over 17,500 blocks. A
   workaround, to be removed once N3's resolver lands; sent to N3 to prove.
 - The publisher filter is written and tested on a stub (`pending/publisher-filter.sql`), including
-  a stranger re-posting a published CID; it waits for N3's `from` column. legacy branches on real data; fees before
+  a stranger re-posting a published CID; it waits for N3's `from` column.
+
+**F1 residuals done.** foghorn#3 (`e96d48d`, `9d8873b`), open.
+- `deployment_quality` grouped by raw signing key, counted refused payments and marked any
+  corroborated probe divergent; now on the shared `JUDGED_PROBES` definition. Test failed before
+  (rows keyed by signing keys).
+- Late changes to a bucket's contents: migration 024 adds `qos_reroll`; the resolver's
+  `record_attribution` and `detect_nondeterministic` request re-rolls; the rollup drains them.
+  Two tests failed before (4 against 5 queries; 4 against 0 divergent).
+- Foghorn had no CI. Added one running the database tests against `postgres:16-alpine`; a CI run
+  without the database URL now fails instead of skipping. CI run 34770364937: probe 33 passed and 1
+  ignored, core 28, API 2, all 9 database tests executed.
+- Found on the way: `sqlx::migrate!` embeds migrations at compile time without cargo knowing, so a
+  cached build kept the old schema; fixed with `build.rs` `rerun-if-changed`.
+- Operator step after deploy: `docker compose run --rm probe foghorn-probe reroll-qos`, idempotent,
+  tested, not run on real data.
+
+**Still open on F1, sent back:** `detect_nondeterministic` keeps `cluster_count > 1` without
+excluding refusals or unattributed keys, so a deployment can be excused from correctness on evidence
+the rest of Foghorn rejects; unflagging has no test; the re-roll leaves stale rows it would not
+write (old signing-key rows, empty buckets). legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
