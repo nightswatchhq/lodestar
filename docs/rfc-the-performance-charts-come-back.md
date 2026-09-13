@@ -22,6 +22,9 @@ Both come back, with no key:
    and `[[ipfs]]` cannot read it there today.
 3. **A second series on the same charts** from Foghorn's own measurements, which kittiwake already
    proxies. Correctness and latency percentiles, which the oracle cannot publish.
+4. **The QoS Quality panel** (grade, four sub-scores, the served-vs-allocated gap, the score history
+   and the per-deployment breakdown) and the directory's QoS column, recomputed in kittiwake from
+   the same nest at allocation grain.
 
 Parity is exact in principle for both charts, because the source is the same data read by a
 different decoder. It will not be exact in the numbers, on purpose, in two places named below where
@@ -82,6 +85,28 @@ avg_query_fee  max_query_fee  total_query_fees
 **Parity includes their holes.** The publisher stopped for about 38 hours from 2026-07-29 and for 37
 hours or more from 2026-08-04, and resumed from the tip without backfilling (GRC, Motivation). Those
 buckets do not exist anywhere. The rebuilt chart shows them as gaps.
+
+## What the old section rendered
+
+The bar for "back" is everything below, read from `cb61cea~1` and `cd47802~1`. Each row names where
+it comes from now and what changes.
+
+| Element | Old source and arithmetic | Now |
+|---|---|---|
+| Query Performance, **Query Count** | oracle `query_count` per day; summary = 90-day total | same field, summed per allocation first |
+| **Query Fees** | `total_query_fees` per day; summary = total | same |
+| **Avg. Query Fee** | fees over queries per day; summary = the **latest day only** | same series; summary over the window, latest day shown beside it |
+| **Query Success Rate** | mean of rows' `proportion_indexer_200_responses`; summary = mean of daily means | Σ 200s over Σ queries, per day and for the window |
+| **Avg. Indexer Latency** | mean of rows' averages; summary = mean of daily means | weighted by 200s; Foghorn p50/p95/p99 beside it |
+| **Avg. Blocks Behind** | mean of rows' means; summary = mean of daily means | mean of bucket means, with `buckets` per day |
+| Provenance link to `/qos`, "90 day window" footer, skeleton, empty state | static | kept; empty state distinguishes "no data" from "publisher silent" |
+| **QoS Quality**, grade A to F | `q_score` from `indexer_qos_score` (Postgres, cron); `qosGrade` thresholds 75/60/45/30 | kittiwake computes it from the nest rollup; same thresholds |
+| Four bars: Reliability (Wilson), Latency (cohort-normalised decay), Freshness, Coverage | `lib/qos-score.ts`, `lib/qos-aggregate.ts` over `qos_daily` | ported to Rust, same `DEFAULTS`, tested against the TypeScript on fixtures |
+| **Served-vs-allocated gap** | allocation share minus served-query share, mean over allocated deployments | allocations from `graph-allocations-nest`, served share from the QoS nest |
+| **Q-score history** | daily `q_score`, EWMA half-life 10 days | same, recomputed for the whole backfill rather than "history builds daily" |
+| **What is holding the score down** | `qos-deployments` route: per deployment success rate, dominant deficit, cohort-struggling marker | same, at the same grain |
+| Directory **QoS** column | `/api/network-health` leaderboard | `q_score` on kittiwake's `/api/indexers-enriched` |
+| Daily Trends: Rewards (indexer and delegator, stacked), Query Fees (collected, curators), Cumulative tabs | Horizon Performance subgraph, 30 days | `graph-allocations-nest` view, fees labelled gross or net |
 
 ## 1. Daily Trends
 
@@ -151,8 +176,9 @@ for a month while reporting itself healthy (GRC, Motivation). The nest therefore
 view filters by a publisher list written in the SQL, and counts rejected rows rather than dropping
 them.
 
-**The rollup.** An authored entity (RFC-0041), `qos_indexer_daily`, keyed by indexer, day and
-gateway:
+**The rollup.** An authored entity (RFC-0041), `qos_allocation_daily`, keyed by indexer,
+deployment, chain, gateway and day, because the QoS Quality score and its per-deployment breakdown
+need that grain. The indexer-day figures on the charts are sums over it, never averages of it:
 
 | Column | Arithmetic |
 |---|---|
@@ -178,6 +204,16 @@ newest bucket. Those are different questions, and conflating them is how the 202
 
 **The page.** `IndexerQoSChart` comes back from `cb61cea^`. Its tooltip already says these are Edge &
 Node's figures, counted from traffic their gateway routed.
+
+**The QoS Quality panel.** `QosQualityPanel` comes back from `cb61cea^` against two kittiwake routes
+in the old shapes, `/api/indexer/{address}/qos-score` and `/api/indexer/{address}/qos-deployments`.
+The scoring is `lib/qos-score.ts` and `lib/qos-aggregate.ts` ported to a kittiwake crate. Those files
+are pure functions with their own tests and a calibration history in their comments, so the port
+keeps `DEFAULTS` as they were and is checked against the TypeScript on the same fixtures before
+anything new is tried. Block times per chain come across with it. Allocations for the served gap
+come from `graph-allocations-nest`, which kittiwake already reads. Two things are better than before:
+the score history covers the whole backfill instead of starting when a cron first ran, and every
+input is a nest row anyone can re-derive.
 
 ## 3. Query Performance: Foghorn's series
 
@@ -205,8 +241,6 @@ of scope here.
 ## Non-goals
 
 - Producing organic demand ourselves. Nobody who did not serve those queries can.
-- `QosQualityPanel`. The Foghorn scorecard already on the page covers that ground; it comes back only
-  if an indexer asks for it.
 - Publishing Foghorn's figures on chain (the GRC).
 - The P&L panel's own daily series. See Open questions.
 
@@ -218,10 +252,12 @@ of scope here.
 | T2 | kittiwake | `/api/indexer/{address}/trends`, with a `kittiwake-parity` entry | T1 |
 | T3 | lodestar | `IndexerTrendsChart` restored | T2 |
 | N1 | nuthatch | `[[ipfs]] cid_json_path` and the topic filter | - |
-| Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_indexer_daily` | N1 |
+| Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_allocation_daily` | N1 |
 | Q2 | kittiwake | `/api/indexer/{address}/qos` | Q1 |
 | Q3 | lodestar | `IndexerQoSChart` restored, with gaps | Q2 |
 | Q4 | lodestar | the Foghorn series | Q3 |
+| S1 | kittiwake | the score port, `qos-score` and `qos-deployments` routes, `q_score` on `indexers-enriched` | Q1 |
+| S2 | lodestar | `QosQualityPanel` and the directory column restored | S1 |
 
 The T slices and N1 can start today, in parallel.
 
