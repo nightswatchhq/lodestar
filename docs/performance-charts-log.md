@@ -430,5 +430,5 @@ before release.
 (`30983de`), pushed, no PR, 1,931 words. `TODO(release)` markers for the date, backfill span and
 serving figures after N4, parity against the old subgraphs, the Foghorn figures re-measured after
 foghorn#3 deploys, and the release run commands. Named indexers appear in it with figures the old
-charts misstated; Chief to decide before publishing whether naming them stays. legacy branches on real data; fees before
+charts misstated. Decision (Chief): the names stay. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
