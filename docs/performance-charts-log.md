@@ -477,6 +477,16 @@ payloads. (The gateway returns 403 to Python's default user agent; the key was n
 - Still to do: run the view itself on production once #23 is deployed, including the legacy branch.
 - Production's public SQL answered 429 to 60 rapid queries from this check; rerun as two grouped
   queries. Our load, not a fault.
+
+**N4 restarted in two halves.** The first N4 run was stopped at a session restart after its
+integration step, which is open as nuthatch#1375 (`289a08a1`: N2's verification inside N3's
+out-of-band resolver, only proven documents become rows). Relaunched on Chief's go as two stacked
+branches with separate ownership, the way N2 and N3 ran:
+- N4a (`pete/ipfs-typed-rows`): typed rows from JSON documents, rollups servable within
+  `nuthatch serve` defaults, and the QoS nest rebuilt with the same contract views, `qos_freshness`,
+  the publisher filter on `tx_from`, verified documents only, and a real-run parity check.
+- N4b (`pete/seal-bytes-and-fetch`): the byte-bounded seal cut, parallel block-body fetch, and the
+  SIGTERM fault.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
