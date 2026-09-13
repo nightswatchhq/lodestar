@@ -200,5 +200,32 @@ different definition, listed not changed. Nothing reads `rav_redemptions` any mo
 Untested: the new views, sums check and speed on the production nest (the public SQL parser refuses
 `ASOF`, so the receipt check ran as equivalent SQL; that refusal applies to ad-hoc SQL only, since
 `views/90-lodestar-indexers.sql` and `views/50-lodestar-epochs.sql` already use `ASOF JOIN` and are
-served in production today); legacy branches on real data; fees before
+served in production today);
+
+**Q1: the QoS nest.** qos-reo-nest#1 (`5cf77dc`, `79ced0a`, `d0bc6df`), open. Gnosis, `data_edge` from
+block 46,700,000 (2026-06-14 23:15 UTC), `top_level_calls`, two `[[ipfs]]` declarations with
+`cid_json_path` and `json_match`. Views: typed five-minute rows (day is the bucket start's UTC day;
+a bucket posted twice counts once), `qos_allocation_daily`, `qos_deployment_daily`,
+`qos_indexer_daily` (sums of allocation rows), seconds behind the freshest credible peer using
+kittiwake#141's block-time table, and `qos_settings.require_verified` ready for N2.
+
+Parity, blocks 48,119,000 to 48,136,546 in 544 s (596 calls, 260 MB hot, 53 MB sealed): 575 of 576
+documents for 2026-09-07 resolved; the 287 indexer-topic documents are byte-identical to the
+measurement's independently fetched copies; on those 287 all 56 indexers match the independent
+reference exactly for counts, buckets, bad buckets and worst bucket, and within 1.1e-14 relative for
+rates and fees. `checks/parity-2026-09-07.sql` covers all 288 and passes on the full set.
+
+**Found by Q1:**
+- The committed check fails on the real run because one document (`QmYTFzn…`, 00:10) failed with
+  "reading response body" and was never retried; that one bucket shifts 49 of 56 indexers. Sent to N3.
+- One day of `qos_indexer_daily` is refused under the default 512 MB analytics budget; at 8 GB it
+  takes 0.97 s and 3.86 GB peak. Recomputing from JSON per query cannot serve 90 days. Entities
+  cannot host the parsing (`from_json`, `unnest`, window functions, `arg_min`). Decision: nuthatch
+  slice N4, typed rows from JSON documents at resolution, so the rollups become authored incremental
+  entities over typed columns. Queued behind N2 and N3, which touch the same code.
+- `blocks = true` is set only for its 800-block window cap: without it the event-less nest's
+  adaptive window grew to 4,000 blocks and hit the fetch budget 53 times over 17,500 blocks. A
+  workaround, to be removed once N3's resolver lands; sent to N3 to prove.
+- The publisher filter is written and tested on a stub (`pending/publisher-filter.sql`), including
+  a stranger re-posting a published CID; it waits for N3's `from` column. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.

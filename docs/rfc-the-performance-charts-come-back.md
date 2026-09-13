@@ -284,7 +284,10 @@ of scope here.
 | T2 | kittiwake | `/api/indexer/{address}/trends`, with a `kittiwake-parity` entry | T1 |
 | T3 | lodestar | `IndexerTrendsChart` restored | T2 |
 | N1 | nuthatch | `[[ipfs]] cid_json_path` and the topic filter | - |
-| Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_allocation_daily` | N1 |
+| N2 | nuthatch | verification of multi-block UnixFS documents | N1 |
+| N3 | nuthatch | out-of-band resolution with retry, `from` on call rows, `--seal-direct`, identity covering calls and IPFS | N1 |
+| N4 | nuthatch | typed rows from JSON documents at resolution, so rollups are incremental entities rather than per-query JSON parsing (one day measured at 3.86 GB peak) | N2, N3 |
+| Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_allocation_daily` | N1; serving waits on N2 to N4 |
 | Q2 | kittiwake | `/api/indexer/{address}/qos` | Q1 |
 | Q3 | lodestar | `IndexerQoSChart` restored, with gaps | Q2 |
 | Q4 | lodestar | the Foghorn series | Q3, F1 |
