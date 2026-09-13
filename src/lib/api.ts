@@ -32,6 +32,7 @@ import type {
   SubgraphSearchResult,
 } from '@/lib/contracts/subgraph-search';
 import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
+import type { IndexerQosResponse, QosDeploymentsResponse, QosScoreResponse } from '@/lib/contracts/indexer-qos';
 import type { DisassemblyReport } from '@/lib/disassembly/types';
 import type { DisassemblyDiff } from '@/lib/disassembly/diff';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
@@ -449,6 +450,41 @@ export async function fetchIndexerPayments(receiver: string): Promise<PaymentsOv
     objects: ['data'],
     arrays: ['data.escrowAccounts', 'data.recentTransactions'],
     present: ['data.totalCollected', 'data.activePayers'],
+    pick: 'data',
+  });
+}
+
+/** An indexer's daily QoS from Edge & Node's oracle postings over the last `days` UTC days, today included. */
+export async function fetchIndexerQos(address: string, days = 90): Promise<IndexerQosResponse> {
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos?days=${days}`),
+  );
+  if (!response.ok) throw new Error(`Indexer QoS failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos', await response.json(), {
+    objects: ['data', 'data.summary', 'data.freshness'],
+    rows: { 'data.qos': ['date', 'buckets', 'partial', 'badBuckets'] },
+    pick: 'data',
+  });
+}
+
+/** The QoS Quality score: the latest breakdown and a daily history over the scoring window. */
+export async function fetchIndexerQosScore(address: string): Promise<QosScoreResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos-score`));
+  if (!response.ok) throw new Error(`QoS score failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos-score', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.daily'],
+    pick: 'data',
+  });
+}
+
+/** Every deployment behind the QoS Quality score, with how much of it each one costs. */
+export async function fetchIndexerQosDeployments(address: string): Promise<QosDeploymentsResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos-deployments`));
+  if (!response.ok) throw new Error(`QoS deployments failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos-deployments', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.deployments': ['deployment_id', 'drag', 'measured'] },
     pick: 'data',
   });
 }

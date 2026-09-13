@@ -35,6 +35,8 @@ import { AprProvenancePanel } from '@/components/indexer/AprProvenancePanel';
 import dynamic from 'next/dynamic';
 
 const StakeHistoryChart = dynamic(() => import('@/components/charts/StakeHistoryChart').then(m => ({ default: m.StakeHistoryChart })), { ssr: false });
+const IndexerQoSChart = dynamic(() => import('@/components/charts/IndexerQoSChart').then(m => ({ default: m.IndexerQoSChart })), { ssr: false });
+const QosQualityPanel = dynamic(() => import('@/components/indexer/QosQualityPanel').then(m => ({ default: m.QosQualityPanel })), { ssr: false });
 const PnlPanel = dynamic(() => import('@/components/indexer/PnlPanel').then(m => ({ default: m.PnlPanel })), { ssr: false });
 import { ParameterHistory } from '@/components/ParameterHistory';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
@@ -465,6 +467,12 @@ export default function IndexerDetailPage({
           </svg>
         </div>
       </Link>
+
+      {/* Query Performance: Edge & Node's oracle postings, with Foghorn's probes beside them */}
+      <IndexerQoSChart indexer={address} />
+
+      {/* QoS Quality: the score, recomputed from the same postings */}
+      <QosQualityPanel indexer={address} />
 
       {/* Indexer P&L — query-fee (RAV) + indexing-reward revenue net of infra cost */}
       <PnlPanel indexer={address} grtPrice={grtPrice} />

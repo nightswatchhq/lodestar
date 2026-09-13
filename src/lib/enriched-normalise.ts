@@ -41,6 +41,8 @@ interface KittiwakeRow {
   rollingApy30d?: string | null;
   rollingApy90d?: string | null;
   lastUpdated?: string;
+  // Sent since kittiwake#143. Null for an indexer the oracle measured nothing for.
+  qScore?: number | null;
 }
 
 const num = (v: unknown): number => {
@@ -108,6 +110,7 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     },
     score: r.score === null || r.score === undefined ? null : num(r.score),
     scoreGrade: (r.scoreGrade ?? null) as EnrichedIndexer['scoreGrade'],
+    qScore: typeof r.qScore === 'number' && Number.isFinite(r.qScore) ? r.qScore : null,
 
     // Absent upstream, and left absent on purpose: `computeScore` in /api/delegate/recommend
     // distinguishes "no breakdown" from "a breakdown of zeroes", and an empty object would make

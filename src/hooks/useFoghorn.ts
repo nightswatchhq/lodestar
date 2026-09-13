@@ -18,6 +18,7 @@ import {
   fetchQosBuckets,
   fetchQosCompare,
 } from '@/lib/foghorn';
+import { FOGHORN_BUCKET_LIMIT, FOGHORN_HOURS } from '@/lib/qos';
 
 const MINUTE = 60 * 1000;
 
@@ -127,6 +128,17 @@ export function useFoghornFeed(limit = 50) {
     queryKey: ['foghorn', 'feed', limit],
     queryFn: () => fetchFoghornFeed(limit),
     staleTime: MINUTE,
+    retry: 0,
+  });
+}
+
+/** One indexer's Foghorn buckets over the last `hours`, newest first, at most FOGHORN_BUCKET_LIMIT of them. */
+export function useIndexerQosBuckets(address: string | null, hours = FOGHORN_HOURS) {
+  return useQuery({
+    queryKey: ['foghorn', 'qos-buckets', address, hours],
+    queryFn: () => fetchQosBuckets(hours, FOGHORN_BUCKET_LIMIT, address!),
+    enabled: !!address,
+    staleTime: 5 * MINUTE,
     retry: 0,
   });
 }

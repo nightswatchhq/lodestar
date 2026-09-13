@@ -17,6 +17,7 @@ import {
 import { useEnrichedIndexers, useIndexers, useNetworkStats } from '@/hooks/useNetworkStats';
 import { useFoghornGrades } from '@/hooks/useFoghorn';
 import { gradeVariant } from '@/lib/foghorn';
+import { qosGrade } from '@/lib/qos';
 import { SCORE_DIMENSION_COUNT, SCORE_DIMENSION_SUMMARY } from '@/lib/risk-score';
 import {
   weiToGRT,
@@ -79,6 +80,7 @@ interface IndexerRow {
   scoreGrade: 'A' | 'B' | 'C' | 'D' | 'F' | null;
   foghornGrade: string | null;
   foghornFlags: { verdicts: number; needsAttention: boolean; sybil: boolean } | null;
+  qScore: number | null;
   raw: Indexer;
 }
 
@@ -319,6 +321,7 @@ export function IndexerTable() {
           scoreGrade: e.scoreGrade ?? null,
           foghornGrade: foghornMap?.get(e.id.toLowerCase())?.grade ?? null,
           foghornFlags: foghornFlagsFor(foghornMap, e.id),
+          qScore: e.qScore ?? null,
           // Reconstruct raw Indexer shape for comparison panel
           raw: {
             id: e.id,
@@ -386,6 +389,7 @@ export function IndexerTable() {
           scoreGrade: null,
           foghornGrade: foghornMap?.get(indexer.id.toLowerCase())?.grade ?? null,
           foghornFlags: foghornFlagsFor(foghornMap, indexer.id),
+          qScore: null,
           raw: indexer,
         };
       })
@@ -532,6 +536,21 @@ export function IndexerTable() {
               {flags?.sybil && (
                 <span className="text-[10px] text-[var(--red-text)]" title="Sybil swarm member">◆</span>
               )}
+            </span>
+          );
+        },
+        sortUndefined: 'last',
+      }),
+      columnHelper.accessor('qScore', {
+        header: () => <HeaderTip label="QoS" tip="QoS Quality score (0 to 100): Wilson reliability × latency × freshness, normalised per deployment and weighted by queries served, from Edge & Node's oracle postings. Measures served quality, not raw volume. The breakdown is on each indexer's page." />,
+        cell: (info) => {
+          const q = info.getValue();
+          if (q === null) return <span className="text-[var(--text-faint)]">—</span>;
+          const color = q >= 75 ? 'var(--green)' : q >= 45 ? 'var(--amber)' : 'var(--red-text)';
+          return (
+            <span className="font-mono font-semibold" style={{ color }}>
+              {q.toFixed(0)}
+              <span className="ml-1 text-[11px] font-medium opacity-70">{qosGrade(q).grade}</span>
             </span>
           );
         },
