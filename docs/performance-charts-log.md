@@ -99,6 +99,8 @@ cohort constants, `LATENCY_TAU_MULT`), every scoring function, aggregation, the 
 tests (every vitest case from both old files plus the nest adapter). Equivalence against the original
 TypeScript run under Node: 689 seeded cases, all equal, max deviation 1.16e-10; two deliberate
 mutations each failed it. Only NaN handling differs (`f64::max` vs `Math.max`), unreachable from real
-input. Routes and database reads are the second half. Its adapter summed indexer attempts for each
-deployment's query total, which undercounts where the gateway retried on a second indexer; being
-changed to read the query-result topic.
+input. Routes and database reads are the second half. Its adapter first summed indexer attempts for
+each deployment's query total, which undercounts where the gateway retried on a second indexer.
+Changed in `cf64f51`: totals come from `qos_deployment_daily` (the query-result topic's
+`query_count`), no attempt-based fallback. A retried-query test covers it (1,100 attempts against
+1,000 gateway queries). 46 unit tests; all 689 equivalence cases still pass, max deviation 1.16e-10.
