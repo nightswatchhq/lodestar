@@ -135,3 +135,27 @@ calls, 36 documents resolved (18 per topic), 37.8 MB, about 1.2 s each, 0 unread
   nothing and says nothing (read from code, not run). Slice N3.
 - The runtime identity guard and `/sql` provenance hash use the event registry only; for an
   event-less nest that is `e3b0c442…`, the hash of nothing. Predates N1. Slice N3.
+
+**F1: Foghorn's quality counts.** foghorn#3 (`92b58dd`), open. Causes:
+- `/quality` matched `observation.indexer_address` directly (`routes.rs:269`), which for a gateway
+  probe holds the allocation signing key, so only paid observations matched; those are mostly
+  payment refusals with no response hash, filtered to 0. `by_deployment` counted the refusals.
+  `divergent_probes` used `cluster_count > 1`, counting a probe as a fault even when this indexer
+  was in the majority.
+- Scorecard 820 against buckets 637: the rollup window started at `NOW() - interval`, not on a
+  bucket boundary (`qos.rs:125`), so each pass rewrote the oldest bucket from a partial slice.
+- Scorecard 21 divergent against buckets 10: the rollup compared answers with the stake-largest
+  hash but checked the count-largest cluster's size (`qos.rs:93-97`, `169-178`). A bug, not two
+  definitions.
+Fixed with one shared probe query resolving identity through `allocation_map`, a bucket-aligned
+window, and a strict count majority matching the scorer. Three tests fail before the fix (0 vs 4, 1
+vs 2, 2 vs 1). Untested against production data.
+
+**Consequence for the RFC.** The Foghorn figures in §3 (7 of 58 pairs differing by 10 points or
+more, 27 attestation conflicts, 0.064 mean difference) came from the faulty endpoints. They are
+re-measured after F1 is deployed and its buckets re-rolled.
+
+**F1 residuals, being fixed on the same PR.** `deployment_quality` carries the same faults; late
+attribution (`resolver.rs:136`, retried after 24 h) and a deployment flagged non-deterministic after
+rollup never re-roll their buckets; the new database tests pass silently when
+`FOGHORN_TEST_DATABASE_URL` is unset.

@@ -249,9 +249,11 @@ than optional. Foghorn's `query_count` is probes dispatched, never demand. And a
 are paid direct (2,932 of 8,840 over the week); the rest go through the gateway and are an upper
 bound (Foghorn migration 021).
 
-What it adds is measured. It disagrees with the oracle by 10 points or more on 7 of 58 comparable
-indexer-deployment pairs: nodeify at 69.8% on the oracle and 15.1% over 166 probes. It found 27
-attestation conflicts with genuinely different data across 3 deployments. Two limits are measured too.
+What it adds was measured through endpoints that turned out to be faulty (slice F1, foghorn#3), so
+the next three figures are provisional until F1 is deployed and re-measured. It disagreed with the
+oracle by 10 points or more on 7 of 58 comparable indexer-deployment pairs: nodeify at 69.8% on the
+oracle and 15.1% over 166 probes. It reported 27 attestation conflicts with genuinely different data
+across 3 deployments. Two limits are measured too.
 It covers 127 indexer-deployment pairs against the oracle's 5,401. In the last day indexers refused
 2,297 paid probes because they denylist our payer, against 397 served. And
 `/v1/indexer/:address/quality` returns `total_probes: 0` and null latency for every indexer while its
