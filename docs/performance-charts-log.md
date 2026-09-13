@@ -159,3 +159,44 @@ re-measured after F1 is deployed and its buckets re-rolled.
 attribution (`resolver.rs:136`, retried after 24 h) and a deployment flagged non-deterministic after
 rollup never re-roll their buckets; the new database tests pass silently when
 `FOGHORN_TEST_DATABASE_URL` is unset.
+
+**The P&L reads the right money.** Open, held: graph-allocations-nest#23 (`9d41ab2`, adds
+`lodestar_indexer_deployment_daily`; `lodestar_indexer_daily` is now its sum), kittiwake#142
+(`bf332b2`, `/revenue`, `/revenue?byDeployment=1` and `/pnl` read those views; the Postgres queries
+are deleted), lodestar#230 (`d70942d`, the panel says "received"). Follow-ups: kittiwake#140
+(`4d285bf`) and lodestar#229 (`84fd14d`) say net is after the delegators' cut too.
+Deploy order: #23, then #142, then lodestar#230 the same day.
+
+Causes, confirmed at `crates/db/src/lib.rs:855` and `:887`:
+- Rewards dated by `allocations.closed_at` with `closed_at IS NOT NULL`, so rewards collected on
+  open allocations were misdated or missing.
+- The rewards figure included the delegators' share, and fees were gross.
+- Postgres `allocations` lags by days: the ingest pages 2,000 an hour through ~245,000.
+
+A double count in the first #23 was caught and fixed: `HorizonRewardsAssigned` fires in the same
+transaction as `IndexingRewardsCollected` on every Horizon allocation (235,408 of 235,408 pairs on
+production), so the view takes it only for legacy allocations.
+
+Fees: `rav_redemptions` is the same gross money as `QueryFeesCollected`, matching to the cent for
+five indexers. Received is gross less the 1% protocol cut (rounded up), the curators' share, and the
+delegators' cut where the pool has shares. The formula matched the chain's own payment records for
+1,990 production collections across 131 transactions, wei for wei. The earlier views rounded the cut
+down and ignored the delegators' cut.
+
+Production error, live P&L at 16:41Z against what each indexer received over the same 30 days:
+`0xf92f…a6d4` +11.3%, `0x8bbe…f699` -49.8%, `0x2f09…e1ce` +98.8%, `0x090f…ed3` -18.5%,
+`0xe9e2…cf59` +259.4%. Network-wide, 30 days to 2026-09-13: 54 of 58 paid indexers off by more than
+1 GRT, 7,196,820 GRT of absolute error; 24,122,578 GRT of rewards collected, 15,651,359 booked by
+close-dating; 16 indexers collected 5,096,669 GRT on still-open allocations across 5,959 collections.
+
+Response meaning changes, field names kept: `rav_grt` and `indexing_rewards_grt` now mean received;
+gross stays as `query_fees_gross_grt` and `indexing_rewards_gross_grt`; windows start at UTC
+midnight; 75 network-wide fee collections for data services other than SubgraphService drop out.
+
+Other readers (`recommend.rs`, `score`, `refresh.rs`) use lifetime nest totals, not close-dated rows,
+so not this fault; their lifetime `query_fees_collected` still includes the delegators' share, a
+different definition, listed not changed. Nothing reads `rav_redemptions` any more.
+
+Untested: the new views, sums check and speed on the production nest (the public SQL parser refuses
+`ASOF`, so the receipt check ran as equivalent SQL); legacy branches on real data; fees before
+exponential rebates (left NULL); kittiwake end to end against a live nest.
