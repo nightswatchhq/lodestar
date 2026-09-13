@@ -104,3 +104,11 @@ each deployment's query total, which undercounts where the gateway retried on a 
 Changed in `cf64f51`: totals come from `qos_deployment_daily` (the query-result topic's
 `query_count`), no attempt-based fallback. A retried-query test covers it (1,100 attempts against
 1,000 gateway queries). 46 unit tests; all 689 equivalence cases still pass, max deviation 1.16e-10.
+
+**Decision: fix the P&L undercount now (Chief).** Cause: kittiwake `revenue_daily` and
+`revenue_by_deployment` (`crates/db/src/lib.rs`) take indexing rewards from `allocations` with
+`closed_at IS NOT NULL`, dated by close, so rewards collected on open allocations are misdated or
+missing. Fix in progress: rewards by collection event from `graph-allocations-nest` at deployment
+grain, one definition for `/revenue`, `/pnl` and Daily Trends. The fee side (`rav_redemptions`
+against `QueryFeesCollected`) is being checked to the same standard, and production error is being
+measured read-only.
