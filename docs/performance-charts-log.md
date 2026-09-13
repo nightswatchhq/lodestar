@@ -432,6 +432,17 @@ before release.
   965 of 965), but the force-push was denied by the permission check. The PR branches are instead
   brought up to date with ordinary merge commits whose trees equal the tested rebased trees, so no
   history is rewritten.
+
+**Both stacks merge clean.**
+- kittiwake: #140 `4d285bf` on `main`; #142 `9c37c65` on #140; #141 `b3e4e3a` on #142; #143 `29edbd4`
+  on #141. Conflicts in `routes.rs` and `sql.rs` resolved by keeping both sides; trends and revenue
+  both read `lodestar_indexer_daily`, per-deployment revenue its per-deployment sum, so one definition.
+  All six routes registered. Each branch fmt, clippy and `cargo test --all` green; the stack top merged
+  onto `origin/main` in a throwaway tree: 647 passed, 0 failed.
+- lodestar: #229 `84fd14d` on `main`; #230 `958f5e7` on #229 (tree identical to the tested rebase);
+  #231 `649ee76` on #230 (tree identical to the tested rebase `176e42e`: tsc clean, eslint 0 errors,
+  vitest 965 of 965). A first attempt at #231 committed conflict markers locally because the shell did
+  not split the file list; caught by the tree comparison before any push, and repaired.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
