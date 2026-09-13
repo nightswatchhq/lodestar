@@ -589,6 +589,32 @@ RFC-0037 slice 8, not scheduled.
 - Memory: with the hot store cache cut from 1 GiB to 64 MiB the peak still reached 1.11 GB during the
   seal, so the cache is not most of the 1.86 GiB; attribution continues in the seal and resolution
   path, on a build combining #1376 and #1377.
+
+**Kittiwake keeps daily QoS results.** kittiwake#143 (`c85a0dd`, `8830946`), open.
+- Tables `qos_day` (per day, with the nest provenance it was computed from), `qos_indexer_day`,
+  `qos_allocation_day` (every indexer, so a deployment-day's attempt total is a sum).
+- Job `ingest-qos-days` (scheduler only, every 30 min): today always; a missing day; a day whose
+  `registry_hash` or `nid` changed; otherwise a one-day probe, recomputing on a changed bucket count or
+  closing block, or once sealing covers a day computed unsealed. `as_of` is stored but never compared.
+  Each computed day is one transaction from one-day statements; the chart statement is split from the
+  seconds-behind statement, since joined they ran out of memory.
+- Routes serve closed days from Postgres and only today from the nest; without a database the QoS
+  routes answer unavailable and send the nest nothing.
+- 430 tests pass; four mutations of the recompute rules each fail a test (one first survived, and got
+  its own test in `8830946`).
+End to end (nuthatch #1377 release, the qos-reo-nest#2 store under `nuthatch serve` defaults, scratch
+Postgres): first fill 90 days, 46,571 rows, 433.4 s, 368 statements none spanning two days, nest peak
+RSS 1,290 MB; second fill 0.1 s. All 56 stored indexer-days for 2026-09-07 match the nest's committed
+parity reference (counts exact, rates within 1e-9); route cards match for the five named indexers.
+Stored days serve in 0.01 to 0.10 s; `/qos` cold 2.4 to 2.8 s (today from the nest), warm 0.00 s.
+
+**Sent back:**
+- Days settled two days after they end, a guess rather than a measurement: a document stored later
+  would never be picked up. To settle only when sealing covers the day's last posting, every document
+  those postings name is stored (a given-up one keeps the day open), and the publisher has posted past
+  the day's end (a day inside an outage stays open).
+- `qos_freshness` reads every stored bucket (0.97 s on eight days); to be made flat in window length.
+- CI status on #143 to be confirmed (a local clippy flagged an untouched file on a newer toolchain).
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
