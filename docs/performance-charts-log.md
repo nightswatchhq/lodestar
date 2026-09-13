@@ -5,8 +5,10 @@ bottom. Every PR, measurement and finding lands here when it happens, so the rel
 be written from this file rather than from memory.
 
 **Release gates:** parity with the old key-based figures signed off; every element in the RFC's
-inventory table present; the blog post (`src/content/blog/`) published with the release. Nothing is
-deployed before all three.
+inventory table present; the blog post (`src/content/blog/`) ready to publish with the release; and
+Chief's yes, asked for once everything is built and verified. On that yes: merge everything, deploy
+in order (nuthatch, nests, kittiwake, lodestar last), then publish the blog post. Nothing is merged
+or deployed before then.
 
 ## 2026-09-13
 
