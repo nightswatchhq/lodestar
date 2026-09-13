@@ -423,7 +423,15 @@ before release.
   #141) then conflicts in `sql.rs`. Being stacked #140, #142, #141, #143 with conflicts resolved.
 - lodestar: #229 clean; #230 clean after it; #231 then conflicts in `docs/MIGRATION.md`,
   `scripts/e2e/contracts.mjs`, `src/hooks/useNetworkStats.ts` and its test, `src/lib/api.ts` and its
-  test. Being stacked #229, #230, #231, with #229's dropped scuttlebutt routes restored at the cause.
+  test. Being stacked #229, #230, #231.
+- Correction: the six scuttlebutt routes #229's route list drops were removed from kittiwake in #129 on
+  2026-09-12; production's `openapi.json` lists none of them and no lodestar call site names them.
+  Dropping them is right; `main`'s generated route list is simply stale. The earlier line saying
+  production still serves them was wrong.
+- The lodestar stack was rebased and tested locally (whole stack: tsc clean, eslint 0 errors, vitest
+  965 of 965), but the force-push was denied by the permission check. The PR branches are instead
+  brought up to date with ordinary merge commits whose trees equal the tested rebased trees, so no
+  history is rewritten.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
