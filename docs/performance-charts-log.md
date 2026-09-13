@@ -443,6 +443,22 @@ before release.
   #231 `649ee76` on #230 (tree identical to the tested rebase `176e42e`: tsc clean, eslint 0 errors,
   vitest 965 of 965). A first attempt at #231 committed conflict markers locally because the shell did
   not split the file list; caught by the tree comparison before any push, and repaired.
+
+**Parity against the old subgraph: QoS.** Chief's key, run 2026-09-13 against Ellipfra's fork
+(`CnfJ5tC5cfAmt2tUyUaM6vPrtmNYasavkDDn793FkbN3`, deployment `QmddS3Tg…`, no indexing errors),
+`indexerDailyDataPoints` for 2026-09-06 to 2026-09-12, against the measurement's rebuild from raw
+payloads. (The gateway returns 403 to Python's default user agent; the key was never the problem.)
+- 388 of 388 indexer-days present on both sides; none on one side only.
+- Daily latency: the fork equals the rebuild of the old pipeline, ratio median 1.000, p90 1.002.
+- Fees: median relative difference 2.2e-15.
+- Query counts and success rates match exactly on 2026-09-07, 09-08, 09-11 and 09-12. On 09-06, 09-09
+  and 09-10 the rebuild has more queries (442,128, 153,567 and 131,774), and the success-rate
+  differences (at most 0.94 pp) come from the same cause.
+- Cause, proven: **the old subgraph silently dropped whole five-minute payloads.** For every indexer,
+  the shortfall equals exactly the per-indexer queries of specific buckets: 09-06 02:45, 15:10 and
+  19:25; 09-09 12:30; 09-10 15:40. Five of 2,014 buckets in the week, lost by a mapping that skips a
+  payload when IPFS does not answer and never tries again. The rebuild, and the nest, have all five.
+- So the old QoS charts were short of data as well as averaging it wrongly.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
