@@ -294,6 +294,7 @@ of scope here.
 | F1 | foghorn | `/quality` counts every dispatched probe; scorecard and buckets agree on the same window | - |
 | S1 | kittiwake | the score port, `qos-score` and `qos-deployments` routes, `q_score` on `indexers-enriched` | Q1 |
 | S2 | lodestar | `QosQualityPanel` and the directory column restored | S1 |
+| V1 | all | the whole stack run locally (both nests, kittiwake with every open PR, lodestar with #229, #230, #231) and the indexer page and directory inspected in a browser against real data | everything above |
 | B1 | lodestar | the release blog post in `src/content/blog/`: what each figure is, and how it differs from the old gateway-queried ones | everything above |
 
 Nothing is deployed until parity is signed off and B1 is ready to publish with it. Progress,

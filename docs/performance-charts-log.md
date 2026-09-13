@@ -354,5 +354,67 @@ Served gap on 2026-09-07, old (gateway total) against new (attempts), with today
 
 The old denominator flipped the sign for Ellipfra and Pinax: it read them as served more than their
 allocation share when they are routed less. Untested: a real 30-day window; the allocations snapshot
-is today's against 2026-09-07 QoS data; the `score-qos` job against Postgres. legacy branches on real data; fees before
+is today's against 2026-09-07 QoS data; the `score-qos` job against Postgres.
+
+**N3: resolution completes.** nuthatch#1374 (`5ed0a069` to `cf309dcb`, base `pete/ipfs-cid-in-json`),
+open, CI queued.
+- Identity: `decode_identity` (`src/project.rs:808`) is the one hash for `schema.json`, the store
+  guard, the startup log and `/sql` provenance. Old stores adopt the full identity once; a
+  top-level-calls store holding rows without `tx_from` is refused with a re-index message. The NID
+  formula is deliberately unchanged, so no production NID moves.
+- `tx_from` on every call row (`src/calldata.rs:368`); an argument named `tx_from` is refused; a body
+  without `from` is an error, not an invented sender.
+- Out-of-band resolver (`src/ipfs_resolve.rs`): the tip path fetches nothing and the 64-fetch budget
+  is gone; work is re-derived from stored rows each pass, so a restart loses nothing; every fetch
+  error retried with backoff 5 s to 10 min, a truncated body included; given up after 10 failures and
+  counted; sealing holds below the lowest outstanding document; writes only while the naming row keeps
+  its block hash. Metrics `nuthatch_nest_ipfs_pending`, `_resolved_total`, `_given_up_total`.
+- `--seal-direct` decodes calls and resolves documents.
+- Found on the way: fetching a 20,000-block window of bodies at once reached 2.32 GB; fetched 200 at a
+  time it stays at 264 to 321 MB.
+- 1,199 lib tests plus integration targets pass; mutations grouped by concern each failed tests.
+End to end on Gnosis, QoS nest config without `blocks = true`, default windows, from 48,119,000:
+`kill -9` at 120 resolved and 558 pending; after restart pending reached 0 in 2 min 59 s. 678 call
+rows, all from `0x8cbbe43f…`, 678 documents, 0 missing, 0 given up, 0 unreadable. 2026-09-07: 576 of
+576, including `QmYTFzn…`, the document Q1 lost. All stored unverified because N2 is a separate
+branch.
+
+**Found by N3, and blocking the QoS nest's deploy:**
+- Sealing 678 documents (about 1.1 GB of JSON) reached 3.17 GB RSS: `seal_cut` bounds a cut by rows
+  and block span, never bytes, and the seal reads and parses the whole finalized range. The fix, a
+  byte bound on the cut and a bounded read, changes the cut rule in RFC-0028 §4, so under nuthatch's
+  non-negotiable 2 it is Chief's decision, not built. Asked.
+- After SIGTERM the run kept ingesting for 26 s and needed `kill -9`; cause not established.
+- Backfill: bodies for 90 days from block 46,700,000 on public RPC is about 6 hours before resolution.
+Untested: `PgStore::put_entity_if_named`; factory seal-direct extras; resolver release on unmount; the
+multi-nest runtime live.
+N2 and N3 need reconciling: the `verified` decision moved into `Gate::document_row`.
+
+**Decision: sealed segments are capped by bytes (Chief).** Byte bound on the cut plus a bounded
+read, recorded as an amendment to RFC-0028 §4; existing sealed segments untouched. Built in N4.
+
+**N4 started.** Integrate N2 and N3 so the resolver stores only proven documents; typed rows from
+JSON documents at resolution with raw retention as a declaration choice; rollups servable within
+`nuthatch serve` defaults; parallel block-body fetch; the SIGTERM fault; the byte-bounded seal; the
+QoS nest rebuilt on typed rows with the same contract view names, `qos_freshness`, the publisher
+filter on `tx_from`, `require_verified` true and `blocks = true` dropped.
+
+**Q3, S2, Q4: the page.** lodestar#231 (`2d4a245`), held; deploys after the QoS nest and
+kittiwake#143.
+- Query Performance: counts and fees carried; average fee shows window and latest day; success and
+  latency headlines query-weighted; bad buckets and the worst five minutes under the success chart;
+  blocks behind becomes "Behind Freshest Peer" in seconds with the share of queries over five minutes
+  behind; partial days hollow, missing days gaps on a dense 90-day axis; empty state separates no
+  data, publisher silent and unknown; a failed read shows its error.
+- QoS Quality: grade (75/60/45/30), four bars, the gap reworded as allocation share minus routing
+  share, history without the "builds daily as the cron runs" copy, per-deployment drag with cohort
+  marker. Directory QoS column from `qScore`.
+- Foghorn: dashed probe lines for success and latency captioned as probes, not demand, with the paid
+  share; a correctness chart shown only when Foghorn probed the indexer; p50 and p95 beside latency.
+  Not carried: a window p99, since Foghorn serves p99 per bucket and most buckets hold one probe.
+- vitest 956 of 956, tsc clean, eslint no errors.
+Untested: nothing has been rendered (jsdom does not draw recharts; Playwright runs against
+production); the directory table render; the Foghorn bucket read against the real proxy; any real
+#143 response. Slice V1 added: the whole stack run locally and the page inspected in a browser
+before release. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
