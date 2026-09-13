@@ -32,6 +32,7 @@ import type {
   SubgraphSearchResult,
 } from '@/lib/contracts/subgraph-search';
 import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
+import type { IndexerTrendsResponse } from '@/lib/contracts/indexer-trends';
 import type { DisassemblyReport } from '@/lib/disassembly/types';
 import type { DisassemblyDiff } from '@/lib/disassembly/diff';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
@@ -449,6 +450,22 @@ export async function fetchIndexerPayments(receiver: string): Promise<PaymentsOv
     objects: ['data'],
     arrays: ['data.escrowAccounts', 'data.recentTransactions'],
     present: ['data.totalCollected', 'data.activePayers'],
+    pick: 'data',
+  });
+}
+
+/** An indexer's daily rewards and query fees over the last `days` UTC days, today included. */
+export async function fetchIndexerTrends(address: string, days = 30): Promise<IndexerTrendsResponse> {
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address)}/trends?days=${days}`),
+  );
+  if (!response.ok) throw new Error(`Indexer trends failed: ${response.status}`);
+  return parseResponse('/api/indexer/trends', await response.json(), {
+    objects: ['data'],
+    rows: {
+      'data.rewards': ['timestamp', 'totalIndexerRewards', 'totalDelegationRewards'],
+      'data.queryFees': ['timestamp', 'totalCollected', 'totalCurators', 'totalCollectedNet'],
+    },
     pick: 'data',
   });
 }

@@ -125,6 +125,7 @@ export const CONTRACTS = [
   { path: '/api/provisions?indexer={address}', name: 'provisions', required: ['data.provisions'] },
   { path: '/api/rewards-history?address={address}', name: 'rewards history', required: ['history'] },
   { path: '/api/indexer-stake-history/{address}', name: 'indexer stake history', required: ['data.history'] },
+  { path: '/api/indexer/{address}/trends?days=30', name: 'indexer daily trends', required: ['data.rewards', 'data.queryFees'] },
   { path: '/api/apr-provenance/{address}', name: 'APR provenance', required: ['data.events', 'data.reconcile'] },
   { path: '/api/indexing-status/{hash}', name: 'indexing status', required: ['data.deploymentId', 'data.indexers'] },
   { path: '/api/subgraph-curation/{hash}', name: 'subgraph curation', required: ['data.totalSignalledTokens', 'data.signals'] },
