@@ -615,6 +615,23 @@ Stored days serve in 0.01 to 0.10 s; `/qos` cold 2.4 to 2.8 s (today from the ne
   the day's end (a day inside an outage stays open).
 - `qos_freshness` reads every stored bucket (0.97 s on eight days); to be made flat in window length.
 - CI status on #143 to be confirmed (a local clippy flagged an untouched file on a newer toolchain).
+
+**Both fixed.** kittiwake `0128976` and qos-reo-nest `c123389` (on `pete/qos-nest-typed-rows`), open;
+kittiwake#143 CI green on `0128976`, `8830946` and `29edbd4`. The local clippy errors in
+`dips_agreements.rs` come from a newer local toolchain, not CI's; that file is untouched.
+- A day settles only when its one-day probe shows all three: sealing covers the highest block holding
+  one of the day's postings; zero of the day's postings lack a stored document (matched on topic,
+  block and CID, the pair the calldata names; a document given up on is never stored, so its day never
+  settles and is probed every run); and the publisher has posted a bucket starting at or after the
+  day's end (a day inside an outage stays open). New contract views `qos_posting`,
+  `qos_stored_document`, `qos_day_resolution`, with `checks/day-resolution.sql`.
+- Tests `a_day_with_an_unresolved_document_never_settles`,
+  `a_day_settles_once_its_last_document_arrives`, `a_day_with_no_posting_past_its_end_stays_open`;
+  removing any one condition fails two tests. 434 pass.
+- `qos_freshness` rewritten to read postings and stored documents rather than typed rows (6,679,658
+  on this store): 0.79 s before, 0.06 s after, identical output. Inputs replicated in place to about 90
+  days' postings (46,920): 0.067 s; to 93,840: 0.081 s. An extrapolation, since no 90-day store exists
+  yet. `nuthatch check` passes parity, day resolution and freshness with zero rows.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
