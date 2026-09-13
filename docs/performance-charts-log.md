@@ -112,3 +112,26 @@ missing. Fix in progress: rewards by collection event from `graph-allocations-ne
 grain, one definition for `/revenue`, `/pnl` and Daily Trends. The fee side (`rav_redemptions`
 against `QueryFeesCollected`) is being checked to the same standard, and production error is being
 measured read-only.
+
+**N1: `[[ipfs]]` reads a CID inside JSON calldata.** nuthatch#1367 (`0c436d9e`, `f1b3ee70`), open.
+New keys `cid_json_path` and `json_match`, entering the declaration hash only when set. Three faults
+fixed on the way, each alone enough to resolve nothing: resolution ran before call decode and saw only
+event rows; the call filter used the `eth_getLogs` address list, which omits an event-less contract;
+unreadable rows left no trace (now `nuthatch_nest_ipfs_unreadable_total`). Five tests, seven
+mutations each caught; 1,185 lib tests pass. Live on Gnosis, blocks 48,231,452 to 48,232,456: 36
+calls, 36 documents resolved (18 per topic), 37.8 MB, about 1.2 s each, 0 unreadable.
+
+**Found by N1, and each blocks "perfect":**
+- 0 of 36 documents verified. Every payload is 0.53 to 1.68 MB, over the 256 KiB single-block
+  verification limit, so each is stored `verified = false`. RFC-0037's reproducibility argument does
+  not yet hold for these. Slice N2.
+- A CID that misses the 64-fetch window budget, or whose gateways fail, is never retried
+  (`src/indexer.rs:5519` promises an out-of-band resolver that does not exist). At Gnosis's default
+  20,000-block window about 678 CIDs arrive per window and 64 resolve: over 90% of a backfill lost
+  permanently. Slice N3.
+- Top-level call rows carry no sender (`src/calldata.rs:316`), so the publisher filter cannot be
+  written. Slice N3.
+- `--seal-direct` never decodes top-level calls or resolves IPFS: a backfill run that way produces
+  nothing and says nothing (read from code, not run). Slice N3.
+- The runtime identity guard and `/sql` provenance hash use the event registry only; for an
+  event-less nest that is `e3b0c442…`, the hash of nothing. Predates N1. Slice N3.
