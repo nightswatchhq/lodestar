@@ -125,6 +125,7 @@ export const CONTRACTS = [
   { path: '/api/provisions?indexer={address}', name: 'provisions', required: ['data.provisions'] },
   { path: '/api/rewards-history?address={address}', name: 'rewards history', required: ['history'] },
   { path: '/api/indexer-stake-history/{address}', name: 'indexer stake history', required: ['data.history'] },
+  { path: '/api/indexer/{address}/trends?days=30', name: 'indexer daily trends', required: ['data.rewards', 'data.queryFees'] },
   { path: '/api/indexer/{address}/qos?days=90', name: 'indexer query performance', required: ['data.qos', 'data.summary', 'data.freshness'] },
   { path: '/api/indexer/{address}/qos-score', name: 'indexer QoS quality', required: ['data.daily'] },
   { path: '/api/indexer/{address}/qos-deployments', name: 'indexer QoS deployments', required: ['data.deployments'] },

@@ -116,12 +116,21 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
     setChains((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));
 
   const exportCsv = () => {
-    const header = ['Date', 'Query Fees (GRT)', 'Indexing Rewards (GRT)', 'Total (GRT)'];
+    const header = [
+      'Date',
+      'Query Fees Received (GRT)',
+      'Indexing Rewards Received (GRT)',
+      'Total Received (GRT)',
+      'Query Fees Collected (GRT)',
+      'Indexing Rewards Collected (GRT)',
+    ];
     const rows = daily.map((d) => [
       d.date,
       d.rav_grt.toFixed(2),
       d.indexing_rewards_grt.toFixed(2),
       d.total_grt.toFixed(2),
+      d.query_fees_gross_grt.toFixed(2),
+      d.indexing_rewards_gross_grt.toFixed(2),
     ]);
     const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
     downloadCsv(`pnl-${addr}-${window}d.csv`, csv);
@@ -137,7 +146,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
           <div>
             <CardTitle>Indexer P&amp;L</CardTitle>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
-              Query-fee revenue + indexing rewards, net of modeled infra cost
+              What the indexer received in query fees and indexing rewards, net of modeled infra cost
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -181,7 +190,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
             {/* Financial summary */}
             {p && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-                <Stat label="Total Revenue" value={`${formatGRT(p.revenue_grt)} GRT`} sub={p.revenue_usd != null ? formatUSD(p.revenue_usd) : undefined} />
+                <Stat label="Revenue Received" value={`${formatGRT(p.revenue_grt)} GRT`} sub={p.revenue_usd != null ? formatUSD(p.revenue_usd) : undefined} />
                 <Stat label={`Infra Cost (${window}d)`} value={formatUSD(p.infra_cost_usd)} sub={`${formatUSD(p.infra_monthly_usd)}/mo`} />
                 <Stat
                   label="Net"
@@ -233,11 +242,11 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
                     itemStyle={{ color: 'var(--text-muted)' }}
                     formatter={(value, name) => [
                       formatGRTFull(Number(value)) + ' GRT',
-                      name === 'rav' ? 'Query Fees' : 'Indexing Rewards',
+                      name === 'rav' ? 'Query Fees Received' : 'Indexing Rewards Received',
                     ]}
                   />
                   <Legend
-                    formatter={(v) => (v === 'rav' ? 'Query Fees (RAV)' : 'Indexing Rewards')}
+                    formatter={(v) => (v === 'rav' ? 'Query Fees Received' : 'Indexing Rewards Received')}
                     wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }}
                   />
                   <Area type="monotone" dataKey="rewards" stackId="1" stroke="var(--green)" strokeWidth={2} fill="url(#pnlRewardsGrad)" />
@@ -309,7 +318,9 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
             )}
 
             <p className="text-[10px] text-[var(--text-faint)] mt-4 leading-relaxed">
-              Revenue: query-fee redemptions (RAV) + indexing rewards realised at allocation close.
+              Revenue is what the indexer received, dated by the collection that paid it: query fees after the 1%
+              protocol tax, the curators&apos; share and the delegators&apos; cut, and indexing rewards after the
+              delegators&apos; share. The CSV carries the collected figures beside it.
               Infra cost is a modeled estimate from archive-node selection; override per operator.
               Informational only, not financial advice.
             </p>

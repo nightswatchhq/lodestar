@@ -23,6 +23,7 @@ import {
   fetchPayments,
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
+  fetchIndexerTrends,
   fetchIndexerQos,
   fetchIndexerQosScore,
   fetchIndexerQosDeployments,
@@ -351,6 +352,27 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   it('fetchIndexerPayments throws with status on failure', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, 404));
     await expect(fetchIndexerPayments('0xabc')).rejects.toThrow('Indexer payments failed: 404');
+  });
+
+  it('fetchIndexerTrends asks for the day window on the path endpoint and unwraps .data', async () => {
+    const trends = {
+      rewards: [{ timestamp: '1787356800000000', indexer: '0xi', totalRewards: '3', totalIndexerRewards: '1', totalDelegationRewards: '2', rewardCount: '1' }],
+      queryFees: [{ timestamp: '1787356800000000', indexer: '0xi', totalCollected: '100', totalCurators: '10', totalProtocolTax: '1', totalCollectedNet: '89', feeCount: '1' }],
+    };
+    mockFetch.mockResolvedValue(jsonResponse({ data: trends }));
+    expect(await fetchIndexerTrends('0xI&x', 90)).toEqual(trends);
+    expect(mockFetch.mock.calls[0][0]).toBe(`/api/indexer/${encodeURIComponent('0xI&x')}/trends?days=90`);
+  });
+
+  it('fetchIndexerTrends refuses a fee row with no net figure rather than charting zero', async () => {
+    const queryFees = [{ timestamp: '1', indexer: '0xi', totalCollected: '100', totalCurators: '10' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { rewards: [], queryFees } }));
+    await expect(fetchIndexerTrends('0xi')).rejects.toThrow(/totalCollectedNet/);
+  });
+
+  it('fetchIndexerTrends throws with status on failure', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchIndexerTrends('0xabc')).rejects.toThrow('Indexer trends failed: 503');
   });
 
   it('fetchIndexerQos asks for the day window on the path endpoint and unwraps .data', async () => {

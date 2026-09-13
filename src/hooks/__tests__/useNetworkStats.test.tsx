@@ -26,6 +26,7 @@ vi.mock('@/lib/api', () => ({
   fetchPayments: vi.fn(),
   fetchIndexerPayments: vi.fn(),
   fetchIndexerStakeHistory: vi.fn(),
+  fetchIndexerTrends: vi.fn(),
   fetchIndexerQos: vi.fn(),
   fetchIndexerQosScore: vi.fn(),
   fetchIndexerQosDeployments: vi.fn(),
@@ -80,6 +81,7 @@ import {
   usePayments,
   useIndexerPayments,
   useIndexerStakeHistory,
+  useIndexerTrends,
   useIndexerQos,
   useIndexerQosScore,
   useIndexerQosDeployments,
@@ -436,6 +438,16 @@ describe('enabled-gated query hooks (no arg → idle, arg → fetch)', () => {
     const on = renderHook(() => useIndexerPayments('0xrecv'), { wrapper: wrapper() });
     await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
     expect(api.fetchIndexerPayments).toHaveBeenCalledWith('0xrecv');
+  });
+
+  it('useIndexerTrends is idle for null and passes the day window through', async () => {
+    const off = renderHook(() => useIndexerTrends(null, 90), { wrapper: wrapper() });
+    expect(off.result.current.fetchStatus).toBe('idle');
+
+    vi.mocked(api.fetchIndexerTrends).mockResolvedValue({ rewards: [], queryFees: [] } as never);
+    const on = renderHook(() => useIndexerTrends('0xtrd', 90), { wrapper: wrapper() });
+    await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
+    expect(api.fetchIndexerTrends).toHaveBeenCalledWith('0xtrd', 90);
   });
 
   it('useIndexerQos is idle for null and passes the day window through', async () => {

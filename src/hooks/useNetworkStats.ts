@@ -24,6 +24,7 @@ import {
   fetchPayments,
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
+  fetchIndexerTrends,
   fetchIndexerQos,
   fetchIndexerQosScore,
   fetchIndexerQosDeployments,
@@ -489,6 +490,20 @@ export function useIndexerPayments(receiver: string) {
   });
 }
 
+
+/**
+ * Hook for an indexer's daily rewards and query fees
+ */
+export function useIndexerTrends(indexer: string | null, days = 30) {
+  return useQuery({
+    queryKey: ['indexerTrends', indexer, days],
+    queryFn: () => fetchIndexerTrends(indexer!, days),
+    staleTime: TEN_MINUTES,
+    refetchInterval: TEN_MINUTES,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
 
 /**
  * Hook for indexer stake history (26-week time-travel snapshots)
