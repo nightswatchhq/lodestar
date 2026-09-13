@@ -198,5 +198,7 @@ so not this fault; their lifetime `query_fees_collected` still includes the dele
 different definition, listed not changed. Nothing reads `rav_redemptions` any more.
 
 Untested: the new views, sums check and speed on the production nest (the public SQL parser refuses
-`ASOF`, so the receipt check ran as equivalent SQL); legacy branches on real data; fees before
+`ASOF`, so the receipt check ran as equivalent SQL; that refusal applies to ad-hoc SQL only, since
+`views/90-lodestar-indexers.sql` and `views/50-lodestar-epochs.sql` already use `ASOF JOIN` and are
+served in production today); legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
