@@ -538,6 +538,57 @@ the public endpoints (recovered); the baseline drew none.
 Integration note: N4a's QoS nest run shows 4.1 to 4.5 GB RSS while sealing because it lacks this
 branch; memory and parity are re-measured on the combined N4a and N4b build before anything is
 called deployable.
+
+**N4a: typed rows, and the QoS nest rebuilt on them.** nuthatch#1377 (`7606087a`, `a4abbb36`,
+`da6c8b6c`, base `pete/ipfs-integrated`) and qos-reo-nest#2 (`pete/qos-nest-typed-rows`), open.
+- `[ipfs.rows]`: a table, `max_rows`, `keep_content`, typed columns (`string`, `number` stored as
+  decimal text, `u64`, `i64`, `bool`, `address`); one row per array element keyed to the document and
+  its naming row, written in the same transaction as the document and only while the naming row keeps
+  its block hash; each document allotted `max_rows` slots so keys never depend on which gateway
+  answered first; a document that does not fit is refused whole and counted
+  (`nuthatch_nest_ipfs_rows_refused_total`). Enters identity only when present. Also fixed:
+  `semantic.toml` had seeded `[[ipfs]]` tables as `[[calls]]` results.
+- Incremental entities cannot host the rollups: RFC-0041 entities bind only decoded event tables fed
+  from ingest, and refuse float aggregation, `FILTER` and `arg_min`. Recorded in RFC-0037 slice 8, not
+  built.
+- 1,227 lib tests plus integration targets pass; ten mutations each caught.
+- The QoS nest rebuilt on typed rows, publisher filter on `tx_from` live, `require_verified`,
+  `blocks = true` gone. Real run from block 48,119,000, `kill -9` at 103 resolved and 575 pending, then
+  restarted: 1,956 indexer-attempt and 1,954 query-result documents, all verified; 0 given up,
+  unverified, refused, unreadable or rejected; one sender. 2026-09-07: 576 of 576 resolved and verified;
+  `checks/parity-2026-09-07.sql` passes with zero rows in 1.75 s. Store: redb 1.8 GB, segments 312 MB.
+  SIGTERM exited in 1 s twice.
+- Serving under `nuthatch serve` defaults (512 MB analytics): the chart for one day 1.9 s at 779 MB
+  RSS; eight days refused (out of memory) for both the chart and the cohort statement; eight days
+  with threads=1: chart 7.7 s, cohort still refused; at a 1 GB limit, chart 4.2 s at 1.66 GB and cohort
+  3.2 s at 1.43 GB. Before typed rows, one day was refused. 90 days not measured.
+
+**Found by N4a:**
+- Serving beyond one day does not fit at defaults, and entities cannot host the rollups. Decision put
+  to Chief.
+- `dev` peaked at 4.5 GB RSS on the clean run (without #1376's cut) and 10 GB with `/sql` queries
+  during resolution. Sent to N4b with the combined build.
+- A `/sql` read racing a provisional-segment fold opened a file already removed, logged "missing on
+  disk, cold data reduced" and answered short with only a warning. A silently short answer; sent to
+  N4b as the highest priority.
+Untested: `PgStore::put_entities_if_named`; a 90-day window; serving through kittiwake; a reorg after
+typed rows are written; unflagged CIDv1 documents.
+
+**Decision: kittiwake keeps daily QoS results (Chief).** The nest computes each day's rollup (one
+day fits at defaults); kittiwake stores every closed day in Postgres with the nest provenance it was
+computed from, serves the 90-day charts from stored days, and asks the nest only for today and for a
+closed day whose provenance changed (a reorg, a late document, a registry change). No statement ever
+spans more than one day. The nest remains the source of truth and any day can be re-derived from it.
+Built on kittiwake#143. Moving the rollups into nuthatch as incremental entities stays recorded in
+RFC-0037 slice 8, not scheduled.
+
+**N4b progress on the residuals.**
+- The short read: a fold now leases replaced segment files and removes them only once readers release
+  them, with a backstop. All three new race tests, including a threaded stress test that reproduces
+  the race without a test hook, catch the mutation that deletes replaced files at once.
+- Memory: with the hot store cache cut from 1 GiB to 64 MiB the peak still reached 1.11 GB during the
+  seal, so the cache is not most of the 1.86 GiB; attribution continues in the seal and resolution
+  path, on a build combining #1376 and #1377.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
