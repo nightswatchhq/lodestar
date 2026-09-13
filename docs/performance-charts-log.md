@@ -264,5 +264,29 @@ write (old signing-key rows, empty buckets).
   produce (signing-key rows, empty buckets), keeping other `bucket_secs` series. Test failed before.
 - Local with Postgres 15: probe 36 passed and 1 ignored, API 2, core 28.
 Untested: production flag rates will shift because the detector's denominator now counts only judged
-probes; not measured. Re-measure after deploy alongside the §3 figures. legacy branches on real data; fees before
+probes; not measured. Re-measure after deploy alongside the §3 figures.
+CI: run 34771219341 on `e598f13` failed in test cleanup (`DROP DATABASE` while the closed pool was
+still disconnecting), not in Foghorn; fixed in `fa86c13` with `WITH (FORCE)`, three clean local runs,
+CI run 34771938010 queued.
+
+**N2: chunked IPFS documents are verified.** nuthatch#1373 (`d6233ed9`, `1df12e10`), stacked on
+#1367, open.
+- Trustless fetch measured: The Graph's path gateway ignores `?format=raw` and `?format=car` and its
+  Kubo RPC answers 403; Pinata serves raw blocks and CARs in 4 to 6 s; ipfs.io and
+  trustless-gateway.link timed out.
+- Primary proof: re-encode the file as `ipfs add` does by default (256 KiB leaves, balanced 174-link
+  tree) and hash the root; no extra request. All 4,025 measured payloads (0.47 to 2.27 MB) verify
+  this way. Pinned to real data: a real root block re-encodes byte for byte, a real leaf fixes the
+  chunk size, Kubo's empty-file CID matches (which caught an existing single-block encoder bug).
+- Fallback: a CAR, every block hash checked from the requested root, sizes checked against
+  `blocksizes` and `filesize`. Caps 16 MiB, 4,096 blocks and visits, 16 levels.
+- Policy: only proven documents become rows; unproven counted in
+  `nuthatch_nest_ipfs_unverified_total`, over-cap in `nuthatch_nest_ipfs_oversize_total`. No schema
+  or identity change.
+- 12 new tests in `cid.rs`, 5 in `subgraph_import.rs`, 16 mutations all caught; 1,202 lib tests pass.
+- Live on Gnosis from block 48,231,452 to 48,232,905: 50 documents resolved, 50 verified, 0
+  unverified, 0 oversize, 0 unreadable; the 36 that #1367 stored unverified are among them.
+- Budget effect for N3: default-layout documents still cost one fetch each.
+Untested: the CAR path against Pinata inside the indexer; a real CIDv1 raw-leaf payload; sealed size.
+Consequence for Q1: `qos_settings.require_verified` can be set true once N2 lands. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
