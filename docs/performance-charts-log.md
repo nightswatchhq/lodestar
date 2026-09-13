@@ -267,7 +267,7 @@ Untested: production flag rates will shift because the detector's denominator no
 probes; not measured. Re-measure after deploy alongside the §3 figures.
 CI: run 34771219341 on `e598f13` failed in test cleanup (`DROP DATABASE` while the closed pool was
 still disconnecting), not in Foghorn; fixed in `fa86c13` with `WITH (FORCE)`, three clean local runs,
-CI run 34771938010 queued.
+CI run 34771938010 passed (probe 36 and 1 ignored, API 2, core 28, every database test executed).
 
 **N2: chunked IPFS documents are verified.** nuthatch#1373 (`d6233ed9`, `1df12e10`), stacked on
 #1367, open.
@@ -288,5 +288,37 @@ CI run 34771938010 queued.
   unverified, 0 oversize, 0 unreadable; the 36 that #1367 stored unverified are among them.
 - Budget effect for N3: default-layout documents still cost one fetch each.
 Untested: the CAR path against Pinata inside the indexer; a real CIDv1 raw-leaf payload; sealed size.
-Consequence for Q1: `qos_settings.require_verified` can be set true once N2 lands. legacy branches on real data; fees before
+Consequence for Q1: `qos_settings.require_verified` can be set true once N2 lands.
+
+**Q2 and S1 second half: the QoS routes.** kittiwake#143 (`bcebbc4`, base `pete/qos-score-port`),
+open.
+- `GET /api/indexer/{address}/qos?days=90`: the old point fields plus `buckets`, `partial`,
+  `badBuckets`, `worstBucket`, `secondsBehind`, `shareQueriesOver5MinBehind`, `shareWithBlockTime`,
+  `gatewayIds` (an array: a day can have several gateways); a day with no data is absent; `summary`
+  query-weighted with window and latest-day average fee separately; `freshness` with the publisher's
+  last post.
+- `/qos-score` in the old shape plus grade and window, history recomputed per day over 30 days;
+  `/qos-deployments` sorted by drag, with a real served share where the old route reported zero.
+- `qScore` on `/api/indexers-enriched` from an hourly `score-qos` job into a new
+  `indexer_qos_quality` table (not `indexer_qos_score`, whose drop is lodestar migration 020, run by
+  hand).
+- Nine new tests plus extended ones; three mutations each caught; kittiwake-read runs 234.
+End to end on 2026-09-07 (routes' SQL through `nuthatch sql` on the Q1 run, answers through the Rust
+folds): card figures match the independent reference for ellipfra, pinax, nodeify, waynewayner.de
+and 0x0a015d9e; scores 63.233 B, 71.814 B, 45.863 C, 21.048 F, 66.559 B, identical to the original
+TypeScript.
+
+**Found by Q2:**
+- Served share exceeds 1 on some deployments (1.045, 1.025, 1.075): attempts counted against the
+  query-result topic's gateway queries, and the gateway hedges across indexers. The old cron had the
+  same fault. Decision: share is the indexer's attempts over all indexers' attempts on the
+  deployment-day, bounded and summing to 1; old against new served gap to be recorded. Sent back.
+- `nuthatch serve` refuses to start with these views: the query memory they need exceeds its fixed
+  2 GiB ceiling. N4 must bring serving within default budgets.
+- No contract view exposes the network-wide newest bucket, so freshness is weaker than RFC §2 asks;
+  a `qos_freshness` view joins N4's contract.
+- Deploy order: `/ready` now counts the QoS nest, so qos-reo-nest serves at `/qos` before kittiwake#143
+  deploys.
+Untested: HTTP and readiness against a real nest; served gap on real data (local allocations end
+2026-08-22); the `score-qos` job against Postgres; windows longer than one day; speed before N4. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
