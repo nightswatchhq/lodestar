@@ -510,6 +510,34 @@ Daily Trends and the P&L, with kittiwake built at the top of its stack (#143 on 
   to users, since production kittiwake reads none of the new views), then run the stack-top kittiwake
   and lodestar locally against the production nests through a fresh temporary user and inspect the
   pages in a browser, then deploy kittiwake, then lodestar.
+
+**N4b: the byte-bounded seal, parallel fetch, SIGTERM.** nuthatch#1376 (`7fa46d0a`, `d94996b1`,
+`ee111777`, `c9882bd4`, base `pete/ipfs-integrated`), open, CI not yet run.
+- Cut rule: the earliest of 20,000 rows, 64 MiB of row JSON (`SEAL_DIRECT_BYTES`) and the chain span,
+  counted from the oldest held row, one cut function for both seal paths. A constant, not config, so
+  two operators cut identical rows identically; cuts tested identical at windows 1, 7, 64 and 1,000.
+  Event nests (rows under about 3.3 KB) cut exactly where they did. A provisional table segment is
+  final at 16 MiB. The tip path picks its cut with a streaming `scan_entities_in_range` and reads only
+  to the cut. RFC-0028 §4 amended, citing Chief's ruling. Existing segments untouched.
+- Parallel body fetch: 20-block batches, 4 at once, inside each 200-block chunk;
+  `NUTHATCH_CALL_BODY_CONCURRENCY`, ceiling 10; memory held at one chunk.
+- SIGTERM: a tokio abort only lands at an await; during shutdown RPC calls fail instantly and
+  `maybe_seal`'s only awaits between cuts ignore those errors, so an in-flight seal ran every
+  remaining cut. `maybe_seal` now yields between segments. After: 0.35 s exit mid-seal. N3's exact 26 s
+  was not reproduced on the old binary (0.55 s); the cause rests on N3's log timings and the tests.
+- Measured on Gnosis, QoS nest, same range from block 48,119,000, without `blocks = true`:
+  peak RSS 11,352,539,136 bytes before, 1,998,815,232 after (1.86 GiB); 100,000 blocks in 1,255 s
+  (79.7/s) before, 721 s (138.6/s) after; document tables 1 segment each before, 25 and 24 after.
+  Cargo builds ran on the same machine during both runs, so throughput is indicative, not a benchmark.
+- 8 new or updated tests; 7 of 7 mutations caught; lib 1,223 passed, integration 1,455 passed across
+  60 targets; clippy and fmt clean.
+Not yet perfect, sent back: 1.86 GiB is unattributed and sits against production's
+`MemoryHigh=2G`; `--seal-direct` not run live on this nest (the likely backfill route) nor SIGTERM
+there; `PgStore::scan_entities_in_range` untested. The faster fetch drew one rate-limited batch from
+the public endpoints (recovered); the baseline drew none.
+Integration note: N4a's QoS nest run shows 4.1 to 4.5 GB RSS while sealing because it lacks this
+branch; memory and parity are re-measured on the combined N4a and N4b build before anything is
+called deployable.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
