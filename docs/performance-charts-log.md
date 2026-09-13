@@ -329,5 +329,30 @@ either. The Q1 parity run averaged about 32 blocks/s, well under what either ser
 inside nuthatch: block bodies fetched with little concurrency, and IPFS resolved inline at about 1 s
 per document (N3 moves that out of the loop). A 90-day backfill is about 1.55M blocks: roughly 13 to
 14 hours at 32/s, about 3 hours at 133/s. Parallel block-body fetch joins N4. The keyed endpoint is
-held in reserve for rate limits and never enters a repo, config or this log. legacy branches on real data; fees before
+held in reserve for rate limits and never enters a repo, config or this log.
+
+**Served share fixed.** kittiwake#141 (`fd2f6fa`) and #143 (rebased: `aed6c8a`, `9ec419b`), open.
+Served share is now an indexer's attempts on a deployment over every indexer's attempts on it, in
+`kittiwake-qos` (`aggregate_indexer_metrics`, `compute_phase2_metrics`): bounded [0, 1], summing to 1
+per deployment. The gateway-total denominator is removed, not kept beside it; nothing in kittiwake
+reads `qos_deployment_daily` now (the view stays in the nest). Tests
+`served_shares_sum_to_one_per_deployment_day`, `a_hedged_query_does_not_push_a_share_over_one`,
+`served_share_is_against_every_indexers_attempts_and_the_gap_follows`; two mutations each fail two
+tests. TypeScript equivalence still green outside the deliberately changed served share (689 cases,
+max deviation 1.16e-10). 418 tests pass across the touched crates. Scores unchanged for all five
+indexers and still identical to the TypeScript, because the score weights by queries.
+
+Served gap on 2026-09-07, old (gateway total) against new (attempts), with today's open allocations:
+
+| Indexer | Allocated deployments | Old gap | New gap | Old max share | Old shares over 1 |
+|---|---:|---:|---:|---:|---:|
+| ellipfra | 2,006 | -0.138003 | 0.103477 | 4.00 | 746 |
+| pinax | 324 | -0.129565 | 0.170947 | 2.00 | 117 |
+| nodeify | 20 | 0.238472 | 0.307477 | 0.43 | 0 |
+| waynewayner.de | 40 | 0.236024 | 0.246650 | 0.67 | 0 |
+| 0x0a015d9e | 1,594 | 0.575427 | 0.582661 | 2.00 | 43 |
+
+The old denominator flipped the sign for Ellipfra and Pinax: it read them as served more than their
+allocation share when they are routed less. Untested: a real 30-day window; the allocations snapshot
+is today's against 2026-09-07 QoS data; the `score-qos` job against Postgres. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
