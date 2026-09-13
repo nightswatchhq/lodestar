@@ -53,3 +53,42 @@ pipeline vs new rollup vs Foghorn), and the S1 scoring port to kittiwake.
 
 **Blocked on Chief.** The Graph API key for parity cannot be stored by the tooling as things stand;
 merges are Chief's.
+
+**Measurement: the old QoS section against raw payloads.** Window 2026-09-06 to 2026-09-12 UTC:
+2,014 indexer-attempt and 2,011 query-result payloads, 4,800,241 rows, 56 indexers, 388
+indexer-days. Old pipeline rebuilt from the reference subgraph mapping and `cb61cea~1`; production
+read Ellipfra's fork, not seen, so subgraph-side parity stays pending.
+- The RFC was wrong twice and is corrected. Daily success rate was already query-weighted: old and
+  rebuilt agree to 2.0e-9 pp on all 388 indexer-days, fees exactly. The unweighted mean of bucket
+  means for blocks behind misses by up to 18,451,669 blocks; query-weighted matches to 2.8e-8.
+- Latency weighted by 200s instead of queries moves more than 20% on 99 of 374 indexer-days, all
+  heavy-fast-failure days, so the oracle average appears to include failures. Query-weighted kept.
+- Headline figures were means of daily means: success rate off by more than 1 pp for 22 of 56
+  indexers and more than 5 pp for 13. staked.cloud 62.7% shown against 83.4%; 0x6f9bb7e4 72.4%
+  against 55.5%; nodeify.eth 56.4% against 69.8%; waynewayner.de 78.6% against 67.7%.
+- Daily grain hid outages. Ellipfra 97.36% for the week, bucket ending 09-08 14:05 served 0 of
+  52,286. Buckets with at least 50 queries under 90% success: suntzu 1,209, nodeify 1,656, p2p-org
+  827, tehn-r 474 (worst 0 of 5,997), pinax 13.
+- Blocks behind across chains is meaningless: one arbitrum-sepolia deployment 306M blocks behind puts
+  0x0a015d9e at 1.59M for the week. The rebuilt card shows seconds behind the freshest peer.
+- QoS Quality reproduced on 7 days (panel used 30 with EWMA): ellipfra 65.1 B, pinax 69.3 B,
+  0x8bbe94c2 79.1 A, 0x17def1a4 33.2 D, 0x605d0b92 5.3 F, nodeify 36.6 D, waynewayner.de 25.2 F,
+  0x0a015d9e 71.3 B with a served gap of 0.59 that would flag. The served gap needs the query-result
+  topic, so the nest declares both.
+- Publisher coverage: 2,014 of 2,016 indexer-attempt buckets posted (missing 09-09 19:05 and 09-11
+  22:25), 2,011 of 2,016 query-result. Post lag 1,815 to 1,860 s. The reference mapping's allowlist
+  (`0x0b8cef00…`) would reject the live publisher (`0x8cbbe43f…`).
+- Storage, measured: 7 days is 394 MB gzip indexer-attempt plus 173 MB query-result; one day 494 MB
+  raw, 26.0 MB zstd parquet. Extrapolated 90 days: 44 GB raw, 5.1 GB gzip, 2.3 GB parquet. Keep
+  everything.
+
+**Foghorn against the oracle, same week, through kittiwake's proxy.** 127 indexer-deployment pairs
+probed against the oracle's 5,401, 112 overlapping. Mean absolute success-rate difference 0.064; 7 of
+58 comparable pairs differ by 10 points or more: nodeify 69.8% oracle against 15.1% over 166 probes,
+suntzu 89.7% against 26.3% over 19. 27 of 500 returned attestation conflicts carry genuinely
+different data across 3 deployments (the limit was hit, so more). 33% of probes paid direct (2,932),
+67% via gateway. Last 24 h: 397 paid probes served, 2,297 refused because indexers denylist our payer.
+
+**Found: two Foghorn defects.** `/v1/indexer/:address/quality` returns `total_probes: 0` and null
+latencies for every indexer while `by_deployment` lists hundreds of probes; the scorecard (820 probes,
+21 divergent) and the buckets (637, 10) disagree for the same indexer and window. Slice F1.

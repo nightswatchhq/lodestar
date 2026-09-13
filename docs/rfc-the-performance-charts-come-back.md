@@ -26,9 +26,11 @@ Both come back, with no key:
    and the per-deployment breakdown) and the directory's QoS column, recomputed in kittiwake from
    the same nest at allocation grain.
 
-Parity is exact in principle for both charts, because the source is the same data read by a
-different decoder. It will not be exact in the numbers, on purpose, in two places named below where
-the old arithmetic was wrong.
+Parity is exact for the daily series, because the source is the same data read by a different
+decoder: rebuilt from a week of raw payloads, daily success rate and fees match the old pipeline to
+within 2e-9. What changes on purpose is what the old section did with them: headline figures that
+were means of daily means, a daily grain that hid outages, and blocks behind summed across chains
+with different block times. The numbers are in "What was wrong with the old section".
 
 ## Why #1160 said QoS could not be done, and what changed
 
@@ -56,7 +58,7 @@ All on 2026-09-13.
 **Two topics are posted per bucket.** `gateway_indexer_attempt_qos_5_minutes_prod_v3` is one row per
 indexer, deployment, chain and gateway, and carries every field the old chart read.
 `gateway_query_result_qos_5_minutes_prod_v3` is per deployment from the gateway's side, and the
-indexer page does not need it.
+served-vs-allocated gap needs it for each deployment's query total.
 
 **The payloads are fetchable at every age I tried**, from `ipfs.network.thegraph.com`:
 
@@ -96,9 +98,9 @@ it comes from now and what changes.
 | Query Performance, **Query Count** | oracle `query_count` per day; summary = 90-day total | same field, summed per allocation first |
 | **Query Fees** | `total_query_fees` per day; summary = total | same |
 | **Avg. Query Fee** | fees over queries per day; summary = the **latest day only** | same series; summary over the window, latest day shown beside it |
-| **Query Success Rate** | mean of rows' `proportion_indexer_200_responses`; summary = mean of daily means | Σ 200s over Σ queries, per day and for the window |
-| **Avg. Indexer Latency** | mean of rows' averages; summary = mean of daily means | weighted by 200s; Foghorn p50/p95/p99 beside it |
-| **Avg. Blocks Behind** | mean of rows' means; summary = mean of daily means | mean of bucket means, with `buckets` per day |
+| **Query Success Rate** | query-weighted per day (the subgraph weights it); summary = mean of daily means | same per day; summary query-weighted over the window; bad buckets and the worst bucket beside it |
+| **Avg. Indexer Latency** | query-weighted per day; summary = mean of daily means | same per day; summary query-weighted; Foghorn p50/p95/p99 beside it |
+| **Avg. Blocks Behind** | query-weighted blocks, across chains; summary = mean of daily means | seconds behind the freshest peer on the same deployment, as the old quality panel already did |
 | Provenance link to `/qos`, "90 day window" footer, skeleton, empty state | static | kept; empty state distinguishes "no data" from "publisher silent" |
 | **QoS Quality**, grade A to F | `q_score` from `indexer_qos_score` (Postgres, cron); `qosGrade` thresholds 75/60/45/30 | kittiwake computes it from the nest rollup; same thresholds |
 | Four bars: Reliability (Wilson), Latency (cohort-normalised decay), Freshness, Coverage | `lib/qos-score.ts`, `lib/qos-aggregate.ts` over `qos_daily` | ported to Rust, same `DEFAULTS`, tested against the TypeScript on fixtures |
@@ -167,7 +169,8 @@ about 150 bytes of JSON, so today the resolver skips every row without saying so
 an optional `cid_json_path` on `[[ipfs]]`. When it is set, the column value (a string, or bytes that
 are valid UTF-8) is parsed as JSON. An object yields the value at the path, an array yields one per
 element, and anything unparseable yields no row and increments a counter. A topic filter belongs in
-the same slice, so a nest can decline the query-result documents it does not need. This is an
+the same slice, so each declaration takes one topic. This nest declares two: the indexer-attempt
+documents for the charts, and the query-result documents for the served-vs-allocated gap. This is an
 RFC-0037 slice and is filed there, not built here.
 
 **Who counts as the publisher.** The oracle subgraph accepts messages only from a submitter
@@ -184,18 +187,37 @@ need that grain. The indexer-day figures on the charts are sums over it, never a
 |---|---|
 | `query_count` | sum of `query_count` |
 | `success_rate` | sum of `num_indexer_200_responses` over sum of `query_count` |
-| `latency_ms` | mean of `avg_indexer_latency_ms` weighted by `num_indexer_200_responses` |
-| `blocks_behind` | unweighted mean of bucket means (freshness is sampled, not per query) |
+| `latency_ms` | mean of `avg_indexer_latency_ms` weighted by `query_count` |
+| `blocks_behind` | mean of `avg_indexer_blocks_behind` weighted by `query_count`, and seconds behind via the chain's block time |
+| `bad_buckets` | buckets with at least 50 queries and under 90% success |
+| `worst_bucket` | the lowest-success bucket with at least 50 queries: its time, success and volume |
 | `total_query_fees` | sum; `avg_query_fee` is that over `query_count` |
 | `buckets` | distinct buckets seen, out of 288 |
 
-The weighting follows Foghorn's `foghorn-api/src/qos.rs`, which already argued it.
+Latency is weighted by queries, not by successful responses as Foghorn weights its own. The oracle's
+average behaves as if it includes failed responses: weighting it by 200s moved latency by more than
+20% on 99 of 374 indexer-days, all of them days with many fast failures. The first draft's
+unweighted mean of bucket means for blocks behind is wrong: it misses the old figure by up to 18.4M
+blocks, because a deployment with 5 queries and 206.8M blocks behind counts as much as a busy one.
 
-**Better than parity, and different on purpose.** The old route averaged
-`proportion_indexer_200_responses`, latency and blocks behind **unweighted** across rows
-(`successRateSum / count`). An allocation that served 3 queries counted as much as one that served
-300,000. The rebuilt figures weight by queries, so they will not match the old chart and should not.
-`buckets` puts a day with an outage on the chart as partial rather than as quiet.
+## What was wrong with the old section
+
+Measured on 2026-09-13 over 2026-09-06 to 2026-09-12: 2,014 indexer-attempt payloads, 4,800,241 rows,
+56 indexers, the old pipeline rebuilt from the reference subgraph mapping and `cb61cea~1`. Parity
+against the subgraph itself is pending: production read Ellipfra's fork, whose mapping may differ.
+
+- **The daily series were right.** Daily success rate matches to 2e-9 pp on all 388 indexer-days, and
+  fees match exactly. The first draft of this RFC said the old route averaged unweighted; with one
+  gateway per row, it did not matter.
+- **The headline figures were not.** Each was a plain mean of daily figures. Against the
+  query-weighted window, success rate was off by more than 1 pp for 22 of 56 indexers and by more
+  than 5 pp for 13. staked.cloud showed 62.7% against 83.4%; nodeify.eth 56.4% against 69.8%.
+- **A day hid its outages.** Ellipfra read 97.36% for the week, and the bucket ending 09-08 14:05
+  served 0 of 52,286 queries. tehn-r.eth had 474 buckets under 90% success with at least 50 queries,
+  worst 0 of 5,997; suntzu had 1,209. None of that was visible.
+- **Blocks behind in blocks meant nothing.** It adds chains with block times 48 times apart. One
+  arbitrum-sepolia deployment 306M blocks behind puts 0x0a015d9e at 1.59M for the week.
+- **"Avg. Query Fee" showed the latest day only.**
 
 **Kittiwake.** `GET /api/indexer/{address}/qos?days=90` answers the old `{ qos: IndexerQoSPoint[] }`
 plus `buckets` and `gatewayId`. Its freshness is the publisher's newest post against the nest's
@@ -223,9 +245,17 @@ five-minute buckets, and rolls it up daily in `foghorn-api/src/qos.rs`. Kittiwak
 
 It goes on the same four charts as a second line labelled as probes, plus a fifth chart for
 `correctness_rate` and p50/p95/p99 latency on the latency chart. Two captions are required rather
-than optional. Foghorn's `query_count` is probes dispatched, never demand. Its success rate is
-gateway-dispatched today and therefore an upper bound, until paid dispatch is on (Foghorn migration
-021).
+than optional. Foghorn's `query_count` is probes dispatched, never demand. And a third of its probes
+are paid direct (2,932 of 8,840 over the week); the rest go through the gateway and are an upper
+bound (Foghorn migration 021).
+
+What it adds is measured. It disagrees with the oracle by 10 points or more on 7 of 58 comparable
+indexer-deployment pairs: nodeify at 69.8% on the oracle and 15.1% over 166 probes. It found 27
+attestation conflicts with genuinely different data across 3 deployments. Two limits are measured too.
+It covers 127 indexer-deployment pairs against the oracle's 5,401. In the last day indexers refused
+2,297 paid probes because they denylist our payer, against 397 served. And
+`/v1/indexer/:address/quality` returns `total_probes: 0` and null latency for every indexer while its
+own `by_deployment` lists hundreds of probes, which is slice F1.
 
 This series is Foghorn's, not a nest's. Moving it onto nuthatch is the GRC's Stages 2 and 3 (a
 publisher contract emitting events on Arbitrum, and a nest over it), which are not built and are out
@@ -255,7 +285,8 @@ of scope here.
 | Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_allocation_daily` | N1 |
 | Q2 | kittiwake | `/api/indexer/{address}/qos` | Q1 |
 | Q3 | lodestar | `IndexerQoSChart` restored, with gaps | Q2 |
-| Q4 | lodestar | the Foghorn series | Q3 |
+| Q4 | lodestar | the Foghorn series | Q3, F1 |
+| F1 | foghorn | `/quality` counts every dispatched probe; scorecard and buckets agree on the same window | - |
 | S1 | kittiwake | the score port, `qos-score` and `qos-deployments` routes, `q_score` on `indexers-enriched` | Q1 |
 | S2 | lodestar | `QosQualityPanel` and the directory column restored | S1 |
 | B1 | lodestar | the release blog post in `src/content/blog/`: what each figure is, and how it differs from the old gateway-queried ones | everything above |
@@ -278,10 +309,10 @@ unweighted arithmetic, where it should match exactly, and then published weighte
    shipped, and verification against the CID is what makes the numbers reproducible by a third
    party. The alternative is kittiwake fetching the CIDs into Postgres, which works and which nobody
    else can check.
-2. **How much to keep.** The indexer-attempt documents are about 1.7 to 1.9 MB each (measured) and 288
-   a day, so 90 days is roughly 45 GB of JSON before compression (arithmetic; compression is not
-   measured). The choice is between keeping every document and keeping the daily rollup plus a window
-   of raw ones.
+2. **How much to keep.** Measured over a week: indexer-attempt documents are 394 MB gzipped and
+   query-result 173 MB; one day is 494 MB raw, 59.5 MB gzip, 26.0 MB as zstd parquet. Extrapolated to
+   90 days: about 44 GB raw, 5.1 GB gzip, 2.3 GB parquet. Compressed, keeping every document is cheap,
+   and I recommend it.
 3. **How far back.** Either the old chart's 90 days, from 2026-06, or everything from block
    24,747,400.
 
