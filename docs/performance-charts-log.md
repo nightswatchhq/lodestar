@@ -487,6 +487,29 @@ branches with separate ownership, the way N2 and N3 ran:
   the publisher filter on `tx_from`, verified documents only, and a real-run parity check.
 - N4b (`pete/seal-bytes-and-fetch`): the byte-bounded seal cut, parallel block-body fetch, and the
   SIGTERM fault.
+
+**V1 attempted early, and moved into the release.** Tried the whole-stack browser check before N4 for
+Daily Trends and the P&L, with kittiwake built at the top of its stack (#143 on #141, #142, #140).
+- Chief chose read-only production nests. A temporary `v1-local-check` `basic_auth` user was added
+  to the nest vhost on Helsinki (backup `Caddyfile.bak.20260913T183301Z`, validated, reloaded; 200
+  with the user, 401 without; production `/ready` and `/api/network-stats` unaffected), and local
+  kittiwake read the production nests through it.
+- It could not show the new charts: production `graph-allocations-nest` has no
+  `lodestar_indexer_daily` ("Table with name lodestar_indexer_daily does not exist"), because #23 is
+  not deployed. No pre-release check against production can see views that only exist in a PR.
+- The local nest copy is no substitute: it refuses to serve under three identity formulas (stored
+  `0xe3de2aa…` against `0xe1977cbb…` for the installed 3.6.1 and for config `073aeb6`, and
+  `0xa93f8b09…` for N3's build), on top of the holes the parity check found. Stopped there rather than
+  guess further.
+- The temporary user was removed the same session (validated, reloaded; the user now gets 401;
+  production API 200) and the local password files deleted. Local processes stopped; balerion on 8080
+  left alone.
+- Found on the way: a symlinked `node_modules` stops Next's dev server (Turbopack refuses a link out
+  of the project root); the stack-top worktree now has its own install.
+- New place for V1 in the release, after Chief's yes: deploy nuthatch and the nests first (invisible
+  to users, since production kittiwake reads none of the new views), then run the stack-top kittiwake
+  and lodestar locally against the production nests through a fresh temporary user and inspect the
+  pages in a browser, then deploy kittiwake, then lodestar.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
