@@ -258,6 +258,11 @@ of scope here.
 | Q4 | lodestar | the Foghorn series | Q3 |
 | S1 | kittiwake | the score port, `qos-score` and `qos-deployments` routes, `q_score` on `indexers-enriched` | Q1 |
 | S2 | lodestar | `QosQualityPanel` and the directory column restored | S1 |
+| B1 | lodestar | the release blog post in `src/content/blog/`: what each figure is, and how it differs from the old gateway-queried ones | everything above |
+
+Nothing is deployed until parity is signed off and B1 is ready to publish with it. Progress,
+measurements and findings are recorded as they happen in
+[performance-charts-log.md](performance-charts-log.md).
 
 The T slices and N1 can start today, in parallel.
 
