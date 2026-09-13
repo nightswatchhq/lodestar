@@ -58,6 +58,6 @@ describe('IndexerTrendsChart', () => {
     mockQuery = ready({ rewards: [], queryFees: [] });
     render(<IndexerTrendsChart indexer="0x1" />);
     expect(screen.getByText(/graph-allocations-nest/)).toBeInTheDocument();
-    expect(screen.getByText(/1% protocol tax/)).toBeInTheDocument();
+    expect(screen.getByText(/after the 1% protocol tax, the curators' share and the delegators' cut/)).toBeInTheDocument();
   });
 });

@@ -322,8 +322,8 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
           </div>
         )}
         <p className="text-[10px] text-[var(--text-faint)] mt-2 text-right">
-          Arbitrum events via graph-allocations-nest, dated by the collection that paid them. Net is after
-          the curators&apos; share and the 1% protocol tax.
+          Arbitrum events via graph-allocations-nest, dated by the collection that paid them. Net is what the
+          indexer received, after the 1% protocol tax, the curators&apos; share and the delegators&apos; cut.
         </p>
       </CardContent>
     </Card>

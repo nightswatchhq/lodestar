@@ -18,7 +18,7 @@ export interface QueryFeeDailyAgg {
   totalCurators: string;
   /** Null for the era whose events never stated it. */
   totalProtocolTax: string | null;
-  /** What the indexer kept. */
+  /** What the indexer received, after the protocol, the curators and the delegators. */
   totalCollectedNet: string;
   feeCount: string;
 }
