@@ -320,5 +320,14 @@ TypeScript.
 - Deploy order: `/ready` now counts the QoS nest, so qos-reo-nest serves at `/qos` before kittiwake#143
   deploys.
 Untested: HTTP and readiness against a real nest; served gap on real data (local allocations end
-2026-08-22); the `score-qos` job against Postgres; windows longer than one day; speed before N4. legacy branches on real data; fees before
+2026-08-22); the `score-qos` job against Postgres; windows longer than one day; speed before N4.
+
+**The RPC is not the backfill bottleneck.** Measured: full Gnosis block bodies in batches of 20,
+from a keyed Alchemy endpoint (offered by Chief) and public `rpc.gnosischain.com`: sequential 34
+against 25 blocks/s; 4 parallel batches 114 against 94; 8 parallel 145 against 133; no errors on
+either. The Q1 parity run averaged about 32 blocks/s, well under what either serves, so the limit is
+inside nuthatch: block bodies fetched with little concurrency, and IPFS resolved inline at about 1 s
+per document (N3 moves that out of the loop). A 90-day backfill is about 1.55M blocks: roughly 13 to
+14 hours at 32/s, about 3 hours at 133/s. Parallel block-body fetch joins N4. The keyed endpoint is
+held in reserve for rate limits and never enters a repo, config or this log. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.

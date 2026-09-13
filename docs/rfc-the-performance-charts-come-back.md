@@ -286,7 +286,7 @@ of scope here.
 | N1 | nuthatch | `[[ipfs]] cid_json_path` and the topic filter | - |
 | N2 | nuthatch | verification of multi-block UnixFS documents | N1 |
 | N3 | nuthatch | out-of-band resolution with retry, `from` on call rows, `--seal-direct`, identity covering calls and IPFS | N1 |
-| N4 | nuthatch | typed rows from JSON documents at resolution, so rollups are incremental entities rather than per-query JSON parsing (one day measured at 3.86 GB peak), serving within `nuthatch serve`'s default memory budget, and a `qos_freshness` view for the network-wide newest bucket | N2, N3 |
+| N4 | nuthatch | typed rows from JSON documents at resolution, so rollups are incremental entities rather than per-query JSON parsing (one day measured at 3.86 GB peak), serving within `nuthatch serve`'s default memory budget, a `qos_freshness` view for the network-wide newest bucket, and parallel block-body fetch for `top_level_calls` (backfill measured at about 32 blocks/s against 133 to 145/s the endpoints serve) | N2, N3 |
 | Q1 | `qos-reo-nest` | the nest, the publisher filter, `qos_allocation_daily` | N1; serving waits on N2 to N4 |
 | Q2 | kittiwake | `/api/indexer/{address}/qos` | Q1 |
 | Q3 | lodestar | `IndexerQoSChart` restored, with gaps | Q2 |
