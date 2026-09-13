@@ -416,5 +416,19 @@ kittiwake#143.
 Untested: nothing has been rendered (jsdom does not draw recharts; Playwright runs against
 production); the directory table render; the Foghorn bucket read against the real proxy; any real
 #143 response. Slice V1 added: the whole stack run locally and the page inspected in a browser
-before release. legacy branches on real data; fees before
+before release.
+
+**Merge dry-runs, release order onto current `main`, throwaway worktrees, nothing pushed.**
+- kittiwake: #140 clean; #142 then conflicts in `crates/read/src/routes.rs` and `sql.rs`; #143 (on
+  #141) then conflicts in `sql.rs`. Being stacked #140, #142, #141, #143 with conflicts resolved.
+- lodestar: #229 clean; #230 clean after it; #231 then conflicts in `docs/MIGRATION.md`,
+  `scripts/e2e/contracts.mjs`, `src/hooks/useNetworkStats.ts` and its test, `src/lib/api.ts` and its
+  test. Being stacked #229, #230, #231, with #229's dropped scuttlebutt routes restored at the cause.
+  (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
+
+**B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
+(`30983de`), pushed, no PR, 1,931 words. `TODO(release)` markers for the date, backfill span and
+serving figures after N4, parity against the old subgraphs, the Foghorn figures re-measured after
+foghorn#3 deploys, and the release run commands. Named indexers appear in it with figures the old
+charts misstated; Chief to decide before publishing whether naming them stays. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
