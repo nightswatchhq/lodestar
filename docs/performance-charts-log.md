@@ -459,6 +459,24 @@ payloads. (The gateway returns 403 to Python's default user agent; the key was n
   19:25; 09-09 12:30; 09-10 15:40. Five of 2,014 buckets in the week, lost by a mapping that skips a
   payload when IPFS does not answer and never tries again. The rebuild, and the nest, have all five.
 - So the old QoS charts were short of data as well as averaging it wrongly.
+
+**Parity against the old subgraph: Daily Trends.** Horizon performance subgraph
+(`eD1TVayj2NtmCjWFr4hZhc1APHQs9iR2Xah6KNE8Y4h`, deployment `QmXRFHuF…`, no indexing errors),
+`rewardDailyAggs` and `queryFeeDailyAggs` for 2026-07-24 to 2026-08-22.
+- Against production's `graph-allocations-nest` (public SQL, `staking` dataset, as of block
+  504,818,355), per indexer per UTC day from `IndexingRewardsCollected` and `QueryFeesCollected`:
+  **327 of 327 indexer-days exact to the wei on every field** (total, indexer and delegator rewards,
+  reward count, gross fees, curators' share, fee count), none on one side only. Horizon rewards only:
+  legacy `RewardsAssigned` needs `ASOF`, which the public SQL screen refuses.
+- Against the local nest copy through `lodestar_indexer_daily`: fees exact on 324 of 324, rewards on
+  320 of 324. The four differences are the local copy, not the view: three transactions
+  (`0xef556ee3…` block 496,496,908; `0xe146d5a7…` block 496,901,240; `0xcdb53af1…` block 496,968,153)
+  are real on Arbitrum and present in production with the subgraph's exact event counts (3, 50, 2)
+  but absent from the local store, and the fourth is past the local copy's last event (2026-08-22
+  11:23 UTC). The local copy has holes; production does not.
+- Still to do: run the view itself on production once #23 is deployed, including the legacy branch.
+- Production's public SQL answered 429 to 60 rapid queries from this check; rerun as two grouped
+  queries. Our load, not a fault.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
