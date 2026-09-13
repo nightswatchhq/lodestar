@@ -92,3 +92,13 @@ different data across 3 deployments (the limit was hit, so more). 33% of probes 
 **Found: two Foghorn defects.** `/v1/indexer/:address/quality` returns `total_probes: 0` and null
 latencies for every indexer while `by_deployment` lists hundreds of probes; the scorecard (820 probes,
 21 divergent) and the buckets (637, 10) disagree for the same indexer and window. Slice F1.
+
+**S1, first half: the scoring ported to kittiwake.** kittiwake#141, crate `kittiwake-qos`, open, not
+merged. Every constant carried unchanged (`DEFAULTS`, block times, grade thresholds 75/60/45/30,
+cohort constants, `LATENCY_TAU_MULT`), every scoring function, aggregation, the served gap. 45 unit
+tests (every vitest case from both old files plus the nest adapter). Equivalence against the original
+TypeScript run under Node: 689 seeded cases, all equal, max deviation 1.16e-10; two deliberate
+mutations each failed it. Only NaN handling differs (`f64::max` vs `Math.max`), unreachable from real
+input. Routes and database reads are the second half. Its adapter summed indexer attempts for each
+deployment's query total, which undercounts where the gateway retried on a second indexer; being
+changed to read the query-result topic.
