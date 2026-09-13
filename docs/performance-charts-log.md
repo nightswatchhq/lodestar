@@ -249,5 +249,20 @@ rates and fees. `checks/parity-2026-09-07.sql` covers all 288 and passes on the 
 **Still open on F1, sent back:** `detect_nondeterministic` keeps `cluster_count > 1` without
 excluding refusals or unattributed keys, so a deployment can be excused from correctness on evidence
 the rest of Foghorn rejects; unflagging has no test; the re-roll leaves stale rows it would not
-write (old signing-key rows, empty buckets). legacy branches on real data; fees before
+write (old signing-key rows, empty buckets).
+
+**F1 complete.** foghorn#3 (`e598f13`), open.
+- `detect_nondeterministic` counted an unattributed signing key as a minority indexer and any
+  `cluster_count > 1` probe as divergent, so a deployment could be flagged, and excused from
+  correctness, on evidence the rest of Foghorn rejects. Now on `judged_probes(since,
+  excuse_nondeterministic)` in `foghorn-core/src/judged.rs`, the single definition for the API and the
+  detector; flagging uses `excuse_nondeterministic = false`, or a flagged deployment would stop
+  producing the evidence that keeps it flagged. Test failed before (flagged the unattributed
+  deployment too), passes after with the rotating-minority control still flagged.
+- Unflagging tested; a mutation that re-rolls only on newly flagged deployments fails it (0 against 1).
+- `roll_range` only upserted; a `stale` CTE now deletes rows in range that the aggregate would not
+  produce (signing-key rows, empty buckets), keeping other `bucket_secs` series. Test failed before.
+- Local with Postgres 15: probe 36 passed and 1 ignored, API 2, core 28.
+Untested: production flag rates will shift because the detector's denominator now counts only judged
+probes; not measured. Re-measure after deploy alongside the §3 figures. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
