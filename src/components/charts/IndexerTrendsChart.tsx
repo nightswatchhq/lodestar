@@ -17,11 +17,16 @@ import {
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { useIndexerTrends } from '@/hooks/useNetworkStats';
 import { formatGRT, formatGRTFull } from '@/lib/utils';
+import { denseDaily, labelWithNoCollections, utcDayLabel, utcDayStart } from '@/lib/day-series';
+import type { IndexerTrendsResponse } from '@/lib/contracts/indexer-trends';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 
 type Tab = 'rewards' | 'fees' | 'cumulative';
 
+export const TREND_DAYS = 90;
+
 interface RewardPoint {
+  day: number;
   date: string;
   indexerRewards: number;
   delegatorRewards: number;
@@ -29,10 +34,17 @@ interface RewardPoint {
 }
 
 interface FeePoint {
+  day: number;
   date: string;
   collected: number;
   curators: number;
   net: number;
+}
+
+interface CumulativePoint {
+  day: number;
+  date: string;
+  cumulative: number;
 }
 
 const FEE_LABELS: Record<string, string> = {
@@ -41,58 +53,69 @@ const FEE_LABELS: Record<string, string> = {
   net: 'Net to Indexer',
 };
 
-function formatTimestamp(ts: string): string {
-  const num = Number(ts);
-  if (!isNaN(num) && num > 0) {
-    // The Graph timeseries Timestamp scalar returns microseconds
-    const seconds = num > 1e15 ? num / 1e6 : num > 1e12 ? num / 1e3 : num;
-    const d = new Date(seconds * 1000);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    }
-  }
-  return ts;
+/** Every UTC day of the window, zero where nothing was paid. */
+export function buildTrendSeries(
+  data: IndexerTrendsResponse | undefined,
+  windowDays: number = TREND_DAYS,
+  nowMs: number = Date.now(),
+): { rewards: RewardPoint[]; fees: FeePoint[]; cumulative: CumulativePoint[] } {
+  const rewards = denseDaily(
+    windowDays,
+    data?.rewards ?? [],
+    (r) => utcDayStart(r.timestamp),
+    (day, r): RewardPoint => ({
+      day,
+      date: utcDayLabel(day),
+      indexerRewards: r ? Number(r.totalIndexerRewards) / 1e18 : 0,
+      delegatorRewards: r ? Number(r.totalDelegationRewards) / 1e18 : 0,
+      total: r ? Number(r.totalRewards) / 1e18 : 0,
+    }),
+    nowMs,
+  );
+  const fees = denseDaily(
+    windowDays,
+    data?.queryFees ?? [],
+    (f) => utcDayStart(f.timestamp),
+    (day, f): FeePoint => ({
+      day,
+      date: utcDayLabel(day),
+      collected: f ? Number(f.totalCollected) / 1e18 : 0,
+      curators: f ? Number(f.totalCurators) / 1e18 : 0,
+      net: f ? Number(f.totalCollectedNet) / 1e18 : 0,
+    }),
+    nowMs,
+  );
+  let running = 0;
+  const cumulative = rewards.map((p) => {
+    running += p.total;
+    return { day: p.day, date: p.date, cumulative: running };
+  });
+  return { rewards, fees, cumulative };
 }
+
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    backgroundColor: 'var(--bg-elevated)',
+    border: '1px solid var(--border-mid)',
+    borderRadius: 'var(--radius-button)',
+    color: 'var(--text)',
+    fontSize: 12,
+  },
+  labelStyle: { color: 'var(--text)' },
+  itemStyle: { color: 'var(--text-muted)' },
+};
 
 export function IndexerTrendsChart({ indexer }: { indexer: string }) {
   const [tab, setTab] = useState<Tab>('rewards');
-  const state = useQueryState(useIndexerTrends(indexer, 90));
+  const state = useQueryState(useIndexerTrends(indexer, TREND_DAYS));
   const data = state.kind === 'ready' ? state.data : undefined;
 
-  const rewardData: RewardPoint[] =
-    data?.rewards
-      ?.slice()
-      .reverse()
-      .map((r) => ({
-        date: formatTimestamp(r.timestamp),
-        indexerRewards: Number(r.totalIndexerRewards) / 1e18,
-        delegatorRewards: Number(r.totalDelegationRewards) / 1e18,
-        total: Number(r.totalRewards) / 1e18,
-      })) ?? [];
+  const { rewards: rewardData, fees: feeData, cumulative: cumulativeData } = buildTrendSeries(data);
 
-  const feeData: FeePoint[] =
-    data?.queryFees
-      ?.slice()
-      .reverse()
-      .map((f) => ({
-        date: formatTimestamp(f.timestamp),
-        collected: Number(f.totalCollected) / 1e18,
-        curators: Number(f.totalCurators) / 1e18,
-        net: Number(f.totalCollectedNet) / 1e18,
-      })) ?? [];
-
-  const hasRewards = rewardData.length > 0;
-  const hasFees = feeData.length > 0;
+  const hasRewards = (data?.rewards?.length ?? 0) > 0;
+  const hasFees = (data?.queryFees?.length ?? 0) > 0;
   const hasData = hasRewards || hasFees;
-
-  const cumulativeData = rewardData.reduce<Array<{ date: string; cumulative: number }>>(
-    (acc, point) => {
-      const prev = acc.length > 0 ? acc[acc.length - 1].cumulative : 0;
-      acc.push({ date: point.date, cumulative: prev + point.total });
-      return acc;
-    },
-    []
-  );
+  const interval = Math.max(0, Math.floor(TREND_DAYS / 6) - 1);
 
   return (
     <Card className="min-w-0 overflow-hidden">
@@ -152,24 +175,14 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={rewardData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="trendIndexerGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="trendDelegatorGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--green)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--green)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={rewardData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis
                     dataKey="date"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
-                    interval={Math.max(0, Math.floor(rewardData.length / 6) - 1)}
+                    interval={interval}
                   />
                   <YAxis
                     axisLine={false}
@@ -179,15 +192,8 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     width={60}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--bg-elevated)',
-                      border: '1px solid var(--border-mid)',
-                      borderRadius: 'var(--radius-button)',
-                      color: 'var(--text)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--text)' }}
-                    itemStyle={{ color: 'var(--text-muted)' }}
+                    {...TOOLTIP_STYLE}
+                    labelFormatter={(label, payload) => labelWithNoCollections(label, payload)}
                     formatter={(value, name) => [
                       formatGRTFull(Number(value)) + ' GRT',
                       name === 'indexerRewards' ? 'Indexer' : 'Delegator',
@@ -197,23 +203,15 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     formatter={(v) => (v === 'indexerRewards' ? 'Indexer' : 'Delegator')}
                     wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }}
                   />
-                  <Area
-                    type="monotone"
-                    dataKey="indexerRewards"
-                    stackId="1"
-                    stroke="var(--accent)"
-                    strokeWidth={2}
-                    fill="url(#trendIndexerGrad)"
-                  />
-                  <Area
-                    type="monotone"
+                  <Bar dataKey="indexerRewards" stackId="rewards" fill="var(--accent)" fillOpacity={0.8} />
+                  <Bar
                     dataKey="delegatorRewards"
-                    stackId="1"
-                    stroke="var(--green)"
-                    strokeWidth={2}
-                    fill="url(#trendDelegatorGrad)"
+                    stackId="rewards"
+                    fill="var(--green)"
+                    fillOpacity={0.7}
+                    radius={[2, 2, 0, 0]}
                   />
-                </AreaChart>
+                </BarChart>
               </ResponsiveContainer>
             )}
           </div>
@@ -232,7 +230,7 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
-                    interval={Math.max(0, Math.floor(feeData.length / 6) - 1)}
+                    interval={interval}
                   />
                   <YAxis
                     axisLine={false}
@@ -242,15 +240,8 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     width={60}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--bg-elevated)',
-                      border: '1px solid var(--border-mid)',
-                      borderRadius: 'var(--radius-button)',
-                      color: 'var(--text)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--text)' }}
-                    itemStyle={{ color: 'var(--text-muted)' }}
+                    {...TOOLTIP_STYLE}
+                    labelFormatter={(label, payload) => labelWithNoCollections(label, payload)}
                     formatter={(value, name) => [
                       formatGRTFull(Number(value)) + ' GRT',
                       FEE_LABELS[String(name)] ?? String(name),
@@ -269,7 +260,7 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
           </div>
         ) : (
           <div className="h-[280px]">
-            {cumulativeData.length === 0 ? (
+            {!hasRewards ? (
               <div className="h-full flex items-center justify-center">
                 <p className="text-sm text-[var(--text-faint)]">No reward data for cumulative view</p>
               </div>
@@ -288,7 +279,7 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     axisLine={false}
                     tickLine={false}
                     tick={{ fill: 'var(--text-faint)', fontSize: 10 }}
-                    interval={Math.max(0, Math.floor(cumulativeData.length / 6) - 1)}
+                    interval={interval}
                   />
                   <YAxis
                     axisLine={false}
@@ -298,19 +289,11 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
                     width={60}
                   />
                   <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--bg-elevated)',
-                      border: '1px solid var(--border-mid)',
-                      borderRadius: 'var(--radius-button)',
-                      color: 'var(--text)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--text)' }}
-                    itemStyle={{ color: 'var(--text-muted)' }}
+                    {...TOOLTIP_STYLE}
                     formatter={(value) => [formatGRTFull(Number(value)) + ' GRT', 'Cumulative Rewards']}
                   />
                   <Area
-                    type="monotone"
+                    type="stepAfter"
                     dataKey="cumulative"
                     stroke="var(--accent)"
                     strokeWidth={2}
