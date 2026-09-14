@@ -60,4 +60,12 @@ describe('IndexerTrendsChart', () => {
     expect(screen.getByText(/graph-allocations-nest/)).toBeInTheDocument();
     expect(screen.getByText(/after the 1% protocol tax, the curators' share and the delegators' cut/)).toBeInTheDocument();
   });
+
+  it('says fees are gross, days are UTC, and what it read before', () => {
+    mockQuery = ready({ rewards: [], queryFees: [] });
+    render(<IndexerTrendsChart indexer="0x1" />);
+    expect(screen.getByText(/Fees are shown gross, with net beside them, over UTC calendar days/)).toBeInTheDocument();
+    expect(screen.getByText(/Until 5 September this chart read a community subgraph/)).toBeInTheDocument();
+    expect(screen.getByText(/every indexer-day from 24 July to 22 August matched to the wei/)).toBeInTheDocument();
+  });
 });
