@@ -750,6 +750,28 @@ move to graph-academy-v2 for release 2.
 **Lodestar CI.** #229 had one check pending. #230 shows only Vercel checks because lodestar's CI runs
 on pull requests targeting `main` and #230 targets #229's branch; its full CI runs once #229 merges
 and #230 is retargeted.
+
+**Kittiwake shipped.** `main` CI run 34830525078 passed on `dcf0f56d`; `deploy/ship.sh 34830525078` run
+from a worktree at that commit (so `install.sh` and the unit file match the binary) installed it on
+the Nuremberg primary. Active since 10:14:40 UTC; health `ok`, no schema gaps, 12 scheduled jobs,
+none silent or failing; every nest ready except `dips-sepolia` (retired, 410, expected). Previous
+binary kept beside it by `install.sh`.
+- Baseline before shipping, for the record: `0xf92f…a6d4` `/revenue?window=30` answered 3,741,265 GRT
+  (2,966,664 rewards, 774,601 RAV) under the old definition; `/trends` answered 404.
+- An honest gap: from 10:14 UTC the live P&L panel shows the corrected figures (same fields, new
+  meaning) before its correction note is deployed with lodestar #230. Lodestar follows as soon as its
+  checks and the browser check pass.
+- P&L correction date set on #230: `PNL_CORRECTED_ON = '14 September 2026'` (`f28d510`); the panel's
+  tests pass and tsc is clean.
+
+**Step 4 verified on production.** Against `lodestar_indexer_daily` read over loopback on the nest:
+- `/api/indexer/{address}/trends?days=30` for five indexers: all 200; every reward day and fee day
+  equals the view to the wei (72 reward days, 56 fee days, 0 mismatches).
+- `0xf92f…a6d4` `/revenue?window=30`: 30 days, 2026-08-16 to 2026-09-14, every day's indexing
+  rewards and fees equal the view's indexer rewards and net fees, and the daily totals sum exactly to
+  `total_grt` (3,496,144.289171 GRT); `/pnl` reports the same revenue. Fields `indexing_rewards_gross_grt`
+  and `query_fees_gross_grt` present. A first comparison summed 3,972,164 GRT because its own window
+  included 2026-08-15; the route was right.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
