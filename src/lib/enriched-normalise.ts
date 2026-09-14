@@ -18,6 +18,10 @@ import type { EnrichedIndexer } from '@/lib/enriched';
 /** Kittiwake's row. Named fields only - anything absent is handled explicitly below. */
 interface KittiwakeRow {
   address: string;
+  // Verified names only: a Graph default name the account owns on ENS, else its primary ENS name.
+  // Absent before kittiwake sent them.
+  name?: string | null;
+  ensName?: string | null;
   url: string | null;
   selfStakeGrt: string;
   delegatedGrt: string;
@@ -72,10 +76,10 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
   const delegated = num(r.delegatedGrt);
   return {
     id: String(r.address).toLowerCase(),
-    // Absent upstream. `null` renders as the address, which is honest; a placeholder string would
-    // read as a name the indexer chose.
-    name: null as unknown as string,
-    ensName: null,
+    // `null` renders as the address, which is honest; a placeholder string would read as a name the
+    // indexer chose.
+    name: r.name ?? null,
+    ensName: r.ensName ?? null,
     url: r.url ?? null,
     geoHash: r.geoHash ?? null,
 
