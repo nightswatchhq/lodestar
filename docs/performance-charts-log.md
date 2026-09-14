@@ -772,6 +772,27 @@ binary kept beside it by `install.sh`.
   `total_grt` (3,496,144.289171 GRT); `/pnl` reports the same revenue. Fields `indexing_rewards_gross_grt`
   and `query_fees_gross_grt` present. A first comparison summed 3,972,164 GRT because its own window
   included 2026-08-15; the route was right.
+
+**Incident: the largest indexer's page fails (found during the browser check, step 5).**
+- Symptom: `https://api.lodestar-dashboard.com/api/indexer/0xf92f…a6d4` returns 502
+  `nest upstream error 400`; the page says the indexer could not be loaded. kittiwake logs the 502s from
+  10:18 UTC, four minutes after the ship; none logged 09:30 to 10:14. Four other indexers answer 200.
+- Cause, measured: of the route's six nest statements, only the delegators list
+  (`lodestar_delegator_stakes`, top 100) fails, with DuckDB "Out of Memory ... 231.1 MiB/244.1 MiB used"
+  against `NUTHATCH_ANALYTICS_MEMORY_LIMIT=256MB` (a drop-in on the unit). The view inner-joins a per-pair
+  `list_reduce` fold of every delegation event (personal exchange rate, realised rewards) that the list
+  does not read, so it is computed anyway. `0xf92f…a6d4` has 334,612 delegation events, ten times the
+  next indexer (32,191); the query works for the other nine of the top ten in 0.9 to 1.1 s. The route
+  folds its parts with `many()`, so one failing part fails the page.
+- Not a change in either release: neither touched that query or view. The restart emptied kittiwake's
+  cache, and the new view files made the nest open a fresh DuckDB connection; either may have removed
+  what was masking a query already at its limit. Treated as ours to fix.
+- Fix, measured: the same list computed from the share and token sums alone, with the indexer filter
+  inside each event source, answers for `0xf92f…a6d4` in 0.19 s, and equals the current view's 100 rows
+  exactly for three indexers where the view works. Being prepared as a kittiwake change
+  (`pete/delegators-list-fits`); no nest change and no restart. Raising the analytics limit would need a
+  protocol-nest restart and would hide the cause, so it is not the chosen fix. Merge and ship wait on
+  Chief's yes, since this is outside the release-1 plan.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
