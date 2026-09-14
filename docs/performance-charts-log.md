@@ -820,6 +820,28 @@ notes. Two faults found, neither a wrong figure, both a misleading picture:
 **Decision (Chief): wait for both fixes before deploying lodestar.** An agent is fixing both on #229
 and #230; the browser check re-runs on its pushes, then lodestar merges and the dispatch publishes the
 same day.
+
+**Both fixed.** #229 `17e260a`, #230 merge `9307987` then `0bedb88`.
+- `src/lib/day-series.ts`: `utcWindowDays(N)` is every UTC day start from `floor(now/86400) - (N - 1)`
+  through today, the same window kittiwake counts; `denseDaily` fills a day with no row with zero and
+  drops rows outside the window. Daily Trends draws rewards as stacked indexer and delegator bars and
+  fees as grouped bars on every day, and Cumulative as a stepped area; the P&L draws stacked reward and
+  fee bars on every day. A zero day's tooltip says "no collections". The CSV export still lists only
+  days with collections.
+- Net: lodestar was the side at fault. `fetchIndexerPnl` sent `price` and `chain`; kittiwake reads
+  `grtPrice` and the cost model reads `chains` (the original Next route used `grtPrice`; kittiwake's
+  parity check uses `chains=`). So the chain selection was also being ignored. Fixed in `src/lib/api.ts`.
+- Tests: `day-series` (5), `IndexerTrendsChart draws only what happened` (3),
+  `PnlPanel draws only what was paid`, `asks the P&L route for the price and chains by the names
+  kittiwake reads`; #230's full suite 942 of 942.
+
+**Step 5 passes on the re-check** (`p2p-org-arbitrum.eth`, local #230 against production kittiwake):
+the page now requests `/pnl?window=30&grtPrice=…&chains=arbitrum,mainnet` (200). The P&L shows Net
+$19.69K at an 88.7% margin, revenue $22.19K, infra $2.50K a month for the selected chains (it was $300
+when the selection was ignored), break-even $0.0021, and one bar on 2026-08-23 (about 1.19M GRT), a
+sliver on 2026-08-24 and zero on every other day of an evenly spaced axis. Daily Trends over 90 days
+shows bars on the paid days only (about 3.3M GRT around 29 June, 1.6M around 27 July, 2.2M on 23 August)
+and zero between, with both source notes. Screenshots taken locally for Chief.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
