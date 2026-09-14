@@ -95,6 +95,21 @@ describe('normaliseEnrichedResponse', () => {
     expect(() => normaliseEnrichedResponse({ data: [{ nope: 1 }] })).toThrow(/not the kittiwake shape/);
   });
 
+  it('carries the verified names through, and leaves a missing one null', () => {
+    const named = normaliseEnrichedResponse({
+      data: [{ ...KITTIWAKE_ROW, name: 'datanexus.datanexus.eth', ensName: 'datanexus.datanexus.eth' }],
+    }).indexers[0];
+    expect(named.name).toBe('datanexus.datanexus.eth');
+    expect(named.ensName).toBe('datanexus.datanexus.eth');
+
+    // A row from before kittiwake sent names, and one without a name.
+    for (const row of [KITTIWAKE_ROW, { ...KITTIWAKE_ROW, name: null, ensName: null }]) {
+      const e = normaliseEnrichedResponse({ data: [row] }).indexers[0];
+      expect(e.name).toBeNull();
+      expect(e.ensName).toBeNull();
+    }
+  });
+
   it('does not invent an eligibility it was not given', () => {
     const { indexers } = normaliseEnrichedResponse({ data: [{ ...KITTIWAKE_ROW, reoStatus: 'garbage' }] });
     expect(indexers[0].reoStatus).toBe('unknown');

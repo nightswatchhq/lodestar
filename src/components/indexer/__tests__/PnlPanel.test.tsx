@@ -27,7 +27,7 @@ vi.mock('@/lib/api', () => ({
   })),
 }));
 
-import { PnlPanel } from '../PnlPanel';
+import { PnlPanel, PNL_CORRECTED_ON } from '../PnlPanel';
 
 function renderPanel() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -47,5 +47,19 @@ describe('PnlPanel', () => {
     expect(screen.getByText(/the curators' share and the delegators' cut/)).toBeInTheDocument();
     expect(screen.queryByText(/allocation close/)).not.toBeInTheDocument();
     expect(screen.queryByText(/RAV/)).not.toBeInTheDocument();
+  });
+
+  /** The panel was wrong in production for most indexers; it says so where the figures are. */
+  it('says, dated and in plain words, what the panel used to get wrong', async () => {
+    renderPanel();
+    const note = await screen.findByRole('note');
+    expect(note).toHaveTextContent(`Corrected on ${PNL_CORRECTED_ON}.`);
+    expect(note).toHaveTextContent(/missed rewards collected on open allocations/);
+    expect(note).toHaveTextContent(/counted the delegators' share as the indexer's revenue and showed query fees gross/);
+    expect(note).toHaveTextContent(/54 of the 58 paid indexers were shown more than 1 GRT off/);
+    expect(screen.getByRole('link', { name: 'What was wrong' })).toHaveAttribute(
+      'href',
+      'https://learn-thegraph.com/dispatches/the-pnl-was-wrong/',
+    );
   });
 });
