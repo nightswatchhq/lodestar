@@ -18,6 +18,9 @@ import { formatGRT, formatGRTFull, formatUSD, cn } from '@/lib/utils';
 import { fetchIndexerRevenue, fetchIndexerPnl } from '@/lib/api';
 
 const WINDOWS = [7, 30, 90, 365] as const;
+
+// Set to the day the corrected panel reaches production.
+export const PNL_CORRECTED_ON = 'RELEASE-DATE';
 type Window = (typeof WINDOWS)[number];
 
 // Default archive-node selection when the panel first loads.
@@ -179,6 +182,23 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
         </div>
       </CardHeader>
       <CardContent>
+        <div
+          role="note"
+          className="mb-4 rounded-md border border-[var(--amber)] bg-[var(--amber-dim)] p-2.5 text-xs text-[var(--text-muted)]"
+        >
+          <span className="font-medium text-[var(--text)]">Corrected on {PNL_CORRECTED_ON}.</span>{' '}
+          Until then this panel dated indexing rewards by the day an allocation was closed, which missed
+          rewards collected on open allocations. It also counted the delegators&apos; share as the
+          indexer&apos;s revenue and showed query fees gross. Over the 30 days to 13 September, 54 of the 58
+          paid indexers were shown more than 1 GRT off. It now shows the amount each collection paid the
+          indexer, on the day it was paid.{' '}
+          <a
+            href="https://learn-thegraph.com/dispatches/the-pnl-was-wrong/"
+            className="text-[var(--accent-text)] hover:underline"
+          >
+            What was wrong
+          </a>
+        </div>
         {isLoading ? (
           <ChartSkeleton height="280px" />
         ) : !hasData ? (
