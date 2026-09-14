@@ -632,6 +632,28 @@ kittiwake#143 CI green on `0128976`, `8830946` and `29edbd4`. The local clippy e
   on this store): 0.79 s before, 0.06 s after, identical output. Inputs replicated in place to about 90
   days' postings (46,920): 0.067 s; to 93,840: 0.081 s. An extrapolation, since no 90-day store exists
   yet. `nuthatch check` passes parity, day resolution and freshness with zero rows.
+
+## 2026-09-14
+
+**State after a session restart.** nuthatch#1367 was merged into `main` by Chief (`d8171207`, 07:36
+UTC). The N4b agent did not survive the restart; it had pushed six more commits to #1376 (head
+`32545293`: document nests bounded on both paths, `/sql` refusing past a byte bound, shutdown
+interrupting queries, the tip loop waiting on outstanding documents, prune guards, the range scan
+alike on Postgres and redb) but its measurements were never written down, so they are re-measured.
+
+**Jules, the required LLM reviewer, requested changes on four stacked PRs.** `Jules approval` is a
+required check on nuthatch `main`, green only on a `ship` verdict; #1377 passes, #1373 to #1376 fail:
+- #1373 (78/100): a valid multi-block document at or below 256 KiB with a non-default chunk size is
+  refused as tampered instead of reaching CAR verification (`src/cid.rs:300`).
+- #1374 (24/100): standalone it ships the 3.17 GB seal path, above the 2 GB per-cursor budget (the
+  fix lives in #1376); and `hold_for_documents` returns `pending.saturating_sub(1)`, so a pending
+  document at block 0 does not hold sealing (`src/indexer.rs:6368`).
+- #1375 (62/100): the inline resolver does not count unverified documents, unlike the out-of-band path
+  (`src/ipfs_resolve.rs:575`).
+- #1376 (68/100): the streaming seal scan stops only on a size cut, never on a known span cut, so sparse
+  ranges are read whole (`src/indexer.rs:3159`).
+All five are real. One agent is fixing them in stack order, retargeting #1373 and #1374 onto `main`,
+re-requesting review, and recording the lost N4b measurements.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
