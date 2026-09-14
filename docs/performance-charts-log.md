@@ -699,6 +699,41 @@ release 2.
 7. Publish the release-1 post only, filling its `TODO(release)` markers from steps 3 and 4 (the QoS
    draft stays unpublished).
 8. Draft the reply to the indexer who asked, for Chief to send.
+
+**Chief: yes to deploy release 1.** Carried out in order.
+
+**Step 1.** graph-allocations-nest#23 merged as `acc2e1b5` (09:48 UTC).
+
+**Step 2, the nest views on Helsinki.** Between `402b30e` and `acc2e1b5` no identity-bearing file
+changed (`nuthatch.toml`, `abis/`, `schema.json` untouched; views, checks, a script, README and
+`semantic.toml` only), and `402b30e` is an ancestor. Restored the hand-applied
+`views/90-lodestar-indexers.sql` from git, fetched, checked out `acc2e1b5` detached as before; tree
+clean; the nest stayed `ready: true`, same registry hash `0xe1977cbb…`, no restart. Both new views
+answer over loopback, history from 2023-03-16.
+- The whole-history `checks/indexer-daily-sums.sql` exceeds production's 244 MiB analytics limit, so
+  it was run per indexer instead: for five indexers, raw events equal the per-deployment view and the
+  daily view, rewards and fees, zero rows each.
+- Kittiwake's three statements (trends, daily revenue, revenue by deployment) for the same five
+  indexers at 30 and 90 days: all 30 answered, 0.77 to 1.75 s, no memory refusals. Unit memory after:
+  1,107 MiB against `MemoryHigh=2G`.
+
+**Step 3, parity through the view itself on production.** `lodestar_indexer_daily` one day per
+statement for 2026-07-24 to 2026-08-22, against the Horizon performance subgraph: **327 of 327
+indexer-days exact to the wei on every field** (total, indexer and delegator rewards, reward count,
+gross fees, curators' share, fee count), none on one side only, no statement errors.
+
+**Honesty notes on the release-1 PRs.** #229 `122ce89`: two lines under Daily Trends (fees gross with
+net beside them over UTC calendar days; until 5 September it read a community subgraph through a key
+Lodestar no longer holds, and every indexer-day from 24 July to 22 August matched it to the wei, which
+step 3 now confirms through the view). #230 merge `8ca56d2` then `e035af7`: an amber, dated
+correction box at the top of the P&L panel saying what was wrong and that 54 of 58 paid indexers were
+more than 1 GRT off, linking to the post; the date is `PNL_CORRECTED_ON`, set at release. The agent
+refused to write that the old subgraph "stopped being available": it still answers; we lost access
+when we dropped the key.
+
+**Found: the blog moved.** Lodestar's `/blog/:slug` redirects to `learn-thegraph.com/dispatches/:slug/`
+(graph-academy-v2), so the release-1 post is published there, before lodestar deploys, or the P&L
+note's link is dead.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
