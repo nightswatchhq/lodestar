@@ -654,6 +654,51 @@ required check on nuthatch `main`, green only on a `ship` verdict; #1377 passes,
   ranges are read whole (`src/indexer.rs:3159`).
 All five are real. One agent is fixing them in stack order, retargeting #1373 and #1374 onto `main`,
 re-requesting review, and recording the lost N4b measurements.
+
+**Decision: release in two parts (Chief).** Release 1 is Daily Trends and the P&L fix, which do not
+depend on the nuthatch stack and are parity-verified: graph-allocations-nest#23, kittiwake #140 and
+#142, lodestar #229 and #230. Release 2 is Query Performance, QoS Quality, the directory column and the
+Foghorn series, once nuthatch lands. Chief also required honesty in the dashboard and the blog: release
+1 carries a dated correction note on the P&L panel and source notes on Daily Trends, and its own post
+(`src/content/blog/the-pnl-was-wrong.md` on `pete/blog-performance-charts`). The QoS post waits for
+release 2.
+
+**Release 1, prepared.**
+- All five PRs mergeable and clean; kittiwake CI green on #140 and #142; lodestar 6 of 6 checks on
+  #229 and #230. graph-allocations-nest has no CI; its view checks ran locally.
+- The production protocol nest (`/opt/nuthatch/graph-allocations-nest-next`, unit
+  `graph-allocations-nest-next`, nuthatch 3.7.0, not 3.5.1 as muster says) is a git checkout at
+  `402b30e` with an uncommitted `views/90-lodestar-indexers.sql`. That file is byte-identical to
+  `main` (#22, `99e110f`): applied by hand before merging. No content drift, but `git pull` needs that
+  file restored first.
+- Nuthatch re-opens its DuckDB connection when any `views/*.sql` content changes (`duck_inputs`), so
+  new views load on the next query without a restart.
+- Production kittiwake's CORS allows `http://localhost:3000`, so the browser check can run lodestar
+  locally against the production API; the Vercel preview origin is not allowed. (Worth a later look:
+  a credentialed allowlist entry for any page on localhost:3000.)
+
+**Release 1 runbook, for Chief's yes.**
+1. Merge graph-allocations-nest#23.
+2. On Helsinki, in the nest directory: restore `views/90-lodestar-indexers.sql` from git, `git pull
+   --ff-only`, then over `/alloc/sql` confirm `lodestar_indexer_daily` and
+   `lodestar_indexer_deployment_daily` answer and `checks/indexer-daily-sums.sql` returns zero rows. If
+   the views do not appear, restart the unit and wait for warm-up.
+   Rollback: `git checkout 402b30e -- views/` (nothing reads the new views yet).
+3. Parity through the view itself on production: Daily Trends against the Horizon performance
+   subgraph for 2026-07-24 to 2026-08-22 including pre-Horizon rewards, and the fee arithmetic against
+   payment records. Must be exact, or every difference explained, before continuing.
+4. Merge kittiwake #140, then #142; wait for CI on `main`; `bash deploy/ship.sh` on the Nuremberg
+   primary; confirm `/ready`, and that `/api/indexer/{address}/trends`, `/revenue` and `/pnl` answer
+   with provenance and match step 3 for five indexers.
+   Rollback: `bash deploy/ship.sh <previous run-id>`.
+5. Browser check: lodestar #230 locally on `http://localhost:3000` with
+   `NEXT_PUBLIC_API_ORIGIN=https://api.lodestar-dashboard.com`; the indexer page's Daily Trends tabs and
+   P&L panel with its correction note, inspected in Chrome, screenshots to Chief.
+6. Set the correction note's date; merge lodestar #229, then #230 (Vercel production); confirm the
+   live pages. Rollback: promote the previous Vercel production deployment.
+7. Publish the release-1 post only, filling its `TODO(release)` markers from steps 3 and 4 (the QoS
+   draft stays unpublished).
+8. Draft the reply to the indexer who asked, for Chief to send.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
