@@ -324,6 +324,11 @@ export function IndexerTrendsChart({ indexer }: { indexer: string }) {
         <p className="text-[10px] text-[var(--text-faint)] mt-2 text-right">
           Arbitrum events via graph-allocations-nest, dated by the collection that paid them. Net is what the
           indexer received, after the 1% protocol tax, the curators&apos; share and the delegators&apos; cut.
+          Fees are shown gross, with net beside them, over UTC calendar days.
+        </p>
+        <p className="text-[10px] text-[var(--text-faint)] mt-1 text-right">
+          Until 5 September this chart read a community subgraph through a gateway key Lodestar no longer
+          holds. Checked against that subgraph, every indexer-day from 24 July to 22 August matched to the wei.
         </p>
       </CardContent>
     </Card>
