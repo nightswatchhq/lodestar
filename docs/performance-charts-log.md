@@ -734,6 +734,22 @@ when we dropped the key.
 **Found: the blog moved.** Lodestar's `/blog/:slug` redirects to `learn-thegraph.com/dispatches/:slug/`
 (graph-academy-v2), so the release-1 post is published there, before lodestar deploys, or the P&L
 note's link is dead.
+
+**Step 4 started.** kittiwake #140 merged as `16f89c0a` (09:55:07 UTC); #142 retargeted from
+`pete/indexer-trends` to `main` and merged as `dcf0f56d` (09:55:43). Branches kept, since #141 and
+#143 stack on them. Shipping waits on `main`'s CI run 34830525078, which builds the binary
+`deploy/ship.sh` installs.
+
+**The dispatch.** graph-academy-v2#13 (`pete/dispatch-the-pnl-was-wrong`), held:
+`src/content/dispatches/the-pnl-was-wrong.md`, 831 words, dated 2026-09-14, with step 3's result
+measured through the view on production in place of the held paragraph. graph-academy-v2 deploys to
+Vercel production on every push to `main`, so it merges the same day as lodestar #229 and #230, after
+them. The lodestar-side drafts on `pete/blog-performance-charts` stay unpublished; the QoS post will
+move to graph-academy-v2 for release 2.
+
+**Lodestar CI.** #229 had one check pending. #230 shows only Vercel checks because lodestar's CI runs
+on pull requests targeting `main` and #230 targets #229's branch; its full CI runs once #229 merges
+and #230 is retargeted.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
