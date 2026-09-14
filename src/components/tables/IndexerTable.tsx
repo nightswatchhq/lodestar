@@ -49,9 +49,8 @@ interface IndexerRow {
   id: string;
   /**
    * **Nullable, and honestly so.** Typed `string` before, which is why `tsc` was happy while the
-   * filter dereferenced it and threw on every keystroke. 97 of 97 indexers on mainnet have no
-   * `defaultDisplayName`, and kittiwake sends no name field at all, so this is null for everyone -
-   * the common case, not an edge one.
+   * filter dereferenced it and threw on every keystroke. Kittiwake sends only names it has verified
+   * on ENS, which about half the indexers have (52 of 100 on 14 September 2026), so null is common.
    */
   name: string | null;
   address: string;
