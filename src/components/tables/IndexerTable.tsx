@@ -37,10 +37,10 @@ import type { EnrichedIndexer } from '@/lib/enriched';
 // pushed 1344px of page down and was most of this page's layout shift.
 const PAGE_SIZE = 25;
 const ROW_HEIGHT_PX = 73;
-import { cooldownRemainingDays } from '@/lib/network-math';
 import { fetchDroppedChains, fetchNodeHealth } from '@/lib/api';
 import { MIN_DEPLOYMENTS_TO_JUDGE, type NodeSyncSummary } from '@/lib/node-health';
 import { Card } from '@/components/ui/Card';
+import { HoverTip, HoverTipContent } from '@/components/ui/HoverTip';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { IndexerComparison } from '@/components/ui/IndexerComparison';
@@ -61,7 +61,6 @@ interface IndexerRow {
   capacity: number;
   rewardCut: number;
   queryCut: number;
-  cooldownRemaining: number; // days until delegation params can change (0 = none)
   allocations: number;
   allocated: number;
   rewards: number;
@@ -171,7 +170,7 @@ function SyncDot({ address, url }: { address: string; url: string | null }) {
   const tipBody = `${syncedPct}% of deployments at chain head${lagText}. View the indexer profile for per-subgraph detail.`;
 
   return (
-    <span className="relative group/sync inline-flex items-center">
+    <HoverTip className="inline-flex items-center">
       <span
         className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-semibold leading-none"
         style={{ color, backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` }}
@@ -181,11 +180,11 @@ function SyncDot({ address, url }: { address: string; url: string | null }) {
         </svg>
         {syncedPct}%
       </span>
-      <span className="absolute left-0 top-full mt-1.5 w-56 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/sync:opacity-100 transition-opacity z-50 text-[11px] whitespace-normal">
+      <HoverTipContent width={224} className="p-2.5">
         <span className="block font-semibold text-[var(--text)] mb-1">Sync Warning</span>
         <span className="block text-[var(--text-muted)] leading-relaxed">{tipBody}</span>
-      </span>
-    </span>
+      </HoverTipContent>
+    </HoverTip>
   );
 }
 
@@ -208,7 +207,7 @@ function DroppedChainDot({ address }: { address: string }) {
   const tipBody = `This indexer appears to have stopped serving: ${dropped.join(', ')}. Chains missing from their node since the last snapshot, which may indicate infra changes. Check before delegating.`;
 
   return (
-    <span className="relative group/drop inline-flex items-center">
+    <HoverTip className="inline-flex items-center">
       <span
         className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] font-semibold leading-none"
         style={{ color: 'var(--amber)', backgroundColor: 'color-mix(in srgb, var(--amber) 12%, transparent)' }}
@@ -218,27 +217,37 @@ function DroppedChainDot({ address }: { address: string }) {
         </svg>
         {label}
       </span>
-      <span className="absolute left-0 top-full mt-1.5 w-60 p-2.5 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/drop:opacity-100 transition-opacity z-50 text-[11px] whitespace-normal">
+      <HoverTipContent width={240} className="p-2.5">
         <span className="block font-semibold text-[var(--text)] mb-1">Chain Drop Detected</span>
         <span className="block text-[var(--text-muted)] leading-relaxed">{tipBody}</span>
-      </span>
-    </span>
+      </HoverTipContent>
+    </HoverTip>
   );
+}
+
+/** The host an indexer registered, shown under the address while the indexer has no name. */
+function urlHost(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
 }
 
 /** Column header with an info tooltip on hover */
 function HeaderTip({ label, tip }: { label: string; tip: string }) {
   return (
-    <span className="relative group/tip inline-flex items-center gap-1">
+    <HoverTip className="inline-flex items-center gap-1">
       {label}
       <svg className="w-3 h-3 text-[var(--text-faint)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <circle cx="12" cy="12" r="10" />
         <path strokeLinecap="round" d="M12 16v-4m0-4h.01" />
       </svg>
-      <span className="absolute left-0 top-full mt-1.5 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/tip:opacity-100 transition-opacity z-50 text-[11px] font-normal normal-case tracking-normal text-[var(--text)]">
+      <HoverTipContent width={224}>
         {tip}
-      </span>
-    </span>
+      </HoverTipContent>
+    </HoverTip>
   );
 }
 
@@ -295,11 +304,6 @@ export function IndexerTable() {
           capacity: e.delegationCapacity.utilizationPercent,
           rewardCut: e.indexingRewardCut,
           queryCut: e.queryFeeCut || raw?.queryFeeCut || 0,
-          cooldownRemaining: cooldownRemainingDays(
-            e.delegatorParameterCooldown || raw?.delegatorParameterCooldown || 0,
-            e.lastDelegationParameterUpdate || raw?.lastDelegationParameterUpdate || 0,
-            Math.floor(Date.now() / 1000),
-          ),
           allocations: e.allocationCount,
           allocated: weiToGRT(e.allocatedTokens),
           rewards: weiToGRT(e.rewardsEarned && e.rewardsEarned !== '0' ? e.rewardsEarned : (raw?.rewardsEarned ?? '0')),
@@ -362,11 +366,6 @@ export function IndexerTable() {
           capacity: calculateCapacityUsed(selfStake, delegated, delegationRatio),
           rewardCut: indexer.indexingRewardCut,
           queryCut: indexer.queryFeeCut,
-          cooldownRemaining: cooldownRemainingDays(
-            indexer.delegatorParameterCooldown ?? 0,
-            indexer.lastDelegationParameterUpdate ?? 0,
-            Math.floor(Date.now() / 1000),
-          ),
           allocations: indexer.allocationCount,
           allocated,
           rewards,
@@ -424,18 +423,18 @@ export function IndexerTable() {
             <div>
               <p className="font-medium text-[var(--text)] hover:text-[var(--accent-text)] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
                 <Link href={`/indexers/${row.address}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
-                  {info.getValue()}
+                  {info.getValue() ?? shortenAddress(row.address)}
                 </Link>
                 {/* REO eligibility indicator — oracle isEligible is authoritative;
                     'unknown' renders neutral (oracle read unavailable), never red. */}
-                <span className="relative group/reo inline-flex">
+                <HoverTip className="inline-flex">
                   <span className={cn(
                     'w-2 h-2 rounded-full inline-block',
                     row.reoStatus === 'eligible' ? 'bg-[var(--green)]'
                       : row.reoStatus === 'ineligible' ? 'bg-[var(--red)]'
                       : 'bg-[var(--text-faint)]'
                   )} />
-                  <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-52 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/reo:opacity-100 transition-opacity z-50 text-[11px] font-normal">
+                  <HoverTipContent width={208}>
                     <span className="block font-semibold text-[var(--text)] mb-1">Rewards Eligibility (GIP-0079)</span>
                     <span className={cn(
                       'block font-medium',
@@ -454,19 +453,19 @@ export function IndexerTable() {
                         Renews in ~{row.reoDaysRemaining.toFixed(1)}d
                       </span>
                     ) : null}
-                  </span>
-                </span>
+                  </HoverTipContent>
+                </HoverTip>
                 {/* Node sync health indicator */}
                 <SyncDot address={row.address} url={row.url} />
                 {/* Dropped chain signal */}
                 <DroppedChainDot address={row.address} />
                 {/* Recent delegation activity indicator */}
                 {row.recentDelegations && (
-                  <span className="relative group/del inline-flex">
+                  <HoverTip className="inline-flex">
                     <svg className="w-3 h-3 text-[var(--accent-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M7 11l5-5m0 0l5 5m-5-5v12" />
                     </svg>
-                    <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-48 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/del:opacity-100 transition-opacity z-50 text-[11px] font-normal">
+                    <HoverTipContent width={192}>
                       <span className="block font-semibold text-[var(--text)] mb-1">Delegation Activity (7d)</span>
                       {row.recentDelegations.delegations > 0 && (
                         <span className="block text-[var(--green)]">
@@ -481,12 +480,12 @@ export function IndexerTable() {
                       <span className={`block font-mono mt-0.5 ${row.recentDelegations.netFlowGRT >= 0 ? 'text-[var(--green)]' : 'text-[var(--red-text)]'}`}>
                         {row.recentDelegations.netFlowGRT >= 0 ? '+' : ''}{formatGRT(row.recentDelegations.netFlowGRT)} GRT
                       </span>
-                    </span>
-                  </span>
+                    </HoverTipContent>
+                  </HoverTip>
                 )}
               </p>
               <p className="text-xs text-[var(--text-faint)] font-mono">
-                {shortenAddress(row.address)}
+                {row.name ? shortenAddress(row.address) : urlHost(row.url)}
               </p>
             </div>
           );
@@ -581,7 +580,7 @@ export function IndexerTable() {
           const recentChange = daysSince <= 30;
           const greedy = isGreedyCut(info.getValue());
           return (
-            <div className={greedy ? 'relative group/greedy' : undefined}>
+            <HoverTip className="block">
               <span className={cn(
                 'font-mono flex items-center gap-1.5',
                 greedy ? 'text-[var(--red-text)] font-semibold' : 'text-[var(--text)]'
@@ -595,9 +594,9 @@ export function IndexerTable() {
                 )}
               </span>
               {greedy && (
-                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-56 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/greedy:opacity-100 transition-opacity z-50 text-[11px] font-normal text-[var(--text)]">
+                <HoverTipContent width={224}>
                   100% Reward Cut: delegators earn nothing from this indexer
-                </span>
+                </HoverTipContent>
               )}
               {row.effectiveCut !== null && (
                 <span className="text-[10px] text-[var(--text-faint)] block">
@@ -607,18 +606,9 @@ export function IndexerTable() {
                   )}
                 </span>
               )}
-            </div>
+            </HoverTip>
           );
         },
-      }),
-      columnHelper.accessor('cooldownRemaining', {
-        header: () => <HeaderTip label="Cooldown" tip="Days until this indexer can next change its delegation parameters (cut, etc.). A longer cooldown means more predictable terms for delegators. '—' means no cooldown is currently active." />,
-        cell: (info) => {
-          const days = info.getValue();
-          if (!days || days <= 0) return <span className="text-[var(--text-faint)]">—</span>;
-          return <span className="font-mono text-[var(--text)]">{Math.ceil(days)}d</span>;
-        },
-        sortUndefined: 'last',
       }),
       columnHelper.accessor('apr', {
         header: () => <HeaderTip label="APR" tip="Forward-looking annualised return based on live allocations. Calculated against active delegation only; thawing tokens are excluded so they don't depress the figure. Snapshot, not a guarantee." />,
@@ -642,18 +632,18 @@ export function IndexerTable() {
           const row = info.row.original;
           if (value === null) return <span className="text-[var(--text-faint)]">—</span>;
           return (
-            <span className="relative group/apy">
+            <HoverTip>
               <span className={cn(
                 'font-mono',
                 value > 5 ? 'text-[var(--green)]' : 'text-[var(--text)]'
               )}>
                 {value.toFixed(2)}%
               </span>
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 w-44 p-2 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover/apy:opacity-100 transition-opacity z-50 text-[11px] font-normal">
+              <HoverTipContent width={176}>
                 <span className="block text-[var(--text-muted)]">30d APY: {row.rollingAPY30d !== null ? `${row.rollingAPY30d.toFixed(2)}%` : '—'}</span>
                 <span className="block text-[var(--text-faint)] mt-0.5">Instant APR: {row.apr !== null ? `${row.apr.toFixed(2)}%` : '—'}</span>
-              </span>
-            </span>
+              </HoverTipContent>
+            </HoverTip>
           );
         },
         sortUndefined: 'last',
