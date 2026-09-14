@@ -963,8 +963,9 @@ export async function fetchIndexerPnl(
   params: { windowDays: number; grtPrice?: number; chain?: string },
 ): Promise<IndexerPnl> {
   const qs = new URLSearchParams({ window: String(params.windowDays) });
-  if (params.grtPrice != null) qs.set('price', String(params.grtPrice));
-  if (params.chain) qs.set('chain', params.chain);
+  // kittiwake reads `grtPrice` and `chains`; any other name is ignored and the dollar columns come back null.
+  if (params.grtPrice != null) qs.set('grtPrice', String(params.grtPrice));
+  if (params.chain) qs.set('chains', params.chain);
   const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/pnl?${qs}`));
   if (!response.ok) throw new Error(`Indexer P&L failed: ${response.status}`);
   // `net_usd` is the headline and it is a subtraction: a missing `infra_cost_usd` would render a

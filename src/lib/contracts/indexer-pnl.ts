@@ -1,10 +1,17 @@
 /** What `/api/indexer/[address]/revenue` and `/api/indexer/[address]/pnl` answer. */
 
+/**
+ * `rav_grt` and `indexing_rewards_grt` are what the indexer received: query fees after the protocol, the
+ * curators and the delegators, and rewards after the delegators. The `*_gross_grt` fields are what was
+ * collected, which is what the first two meant before nightswatchhq/kittiwake#142.
+ */
 export interface RevenueDay {
   date: string;
   indexing_rewards_grt: number;
   rav_grt: number;
   total_grt: number;
+  query_fees_gross_grt: number;
+  indexing_rewards_gross_grt: number;
 }
 
 export interface IndexerRevenue {
@@ -13,6 +20,8 @@ export interface IndexerRevenue {
   indexing_rewards_grt: number;
   rav_grt: number;
   total_grt: number;
+  query_fees_gross_grt: number;
+  indexing_rewards_gross_grt: number;
   daily: RevenueDay[];
 }
 

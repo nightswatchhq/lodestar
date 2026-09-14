@@ -24,6 +24,7 @@ import {
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
   fetchIndexerTrends,
+  fetchIndexerPnl,
   fetchParameterHistory,
   fetchSubgraphCuration,
   fetchSubgraphSchema,
@@ -123,6 +124,26 @@ describe('api: URL building', () => {
     expect(url).toContain('skip=10');
     expect(url).toContain('orderBy=createdAt');
     expect(url).toContain('orderDirection=asc');
+  });
+
+  /** It sent `price` and `chain`; kittiwake reads `grtPrice` and `chains`, so Net never computed. */
+  it('asks the P&L route for the price and chains by the names kittiwake reads', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          pnl: { revenue_usd: null, infra_cost_usd: 0, net_usd: null },
+          costModel: {},
+          defaultChainCosts: {},
+        },
+      }),
+    );
+    await fetchIndexerPnl('0xabc', { windowDays: 30, grtPrice: 0.0186, chain: 'arbitrum,mainnet' });
+    const url = new URL(mockFetch.mock.calls[0][0] as string, 'http://x');
+    expect(url.searchParams.get('window')).toBe('30');
+    expect(url.searchParams.get('grtPrice')).toBe('0.0186');
+    expect(url.searchParams.get('chains')).toBe('arbitrum,mainnet');
+    expect(url.searchParams.has('price')).toBe(false);
+    expect(url.searchParams.has('chain')).toBe(false);
   });
 
   it('URL-encodes addresses to prevent injection', async () => {

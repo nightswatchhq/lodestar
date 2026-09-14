@@ -3,8 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -16,8 +16,12 @@ import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, formatGRTFull, formatUSD, cn } from '@/lib/utils';
 import { fetchIndexerRevenue, fetchIndexerPnl } from '@/lib/api';
+import { denseDaily, labelWithNoCollections, utcDayLabel, utcDayStart } from '@/lib/day-series';
 
 const WINDOWS = [7, 30, 90, 365] as const;
+
+// Set to the day the corrected panel reaches production.
+export const PNL_CORRECTED_ON = '14 September 2026';
 type Window = (typeof WINDOWS)[number];
 
 // Default archive-node selection when the panel first loads.
@@ -104,24 +108,34 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
 
   const chartData = useMemo(
     () =>
-      daily.map((d) => ({
-        date: new Date(d.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-        rav: d.rav_grt,
-        rewards: d.indexing_rewards_grt,
-      })),
-    [daily],
+      denseDaily(
+        window,
+        daily,
+        (d) => utcDayStart(d.date),
+        (day, d) => ({ date: utcDayLabel(day), rav: d?.rav_grt ?? 0, rewards: d?.indexing_rewards_grt ?? 0 }),
+      ),
+    [daily, window],
   );
 
   const toggleChain = (key: string) =>
     setChains((c) => (c.includes(key) ? c.filter((k) => k !== key) : [...c, key]));
 
   const exportCsv = () => {
-    const header = ['Date', 'Query Fees (GRT)', 'Indexing Rewards (GRT)', 'Total (GRT)'];
+    const header = [
+      'Date',
+      'Query Fees Received (GRT)',
+      'Indexing Rewards Received (GRT)',
+      'Total Received (GRT)',
+      'Query Fees Collected (GRT)',
+      'Indexing Rewards Collected (GRT)',
+    ];
     const rows = daily.map((d) => [
       d.date,
       d.rav_grt.toFixed(2),
       d.indexing_rewards_grt.toFixed(2),
       d.total_grt.toFixed(2),
+      d.query_fees_gross_grt.toFixed(2),
+      d.indexing_rewards_gross_grt.toFixed(2),
     ]);
     const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
     downloadCsv(`pnl-${addr}-${window}d.csv`, csv);
@@ -137,7 +151,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
           <div>
             <CardTitle>Indexer P&amp;L</CardTitle>
             <p className="text-[11px] text-[var(--text-faint)] mt-0.5">
-              Query-fee revenue + indexing rewards, net of modeled infra cost
+              What the indexer received in query fees and indexing rewards, net of modeled infra cost
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -170,6 +184,23 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
         </div>
       </CardHeader>
       <CardContent>
+        <div
+          role="note"
+          className="mb-4 rounded-md border border-[var(--amber)] bg-[var(--amber-dim)] p-2.5 text-xs text-[var(--text-muted)]"
+        >
+          <span className="font-medium text-[var(--text)]">Corrected on {PNL_CORRECTED_ON}.</span>{' '}
+          Until then this panel dated indexing rewards by the day an allocation was closed, which missed
+          rewards collected on open allocations. It also counted the delegators&apos; share as the
+          indexer&apos;s revenue and showed query fees gross. Over the 30 days to 13 September, 54 of the 58
+          paid indexers were shown more than 1 GRT off. It now shows the amount each collection paid the
+          indexer, on the day it was paid.{' '}
+          <a
+            href="https://learn-thegraph.com/dispatches/the-pnl-was-wrong/"
+            className="text-[var(--accent-text)] hover:underline"
+          >
+            What was wrong
+          </a>
+        </div>
         {isLoading ? (
           <ChartSkeleton height="280px" />
         ) : !hasData ? (
@@ -181,7 +212,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
             {/* Financial summary */}
             {p && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-5">
-                <Stat label="Total Revenue" value={`${formatGRT(p.revenue_grt)} GRT`} sub={p.revenue_usd != null ? formatUSD(p.revenue_usd) : undefined} />
+                <Stat label="Revenue Received" value={`${formatGRT(p.revenue_grt)} GRT`} sub={p.revenue_usd != null ? formatUSD(p.revenue_usd) : undefined} />
                 <Stat label={`Infra Cost (${window}d)`} value={formatUSD(p.infra_cost_usd)} sub={`${formatUSD(p.infra_monthly_usd)}/mo`} />
                 <Stat
                   label="Net"
@@ -195,17 +226,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
             {/* Daily stacked revenue */}
             <div className="h-[260px]">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="pnlRavGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="pnlRewardsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--green)" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="var(--green)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                   <XAxis
                     dataKey="date"
@@ -231,18 +252,19 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
                     }}
                     labelStyle={{ color: 'var(--text)' }}
                     itemStyle={{ color: 'var(--text-muted)' }}
+                    labelFormatter={(label, payload) => labelWithNoCollections(label, payload)}
                     formatter={(value, name) => [
                       formatGRTFull(Number(value)) + ' GRT',
-                      name === 'rav' ? 'Query Fees' : 'Indexing Rewards',
+                      name === 'rav' ? 'Query Fees Received' : 'Indexing Rewards Received',
                     ]}
                   />
                   <Legend
-                    formatter={(v) => (v === 'rav' ? 'Query Fees (RAV)' : 'Indexing Rewards')}
+                    formatter={(v) => (v === 'rav' ? 'Query Fees Received' : 'Indexing Rewards Received')}
                     wrapperStyle={{ fontSize: 11, color: 'var(--text-muted)' }}
                   />
-                  <Area type="monotone" dataKey="rewards" stackId="1" stroke="var(--green)" strokeWidth={2} fill="url(#pnlRewardsGrad)" />
-                  <Area type="monotone" dataKey="rav" stackId="1" stroke="var(--accent)" strokeWidth={2} fill="url(#pnlRavGrad)" />
-                </AreaChart>
+                  <Bar dataKey="rewards" stackId="revenue" fill="var(--green)" fillOpacity={0.7} />
+                  <Bar dataKey="rav" stackId="revenue" fill="var(--accent)" fillOpacity={0.8} radius={[2, 2, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
 
@@ -309,7 +331,9 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
             )}
 
             <p className="text-[10px] text-[var(--text-faint)] mt-4 leading-relaxed">
-              Revenue: query-fee redemptions (RAV) + indexing rewards realised at allocation close.
+              Revenue is what the indexer received, dated by the collection that paid it: query fees after the 1%
+              protocol tax, the curators&apos; share and the delegators&apos; cut, and indexing rewards after the
+              delegators&apos; share. The CSV carries the collected figures beside it.
               Infra cost is a modeled estimate from archive-node selection; override per operator.
               Informational only, not financial advice.
             </p>
