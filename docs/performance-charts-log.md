@@ -793,6 +793,33 @@ binary kept beside it by `install.sh`.
   (`pete/delegators-list-fits`); no nest change and no restart. Raising the analytics limit would need a
   protocol-nest restart and would hide the cause, so it is not the chosen fix. Merge and ship wait on
   Chief's yes, since this is outside the release-1 plan.
+- Opened as kittiwake#144 (`pete/delegators-list-fits`): `indexer_delegators_sql` computes the top N
+  active delegators from share and token sums, filtering by indexer inside each of the four staking
+  sources; the output columns are unchanged. The builder's exact generated SQL answers for
+  `0xf92f…a6d4` on production loopback in 0.21 s with 100 rows. Test
+  `an_indexers_delegators_are_summed_at_the_source_and_never_folded` pins the shape; kittiwake-read
+  passes 230 tests; fmt clean. `delegator_stakes_sql` keeps the view: it reads the fold and is keyed by
+  delegator. Local clippy reports three lines in `dips_agreements.rs`, untouched and not flagged by CI's
+  toolchain.
+
+**Step 5, the browser check, on `p2p-org-arbitrum.eth` (a page that loads).** Lodestar #230 locally on
+`http://localhost:3000` against production kittiwake: the indexer page renders; `/api/indexer/…`,
+`/revenue?window=30`, `/pnl?window=30` and `/trends?days=90` all answer 200 from production. The P&L
+panel shows the correction note, "Corrected on 14 September 2026.", linking to
+`learn-thegraph.com/dispatches/the-pnl-was-wrong/`. Daily Trends renders with its three tabs and source
+notes. Two faults found, neither a wrong figure, both a misleading picture:
+- The charts draw shapes the data does not contain. The revenue and trends routes return only days
+  with a collection (for this indexer, 30 days holds 2026-08-23 with 1,185,418 GRT and 2026-08-24 with
+  3,226 GRT); both charts draw them as smoothed stacked areas on a categorical axis, so Daily Trends
+  shows a month-long slide from 3.4M GRT to zero that never happened, with uneven spacing. The P&L chart
+  on `main` already does this; Daily Trends would add it. Fix: every UTC day of the window, zero where
+  nothing was paid, per-day amounts as bars.
+- "Net" never computes: `fetchIndexerPnl` sends `price=` and kittiwake's handler reads only `grtPrice`
+  (since kittiwake#72), so `revenue_usd`, `net_usd` and `margin_pct` are null and the panel shows "—".
+  The same on `main`: broken since the cutover.
+**Decision (Chief): wait for both fixes before deploying lodestar.** An agent is fixing both on #229
+and #230; the browser check re-runs on its pushes, then lodestar merges and the dispatch publishes the
+same day.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
