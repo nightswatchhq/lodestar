@@ -815,7 +815,7 @@ notes. Two faults found, neither a wrong figure, both a misleading picture:
   on `main` already does this; Daily Trends would add it. Fix: every UTC day of the window, zero where
   nothing was paid, per-day amounts as bars.
 - "Net" never computes: `fetchIndexerPnl` sends `price=` and kittiwake's handler reads only `grtPrice`
-  (since kittiwake#72), so `revenue_usd`, `net_usd` and `margin_pct` are null and the panel shows "—".
+  (since kittiwake#72), so `revenue_usd`, `net_usd` and `margin_pct` are null and the panel shows a dash where Net should be.
   The same on `main`: broken since the cutover.
 **Decision (Chief): wait for both fixes before deploying lodestar.** An agent is fixing both on #229
 and #230; the browser check re-runs on its pushes, then lodestar merges and the dispatch publishes the
