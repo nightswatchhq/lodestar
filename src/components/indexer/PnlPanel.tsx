@@ -20,7 +20,7 @@ import { fetchIndexerRevenue, fetchIndexerPnl } from '@/lib/api';
 const WINDOWS = [7, 30, 90, 365] as const;
 
 // Set to the day the corrected panel reaches production.
-export const PNL_CORRECTED_ON = 'RELEASE-DATE';
+export const PNL_CORRECTED_ON = '14 September 2026';
 type Window = (typeof WINDOWS)[number];
 
 // Default archive-node selection when the panel first loads.
