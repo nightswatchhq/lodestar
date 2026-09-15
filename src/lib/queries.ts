@@ -828,6 +828,12 @@ export interface GraphTallyTokensCollected {
 }
 
 /** Aggregated payment stats for the payments overview API */
+export interface PaymentsCollectedByPayer {
+  payer: { id: string };
+  collections: number;
+  tokens: string;
+}
+
 export interface PaymentsOverview {
   totalEscrowBalance: string;
   totalThawing: string;
@@ -837,6 +843,8 @@ export interface PaymentsOverview {
   escrowAccounts: PaymentsEscrowAccount[];
   recentTransactions: PaymentsEscrowTransaction[];
   topCollectors: GraphTallyTokensCollected[];
+  /** Every payer's collections, uncapped. Absent from kittiwake builds that predate it. */
+  collectedByPayer?: PaymentsCollectedByPayer[];
 }
 
 // =============================================================================

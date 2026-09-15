@@ -15,7 +15,6 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { HorizonParameters } from '@/components/ui/HorizonParameters';
 import { HorizonActivity } from '@/components/ui/HorizonActivity';
 import { CatalystCoverage } from '@/components/ui/CatalystCoverage';
-import { DipsStatus } from '@/components/ui/DipsStatus';
 import { DipsAgreements } from '@/components/ui/DipsAgreements';
 import dynamic from 'next/dynamic';
 
@@ -151,10 +150,6 @@ export default function ProtocolOverview() {
       <CatalystCoverage />
 
 
-      {/* DIPS: live contracts, zero allocation. Sits directly under the Catalyst card because it is
-          the one roadmap item where the protocol has already moved and nobody has noticed. Renders
-          nothing when `dips-nest` is unconfigured. */}
-      <DipsStatus />
       <DipsAgreements />
 
       {/* Epoch progress */}

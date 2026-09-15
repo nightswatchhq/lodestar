@@ -3,8 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Badge } from './Badge';
-import { ProgressBar } from './ProgressBar';
-import { weiToGRT, formatGRT, formatPPM, cn } from '@/lib/utils';
+import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import {
   calculateDelegationCapacity,
   calculateDelegatorAPR,
@@ -86,8 +85,6 @@ export function DelegationCalculator({
     [indexer.allocations, indexer.indexingRewardCut, currentDelegated, newDelegation, totalNetworkSignal, annualIssuance]
   );
 
-  const rawCut = indexer.indexingRewardCut / 1_000_000;
-
   // Check if parameters are locked (cooldown active)
   const cooldownEnd = indexer.lastDelegationParameterUpdate + indexer.delegatorParameterCooldown;
   const isLocked = cooldownEnd > nowSec;
@@ -109,45 +106,6 @@ export function DelegationCalculator({
         </div>
       </CardHeader>
       <CardContent>
-        {/* Indexer summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6 p-4 rounded-lg bg-[var(--bg-elevated)]">
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Self-Stake</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatGRT(selfStake)} GRT</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Current Delegated</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatGRT(currentDelegated)} GRT</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Reward Cut</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatPPM(indexer.indexingRewardCut)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Query Fee Cut</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatPPM(indexer.queryFeeCut)}</p>
-          </div>
-        </div>
-
-        {/* Capacity indicator */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-[var(--text-muted)]">Delegation Capacity</span>
-            <span className="text-sm font-mono text-[var(--text)]">
-              {formatGRT(capacity.availableCapacity)} GRT available
-            </span>
-          </div>
-          <ProgressBar
-            value={capacity.utilizationPercent}
-            max={100}
-            variant={capacity.utilizationPercent > 90 ? 'orange' : 'teal'}
-            size="md"
-          />
-          <p className="text-xs text-[var(--text-faint)] mt-1">
-            {capacity.utilizationPercent.toFixed(1)}% utilized ({delegationRatio}x ratio)
-          </p>
-        </div>
-
         {/* Input */}
         <div className="mb-6">
           <label className="block text-sm text-[var(--text-muted)] mb-2">

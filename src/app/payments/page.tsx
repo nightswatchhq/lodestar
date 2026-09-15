@@ -294,14 +294,16 @@ function PaymentsInner() {
   const gatewayBreakdown = useMemo<GatewayStats[]>(() => {
     if (!data) return [];
     const canonical = (id: string) => GATEWAY_CANONICAL[id] ?? id;
+    // Before kittiwake sent collectedByPayer only the 50 largest collections existed here: a floor, not a total.
+    const collectedRows = data.collectedByPayer ?? data.topCollectors;
     const allCanonical = new Set([
       ...data.escrowAccounts.map(a => canonical(a.payer.id.toLowerCase())),
-      ...data.topCollectors.map(c => canonical(c.payer.id.toLowerCase())),
+      ...collectedRows.map(c => canonical(c.payer.id.toLowerCase())),
     ]);
     return Array.from(allCanonical).map((canonicalId) => {
       const aliases = new Set([canonicalId, ...Object.keys(GATEWAY_CANONICAL).filter(k => GATEWAY_CANONICAL[k] === canonicalId)]);
       const accounts = data.escrowAccounts.filter(a => aliases.has(a.payer.id.toLowerCase()));
-      const collected = data.topCollectors.filter(c => aliases.has(c.payer.id.toLowerCase()));
+      const collected = collectedRows.filter(c => aliases.has(c.payer.id.toLowerCase()));
       const totalEscrow = accounts.reduce((s, a) => s + BigInt(a.balance), BigInt(0));
       const totalCollected = collected.reduce((s, c) => s + BigInt(c.tokens), BigInt(0));
       return {
