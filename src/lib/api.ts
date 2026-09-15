@@ -20,7 +20,6 @@ import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status-shape';
 import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activity';
 import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
-import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
 import type { Agreement, AgreementStatus } from '@/lib/dips-agreements';
 import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import type { Concentration } from '@/lib/concentration';
@@ -56,17 +55,6 @@ import type {
   SubgraphHistoryPoint,
   SubgraphVersion,
 } from '@/lib/contracts/indexer-signals';
-
-/** What `/api/dips` answers. `available: false` when the contracts are not configured. */
-export interface DipsStatusResponse {
-  available: boolean;
-  totalRate?: number;
-  agreementRate?: number;
-  live?: boolean;
-  allocations?: DipsAllocation[];
-  timeline?: DipsStep[];
-  lastConfiguredAt?: number | null;
-}
 
 /** What `/api/dips/agreements` answers. */
 export interface DipsAgreementsResponse {
@@ -712,16 +700,6 @@ export async function fetchCuratorLeaderboard(params: { first?: number; skip?: n
 // `const r = await fetch(…)` form, so this shape walked past it.
 
 /** `available: false` is a real answer here: the DIPS contracts may simply not be configured. */
-export async function fetchDipsStatus(): Promise<DipsStatusResponse> {
-  const response = await fetchShedAware(apiUrl('/api/dips'));
-  if (!response.ok) throw new Error(`DIPS status failed: ${response.status}`);
-  return parseResponse('/api/dips', await response.json(), {
-    objects: ['data'],
-    present: ['data.available'],
-    pick: 'data',
-  });
-}
-
 export async function fetchDipsAgreements(): Promise<DipsAgreementsResponse> {
   const response = await fetchShedAware(apiUrl('/api/dips/agreements'));
   if (!response.ok) throw new Error(`DIPS agreements failed: ${response.status}`);

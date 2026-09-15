@@ -1,15 +1,17 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useIndexerPayments, useGRTPrice, useEnrichedIndexers } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Pagination } from '@/components/ui/Pagination';
 import { weiToGRT, formatGRT, formatUSD, shortenAddress, formatRelativeTime, cn, GATEWAY_ALIASES } from '@/lib/utils';
 
 const ARBISCAN = 'https://arbiscan.io/address/';
+const TX_PAGE_SIZE = 20;
 
 function PayerLink({ address }: { address: string }) {
   const alias = GATEWAY_ALIASES[address.toLowerCase()];
@@ -41,6 +43,7 @@ export default function IndexerPaymentsPage({
   const { data, isLoading, isError } = useIndexerPayments(address);
   const { data: priceData } = useGRTPrice();
   const { data: enrichedData } = useEnrichedIndexers();
+  const [txPage, setTxPage] = useState(0);
 
   const grtPrice = priceData?.price ?? 0;
 
@@ -75,6 +78,7 @@ export default function IndexerPaymentsPage({
   const totalEscrow = weiToGRT(data.totalEscrowBalance);
   const totalThawing = weiToGRT(data.totalThawing);
   const totalCollected = weiToGRT(data.totalCollected);
+  const byPayer = data.collectedByPayer ?? [];
 
   // Compute redemptions for the revenue breakdown
   const redeemTransactions = data.recentTransactions.filter((tx) => tx.type === 'redeem');
@@ -280,7 +284,7 @@ export default function IndexerPaymentsPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.recentTransactions.map((tx) => {
+              {data.recentTransactions.slice(txPage * TX_PAGE_SIZE, (txPage + 1) * TX_PAGE_SIZE).map((tx) => {
                 const amount = weiToGRT(tx.amount);
                 const timestamp = Number(tx.timestamp);
                 const typeColors: Record<string, string> = {
@@ -333,40 +337,38 @@ export default function IndexerPaymentsPage({
                 );
               })}
             </div>
+            {data.recentTransactions.length > TX_PAGE_SIZE && (
+              <Pagination
+                page={txPage}
+                pageSize={TX_PAGE_SIZE}
+                totalItems={data.recentTransactions.length}
+                onPageChange={setTxPage}
+              />
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Top payers to this indexer */}
-      {data.topCollectors.length > 0 && (
+      {byPayer.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Collections by Gateway</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.topCollectors.map((c) => {
+              {byPayer.map((c) => {
                 const amount = weiToGRT(c.tokens);
                 return (
                   <div
-                    key={c.id}
+                    key={c.payer.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-elevated)]"
                   >
-                    <a
-                      href={`${ARBISCAN}${c.payer.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={c.payer.id}
-                      className={cn(
-                        'text-sm text-[var(--text)] hover:text-[var(--accent-text)]',
-                        GATEWAY_ALIASES[c.payer.id.toLowerCase()] ? 'font-medium' : 'font-mono'
-                      )}
-                    >
-                      {GATEWAY_ALIASES[c.payer.id.toLowerCase()] ?? shortenAddress(c.payer.id, 6)}
-                      <svg className="w-3 h-3 inline-block ml-1 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                      </svg>
-                    </a>
+                    <div>
+                      <PayerLink address={c.payer.id} />
+                      <p className="text-xs text-[var(--text-faint)] mt-0.5">
+                        {c.collections.toLocaleString()} collection{c.collections !== 1 ? 's' : ''}
+                      </p>
+                    </div>
                     <div className="text-right shrink-0 ml-3">
                       <p className="font-mono text-sm text-[var(--text)]">{formatGRT(amount)} GRT</p>
                       <p className="text-xs text-[var(--text-faint)]">{formatUSD(amount * grtPrice)}</p>

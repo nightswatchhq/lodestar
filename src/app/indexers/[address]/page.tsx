@@ -2,13 +2,11 @@
 
 import { use, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
 import { redirect } from 'next/navigation';
 import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments } from '@/hooks/useNetworkStats';
 import {
   weiToGRT,
   formatGRT,
-  formatGRTFull,
   formatUSD,
   formatPPM,
   shortenAddress,
@@ -16,7 +14,7 @@ import {
   isGreedyCut,
   cn,
 } from '@/lib/utils';
-import { ClosedAllocationsTable, type ClosedAllocation } from '@/components/indexer/ClosedAllocationsTable';
+import { ClosedAllocationsTable } from '@/components/indexer/ClosedAllocationsTable';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
 import { FoghornScorecard } from '@/components/foghorn/FoghornScorecard';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
@@ -27,6 +25,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Pagination } from '@/components/ui/Pagination';
 import { DelegationCalculator } from '@/components/ui/DelegationCalculator';
 import { ProvisionsPanel } from '@/components/ui/ProvisionsPanel';
 import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
@@ -187,7 +186,6 @@ export default function IndexerDetailPage({
   const distinctDataServices = new Set(
     (provisionsData?.provisions ?? []).map((p) => p.dataService.id.toLowerCase())
   ).size;
-  const ownStakeRatio = indexer.ownStakeRatio ? parseFloat(indexer.ownStakeRatio) * 100 : null;
   const netFlowGRT = recentDelegations?.reduce((sum, e) => {
     const tokens = weiToGRT(e.tokens);
     if (e.eventType === 'delegation') return sum + tokens;
@@ -469,18 +467,8 @@ export default function IndexerDetailPage({
         </div>
       </Link>
 
-      {/* Query Performance: Edge & Node's oracle postings, with Foghorn's probes beside them */}
-      <IndexerQoSChart indexer={address} />
-
-      {/* QoS Quality: the score, recomputed from the same postings */}
-      <QosQualityPanel indexer={address} />
-
-      {/* Indexer P&L — query-fee (RAV) + indexing-reward revenue net of infra cost */}
-      <PnlPanel indexer={address} grtPrice={grtPrice} />
-
-      {/* Main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column - Calculator */}
+      {/* Paired rows, not two columns: a grid stretches a lone card to the height of the stack beside it. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <DelegationCalculator
           indexer={{
             id: indexer.id,
@@ -499,8 +487,6 @@ export default function IndexerDetailPage({
           totalNetworkSignal={totalNetworkSignal}
           annualIssuance={annualIssuance}
         />
-
-        {/* Right column - Details */}
         <div className="space-y-6">
           {/* Capacity */}
           <Card>
@@ -534,6 +520,121 @@ export default function IndexerDetailPage({
             </CardContent>
           </Card>
 
+          {/* Parameters */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Parameters</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">Indexing Reward Cut</span>
+                  <span className="font-mono text-[var(--text)]">{formatPPM(indexer.indexingRewardCut)}</span>
+                </div>
+                {(() => {
+                  const v = indexer.indexingRewardEffectiveCut ? parseFloat(indexer.indexingRewardEffectiveCut) : null;
+                  return v !== null && v >= 0 && v <= 1 ? (
+                    <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                      <span className="text-sm text-[var(--text-muted)]">Effective Cut</span>
+                      <span className="font-mono text-[var(--text)]">{(v * 100).toFixed(2)}%</span>
+                    </div>
+                  ) : null;
+                })()}
+                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">Query Fee Cut</span>
+                  <span className="font-mono text-[var(--text)]">{formatPPM(indexer.queryFeeCut)}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                  <span className="text-sm text-[var(--text-muted)]">Delegation Ratio</span>
+                  <span className="font-mono text-[var(--text)]">{delegationRatio}x</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-sm text-[var(--text-muted)]">Active Allocations</span>
+                  <span className="font-mono text-[var(--text)]">{indexer.allocationCount}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Query Performance: Edge & Node's oracle postings, with Foghorn's probes beside them */}
+      <IndexerQoSChart indexer={address} />
+
+      {/* QoS Quality: the score, recomputed from the same postings */}
+      <QosQualityPanel indexer={address} />
+
+      {/* Indexer P&L — query-fee (RAV) + indexing-reward revenue net of infra cost */}
+      <PnlPanel indexer={address} grtPrice={grtPrice} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Indexer Score Breakdown */}
+        {indexerScore && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle>Indexer Score</CardTitle>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    'text-2xl font-mono font-bold',
+                    indexerScore.composite >= 80 ? 'text-[var(--green)]' :
+                    indexerScore.composite >= 65 ? 'text-[var(--teal, var(--green))]' :
+                    indexerScore.composite >= 50 ? 'text-[var(--amber)]' : 'text-[var(--red-text)]'
+                  )}>
+                    {indexerScore.composite}
+                  </span>
+                  <Badge variant={
+                    indexerScore.grade === 'A' ? 'success' :
+                    indexerScore.grade === 'B' ? 'accent' :
+                    indexerScore.grade === 'C' ? 'warning' : 'error'
+                  }>
+                    {indexerScore.grade}
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {(Object.keys(SCORE_WEIGHTS) as Array<keyof typeof SCORE_WEIGHTS>).map((key) => {
+                  const dimScore = indexerScore.breakdown[key];
+                  const weight = SCORE_WEIGHTS[key];
+                  const label = SCORE_LABELS[key];
+                  return (
+                    <div key={key}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {label}
+                          <span className="text-[var(--text-faint)] ml-1">({weight}%)</span>
+                        </span>
+                        <span className={cn(
+                          'text-xs font-mono font-medium',
+                          dimScore >= 80 ? 'text-[var(--green)]' :
+                          dimScore >= 50 ? 'text-[var(--amber)]' : 'text-[var(--red-text)]'
+                        )}>
+                          {dimScore}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
+                        <div
+                          className={cn(
+                            'h-full rounded-full transition-all duration-500',
+                            dimScore >= 80 ? 'bg-[var(--green)]' :
+                            dimScore >= 50 ? 'bg-[var(--amber)]' : 'bg-[var(--red)]'
+                          )}
+                          style={{ width: `${dimScore}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-[var(--text-faint)] mt-4 leading-relaxed">
+                Composite score from 11 on-chain dimensions. Weights reflect delegator priorities: REO compliance (20%), allocation efficiency (13%), self-stake (12%), delegator cut (10%), delegation safety (9%), transparency (8%), delegator APY (8%), data service coverage (5%), query volume (6%), cut stability (6%), delegation trend (3%). Higher = better for delegators.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+        <div className="space-y-6">
           {/* REO Eligibility — direct oracle read. The oracle's own verdict
               (the badge) is authoritative; renewal timing is shown as context
               only and never contradicts it. */}
@@ -615,122 +716,23 @@ export default function IndexerDetailPage({
             </Card>
           )}
 
-          {/* Indexer Score Breakdown */}
-          {indexerScore && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle>Indexer Score</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'text-2xl font-mono font-bold',
-                      indexerScore.composite >= 80 ? 'text-[var(--green)]' :
-                      indexerScore.composite >= 65 ? 'text-[var(--teal, var(--green))]' :
-                      indexerScore.composite >= 50 ? 'text-[var(--amber)]' : 'text-[var(--red-text)]'
-                    )}>
-                      {indexerScore.composite}
-                    </span>
-                    <Badge variant={
-                      indexerScore.grade === 'A' ? 'success' :
-                      indexerScore.grade === 'B' ? 'accent' :
-                      indexerScore.grade === 'C' ? 'warning' : 'error'
-                    }>
-                      {indexerScore.grade}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {(Object.keys(SCORE_WEIGHTS) as Array<keyof typeof SCORE_WEIGHTS>).map((key) => {
-                    const dimScore = indexerScore.breakdown[key];
-                    const weight = SCORE_WEIGHTS[key];
-                    const label = SCORE_LABELS[key];
-                    return (
-                      <div key={key}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-[var(--text-muted)]">
-                            {label}
-                            <span className="text-[var(--text-faint)] ml-1">({weight}%)</span>
-                          </span>
-                          <span className={cn(
-                            'text-xs font-mono font-medium',
-                            dimScore >= 80 ? 'text-[var(--green)]' :
-                            dimScore >= 50 ? 'text-[var(--amber)]' : 'text-[var(--red-text)]'
-                          )}>
-                            {dimScore}
-                          </span>
-                        </div>
-                        <div className="w-full h-1.5 rounded-full bg-[var(--bg-elevated)] overflow-hidden">
-                          <div
-                            className={cn(
-                              'h-full rounded-full transition-all duration-500',
-                              dimScore >= 80 ? 'bg-[var(--green)]' :
-                              dimScore >= 50 ? 'bg-[var(--amber)]' : 'bg-[var(--red)]'
-                            )}
-                            style={{ width: `${dimScore}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-[var(--text-faint)] mt-4 leading-relaxed">
-                  Composite score from 11 on-chain dimensions. Weights reflect delegator priorities: REO compliance (20%), allocation efficiency (13%), self-stake (12%), delegator cut (10%), delegation safety (9%), transparency (8%), delegator APY (8%), data service coverage (5%), query volume (6%), cut stability (6%), delegation trend (3%). Higher = better for delegators.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Foghorn network-quality grade — correctness/availability/freshness/coverage/value */}
           <FoghornAlertBanner />
           <FoghornScorecard address={address} />
+        </div>
+      </div>
 
-          {/* Recent Delegation Activity — reusable feed component pre-filtered to this indexer */}
-          <DelegationFeed indexerAddress={address} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Stake History — self-stake vs delegated over 6 months */}
+        <StakeHistoryChart indexer={address} />
+        {/* Daily rewards and query fees, per UTC day */}
+        <IndexerTrendsChart indexer={address} />
+      </div>
 
-          {/* Stake History — self-stake vs delegated over 6 months */}
-          <StakeHistoryChart indexer={address} />
-
-          {/* Daily rewards and query fees, per UTC day */}
-          <IndexerTrendsChart indexer={address} />
-
-          {/* Parameters */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Parameters</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
-                  <span className="text-sm text-[var(--text-muted)]">Indexing Reward Cut</span>
-                  <span className="font-mono text-[var(--text)]">{formatPPM(indexer.indexingRewardCut)}</span>
-                </div>
-                {(() => {
-                  const v = indexer.indexingRewardEffectiveCut ? parseFloat(indexer.indexingRewardEffectiveCut) : null;
-                  return v !== null && v >= 0 && v <= 1 ? (
-                    <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
-                      <span className="text-sm text-[var(--text-muted)]">Effective Cut</span>
-                      <span className="font-mono text-[var(--text)]">{(v * 100).toFixed(2)}%</span>
-                    </div>
-                  ) : null;
-                })()}
-                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
-                  <span className="text-sm text-[var(--text-muted)]">Query Fee Cut</span>
-                  <span className="font-mono text-[var(--text)]">{formatPPM(indexer.queryFeeCut)}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
-                  <span className="text-sm text-[var(--text-muted)]">Delegation Ratio</span>
-                  <span className="font-mono text-[var(--text)]">{delegationRatio}x</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm text-[var(--text-muted)]">Active Allocations</span>
-                  <span className="font-mono text-[var(--text)]">{indexer.allocationCount}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Recent Delegation Activity — reusable feed component pre-filtered to this indexer */}
+        <DelegationFeed indexerAddress={address} />
+        <div className="space-y-6">
           {/* Parameter Change History */}
           <ParameterHistory address={address} />
 
@@ -950,44 +952,14 @@ export default function IndexerDetailPage({
                 </tbody>
               </table>
             </div>
-            {(statusData?.totalAllocations ?? indexer.allocations.length) > ALLOC_PAGE_SIZE && (() => {
-              const total = statusData?.totalAllocations ?? indexer.allocations.length;
-              const totalPages = Math.ceil(total / ALLOC_PAGE_SIZE);
-              return (
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-[var(--border)]">
-                  <span className="text-sm text-[var(--text-faint)]">
-                    {allocPage * ALLOC_PAGE_SIZE + 1}–{Math.min((allocPage + 1) * ALLOC_PAGE_SIZE, total)} of {total}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setAllocPage((p) => Math.max(0, p - 1))}
-                      disabled={allocPage === 0}
-                      className={cn(
-                        'px-3 py-1.5 text-sm rounded-[var(--radius-button)]',
-                        'border border-[var(--border)]',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                        'hover:bg-[var(--bg-elevated)] transition-colors'
-                      )}
-                    >
-                      Prev
-                    </button>
-                    <span className="text-sm text-[var(--text-muted)]">{allocPage + 1}/{totalPages}</span>
-                    <button
-                      onClick={() => setAllocPage((p) => Math.min(totalPages - 1, p + 1))}
-                      disabled={allocPage >= totalPages - 1}
-                      className={cn(
-                        'px-3 py-1.5 text-sm rounded-[var(--radius-button)]',
-                        'border border-[var(--border)]',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                        'hover:bg-[var(--bg-elevated)] transition-colors'
-                      )}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
+            {(statusData?.totalAllocations ?? indexer.allocations.length) > ALLOC_PAGE_SIZE && (
+              <Pagination
+                page={allocPage}
+                pageSize={ALLOC_PAGE_SIZE}
+                totalItems={statusData?.totalAllocations ?? indexer.allocations.length}
+                onPageChange={setAllocPage}
+              />
+            )}
           </CardContent>
         </Card>
       )}
@@ -1019,8 +991,6 @@ export default function IndexerDetailPage({
         unavailable={isUnavailable(provisions)}
         selfStakeGRT={selfStake}
       />
-
-      {/* Recent Delegation Activity — moved to right column above */}
 
       {/* Top Delegators */}
       {indexer.delegators.length > 0 && (
