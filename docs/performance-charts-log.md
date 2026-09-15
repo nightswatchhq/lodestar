@@ -842,6 +842,35 @@ when the selection was ignored), break-even $0.0021, and one bar on 2026-08-23 (
 sliver on 2026-08-24 and zero on every other day of an evenly spaced axis. Daily Trends over 90 days
 shows bars on the paid days only (about 3.3M GRT around 29 June, 1.6M around 27 July, 2.2M on 23 August)
 and zero between, with both source notes. Screenshots taken locally for Chief.
+
+**Chief: merge, push and deploy everything, then publish the post.**
+
+**The largest indexer's page is fixed in production.** kittiwake#144 merged as `74a16f40` (10:39 UTC);
+`main` CI run 34834252872 passed; shipped from a worktree at that commit, active since 10:47:57 UTC,
+health `ok`, no schema gaps or failing jobs, every nest ready except the retired `dips-sepolia`.
+`/api/indexer/0xf92f…a6d4` answers 200 with all 100 delegators: 32.9 s on a cold cache (1 MB response),
+0.88 s warm. Four other indexers answer 200 in 4.4 to 7.5 s cold. The page was down from 10:18 to
+10:47 UTC. Follow-up, not blocking: a 33 s cold start for the largest indexer is too slow.
+
+**CI queue.** Every push of this log to the RFC branch (#228) starts a full lodestar CI run; seven such
+runs for superseded doc-only commits were queued ahead of #229, which sat queued from 10:36 without a
+job starting, behind them and nuthatch's queue from the release-2 agent. The seven were cancelled
+(re-runnable). Log pushes are now batched so they stop competing with release CI.
+Release-2 nuthatch CI (four queued `ci` runs on the IPFS stack) was paused the same way, with the
+release-2 agent told, to be re-run once lodestar's CI is through.
+
+**The dispatch is published.** graph-academy-v2#13 squash-merged as `644fce95` (11:05:42 UTC), at
+Chief's instruction; `https://learn-thegraph.com/dispatches/the-pnl-was-wrong/` answers 200 with its
+title. Its `build` check had failed, but not on the dispatch: learn-thegraph.com's `main` has failed its
+internal-link check since `2611c55` (09:47), which added links from three governance pages to
+`/governance/the-labs-decision/`, a page that exists nowhere in the repository. Left for Chief: not our
+content.
+
+**Daily Trends is live.** lodestar#229 merged as `6dd3fa1a` (11:13:05 UTC); Vercel production deploy
+succeeded 11:14:12. On `www.lodestar-dashboard.com`, `p2p-org-arbitrum.eth`'s page renders Daily Trends
+with bars on the paid days only and both source notes; every indexer API call on the page answers 200.
+#230 was retargeted to `main`; the retarget did not start CI, so `main` was merged into it (`9aafca1`,
+no file changes) to trigger it.
   (This repo's `remote.origin.fetch` maps only `main`; PR branches must be fetched by name.)
 
 **B1 drafted.** `src/content/blog/the-performance-charts-come-back.md` on `pete/blog-performance-charts`
@@ -850,3 +879,161 @@ serving figures after N4, parity against the old subgraphs, the Foghorn figures 
 foghorn#3 deploys, and the release run commands. Named indexers appear in it with figures the old
 charts misstated. Decision (Chief): the names stay. legacy branches on real data; fees before
 exponential rebates (left NULL); kittiwake end to end against a live nest.
+
+## 2026-09-15
+
+**Release 2 deployment started after Chief confirmed nuthatch 3.8.0 was published.**
+- Verified the Linux release archive against its SHA-256 (`b28a4d12c799c237ff6f9784ec8d09bb900788d208f1807f5a0f0b86790462f9`).
+  Installed `/usr/local/bin/nuthatch-3.8.0` on Helsinki, leaving other nests on their existing versions.
+- `qos-reo-nest` on Helsinki matches merged `2082c660`. Started its new systemd unit at
+  2026-09-14 19:46:15 UTC, listening on loopback 8114, from block 46,700,000, with direct sealing,
+  concurrency 2, window 2000 (adapted to 400), 512 MB analytics, 2 SQL permits, MemoryHigh 2G,
+  MemoryMax 3G. `/qos/*` added behind the existing Caddy authentication after validation, with
+  `/etc/caddy/Caddyfile.before-qos-20260914` retained. The API and frontend are not deployed yet.
+- kittiwake #141 merged as `b48d0f6d`, #143 retargeted to main and merged as `5362067b`.
+  Main CI run 34889008606 passed, including the release artifact. Artifact downloaded, not installed.
+
+**The 90-day run exposed a resolver delay that the seven-day measurement missed.** At 06:28 UTC,
+22% of history was sealed (47,042,657 of initial target 48,251,479); 984 MB on disk, about 1.43 GB
+unit memory, zero restarts. `/ready` correctly returns 503 while direct sealing has not advanced
+for over 20 minutes. Logs repeatedly show the same empty-file CID
+`QmbFMke1KXqnYyBBWxB74N4c5SBnJMVAiMNRcGu6x1AwQH`, with ten retries and roughly 30 minutes of
+backoff per affected window. Independently fetched: HTTP 204, zero bytes. `fetch_ipfs_proven`
+rejects blank bodies before checking their CID, despite the CID verifier supporting empty files.
+Fix being prepared in an isolated nuthatch checkout: verify addressed blank content, then let typed
+rows reject it immediately, while refusing an empty response for a nonempty CID or an unaddressed URL.
+
+**Historical source corruption also exists.** At the same check, 85 documents were given up on and
+39 refused by the typed-row parser. The rejected CID
+`QmQ9CLHjD4bjWn842cUqq1bRLiwzAqt8QWREVnu3PAp4DH` (block 47,042,539) independently returns
+1,767,036 bytes and ends with an extra `]`; JSON parsing fails at its last byte, as nuthatch reported.
+Other verified documents are truncated. These are source gaps, not figures to repair or fill with zero.
+The direct-seal path's `ipfs_resolved_total` stays zero even with stored documents, so it is not a
+backfill completeness check; query the stored payload tables and day-resolution views.
+
+**Empty-file fix and patch release prepared here, at Chief's instruction.** nuthatch #1397
+(`9141460e`) lets CID-addressed blank bodies reach proof verification; typed declarations then refuse
+the proven empty file without retrying its download. The regression fails before the fix with
+`empty body`. Afterwards: 41 subgraph-import tests, seven resolver tests, 1,318 library tests passed
+(two external-fixture tests ignored), and `cargo clippy --lib --tests --locked -- -D warnings` clean.
+The full local run needed canonical `TMPDIR=/private/tmp` for a path test and execution outside the
+macOS sandbox for the process-CPU test. Release #1398 (`17bb4939`) prepares 3.8.1. Both PRs have
+Jules approval; CI still running at 06:47 UTC. No patch binary deployed yet.
+
+**Kittiwake preview exposed a database ownership mistake before live deployment.** Started the
+CI artifact from `5362067b` as `kittiwake-qos-preview` on Nuremberg loopback 8180, with ingestion and
+the warmer disabled. Startup failed: `must be owner of table qos_allocation_day`. All four new QoS
+tables had been created as `lodestar`; `CREATE INDEX IF NOT EXISTS` still checks table ownership.
+Changed ownership of only `indexer_qos_quality`, `qos_day`, `qos_indexer_day` and `qos_allocation_day`
+to their writer, `kittiwake`, in one transaction. Preview now starts with no schema gaps and reaches
+the new authenticated `/qos` route. The live kittiwake process is unchanged.
+
+**The early browser check found an overclaim in the empty-state copy.** With no stored QoS days,
+the preview said the publisher had not posted for 72 days, although the backfill had simply not
+reached recent postings. Lodestar #231 now reports the latest *indexed* post's age and no longer
+equates missing rows with no routed traffic (`4e3d265`). Eleven chart tests pass, and full CI run
+34939215266 passes lint, types, tests and build. Rechecked in Chromium against the private kittiwake
+preview: the QoS, score and Foghorn bucket requests answer 200, both panels render their empty
+states, and no page errors or failed API requests were observed. This does not validate populated
+charts yet. Browser screenshot captures are in `/private/tmp/lodestar-qos-release.C95VuL/`.
+The preview API was stopped afterwards; live kittiwake health remains `ok` with no failing jobs.
+
+**3.8.1 tagged.** Both nuthatch #1397 and release #1398 passed every CI job and Jules approval.
+Merged as `a175ad34` and `48185cc5`; the tagged tree equals the tested release PR tree exactly.
+Pushed `v3.8.1` to start the release workflow. Public binary publication and the QoS upgrade are
+still pending at this entry.
+
+**The QoS nest moved to 3.8.1, and nothing was lost to fetch failures.** Downloaded the v3.8.1
+linux x86_64 asset on Helsinki, matched its sha256 (`267e48cf...`), installed it as
+`/usr/local/bin/nuthatch-3.8.1`, and changed only the binary path in `qos-reo-nest.service` (unit
+backed up beside it). Restarted at 08:19:43 UTC; it resumed from the watermark at 47,047,958. Before
+the restart the 3.8.0 run had sealed through 47,047,957 of about 48.26M in 12.5 hours. Every document
+it gave up on was classified from the journal: 116 in all, 61 of them the empty UnixFS file
+`QmbFMke1...` (HTTP 204 on the gateway) and 55 distinct documents that prove against their CID but are
+truncated JSON at the source. None was lost to a timeout or gateway error. Measured on 3.8.1 over
+12.2 minutes: 62,116 blocks, 305,072 blocks an hour, memory 1.48 to 1.60 GiB against `MemoryHigh=2G`,
+and every given-up document also counted as a typed-row refusal (228 of 228). About 3.8 hours to the
+tip at that rate. Kittiwake `5362067b` and lodestar #231 wait for the backfill: the 90-day job's
+statements would otherwise run beside it. #231 has main merged in again (`83d209a`).
+
+**Kittiwake shipped with the QoS routes, and the backfill stopped stalling.** Kittiwake `5362067b`
+(CI run 34889008606) started at 08:58 UTC: 15 jobs, no schema gaps, `/ready` counting qos ready, the
+QoS route 200 in 8.9 s cold. The backfill kept pausing for 14 minutes at a time with no log line.
+Measured, in order: RPC failures and retries 0; gateway 200 in 0.07 s for cached documents; no memory,
+CPU or IO pressure; no open connections while paused. The cause is in `--seal-direct`'s IPFS loop: a
+failed fetch backs off 5 s doubling to 600 s and logs only on the tenth failure (nuthatch#1399). The
+failures are real and of two kinds. A document The Graph's gateway has not cached takes about 30 s,
+which is nuthatch's client timeout (`QmaJj5W1K2k6...`, 29.86 s). Some documents it never finishes:
+`QmNU3JHd...` and `QmURAbd...` stop after 256 to 320 KiB at 45 s, while Pinata's gateway serves them
+whole in 4.6 and 6.1 s. Fixes, all operational: Chief's Alchemy Gnosis endpoint in a root-only env
+file, with both public RPCs, because a single `--rpc` caps seal-direct at one fetch
+(`safe_backfill_concurrency`); `--concurrency 8`; Pinata as a second `--ipfs` gateway; `MemoryHigh`
+raised to 2.5 GiB at runtime after 1,644 throttles at 2 GiB; and a read-only warmer
+(`qos-ipfs-warm`, transient unit) fetching documents ahead of the nest so the gateway has them cached.
+`--concurrency 6` on public RPCs alone fetched nothing for four minutes and was reverted. From 09:42
+the backfill ran at about 15,000 blocks a minute with no stall, against 170,000 to 305,000 an hour
+before.
+
+**The QoS day job cannot finish its window in five minutes.** Its first run computed 14 of 90 days at
+17 to 30 s each and was stopped by the scheduler's default 300 s timeout. kittiwake#147 gives that one
+job 25 minutes, below its 30-minute period.
+
+**The first 19 days were filtered out by the wrong publisher list, not lost.** Kittiwake's stored QoS
+days began on 3 July for every indexer, though the nest holds about 840,000 typed rows a day from 14
+June. `qos_indexer_attempt_raw` keeps a row only if its posting call is in `qos_published_call`, which
+matched `tx_from` against one address. Per sender over the whole indexed range:
+`0x0b8cef00f90553b9535845be6abbe3797582d424` sent all 9,264 postings from 2026-06-14 23:15 UTC to
+2026-07-01 03:50 UTC (block 46,972,821); `0x8cbbe43f97f80efa6ba0a95f3d544e03f84db0ce` sent all 25,711
+from 2026-07-03 14:55 UTC (block 47,014,403). No overlap, the same gateway ID
+(`0xff4b7a5efd00ff2ec3518d4f250a27e4c29a2211`) in both sets of typed rows, and a June transaction's
+sender checked on chain (`0x5cbf370e...`, block 46,784,930). The 59 hours between them are a source
+gap. qos-reo-nest#3 (`debfa75c`) lists both; pulled on Helsinki, the views reloaded with the registry
+hash unchanged (`0x10918245671c...`) and 20 June's 569 postings counted. Kittiwake held no rows for 18
+June to 2 July (a delete for those days removed nothing; `qos_day` had only 3 to 8 July), so the 10:21
+run computes them as missing.
+
+**The QoS nest reached the tip; kittiwake's day statements do not fit the SQL budget.** Sealing
+finished at 10:43:35 UTC: the last run sealed 58,891,501 events over blocks 47,231,597 to 48,261,084 in
+1h04m (15,228 events a second), and the nest has followed the tip since 10:46 at about 12 blocks
+behind, 155 MiB. On disk: 9,026 sealed segments, 4.29 GiB. The warmer finished at 10:05 (30,396
+documents warmed, 1,283 slow, 10 failed on The Graph's gateway and served by Pinata). Kittiwake's
+10:21 run then failed every June day with `nest returned HTTP 400`: `query exceeded the 29s time budget
+on the read-only SQL surface`. Timed while the nest was still sealing, `count(*) FROM
+qos_indexer_daily WHERE day = ...` returned that error after 50.8 s for 20 June and 63.3 s for 5 July.
+`SQL_TIMEOUT` is a 30 s constant in nuthatch `src/serve.rs`. The views dedupe documents with a
+`GROUP BY start_epoch` over every raw row before any day filter, so each one-day statement likely reads
+all segments. A rewrite that filters `start_epoch` at the scans is in progress.
+
+**Two copies of this session, one outage.** A second terminal resumed the same session (lodestar-06)
+and, at 10:48:26 UTC, raised the QoS nest's `NUTHATCH_SQL_MAX_CONCURRENCY` to 4. nuthatch refuses
+that split at 512 MB (4 x 512 + 1024 = 3072 MB against a 2048 MB floor), so the nest crash-looped nine
+times and kittiwake `/ready` went false. Concurrency restored to 2 and the nest restarted at 10:51:28;
+the broken unit is kept as `.bak.20260915T105109Z.broken`. lodestar-06 has stood down from release 2,
+and a guard compares the unit's hash every two minutes.
+
+**A day filter now reads one day.** qos-reo-nest#4 (`dff8ece`, merged 11:52:24 UTC, pulled onto
+Helsinki at once, registry hash unchanged) joins rows to a `qos_day_bounds` calendar on the computed day
+and on the day's `start_epoch` text range, which DuckDB pushes into the Parquet scan, and replaces the
+first-document join-backs with windows. Measured idle for 2026-06-18 as kittiwake sees it: probe 1.64 s,
+`qos_indexer_daily` 17.23 s, `qos_indexer_seconds_behind` 11.55 s, `qos_allocation_daily` 10.47 s,
+where the served views had returned 400 after 34.9, 60.0 and 40.3 s. Output identical: 49 indexers and
+6,838 allocation rows for 2026-06-18 and 48 and 6,287 for 2026-07-05 match the old views row for row, and
+the new dedupe picks the same document in all 49,592 buckets. After the pull, `count(*)` over
+`qos_indexer_daily` for 2026-06-18 answered in 4.4 s. About 40 s of statements per day against a 25-minute
+job means two or three runs to fill 90 days.
+
+**Behind Freshest Peer needs a peer.** With days filling, 0x2f09...'s chart scaled to 69 days: without
+three credible peers (100+ queries each) the view fell back to raw lag, so a 2-query BSC deployment
+read 255,917,126 s. qos-reo-nest#5 (`e5337566`, pulled 12:30 UTC) leaves those deployment-days out; on
+2026-09-07 across 56 indexers the worst went from 15,801,710 s to 3,451 and the median from 25 s to 6,
+a median 98.2% of queries still compared. lodestar #231 (`00d10c2`) shows the compared share on the card
+and weights the over-five-minutes share by compared queries. Chief ran the delete of kittiwake's stored
+QoS days at 12:36 (the classifier refused it from here), and the 12:51 run rebuilt all 90 days by 13:13
+with no failure: 78 settled, 12 open, 4,450 indexer-days across 59 indexers. Across the window the nest
+stores 24,827 of 24,843 indexer-attempt buckets and 24,829 of 24,833 query-result buckets; 320 and 45
+documents never resolved, on 10 and 9 days. One outlier is the oracle's own: 0x2f09... on one mainnet
+deployment, 21 to 23 July, 208,924 queries at 5,832,243 blocks behind while three peers were 1,609 to
+3,742 blocks behind. Route latency after the rebuild: chart 4.3 to 8.1 s cold, 0.25 s cached; score
+4.4 s cold, 0.9 s cached; deployments 0.5 s. #231 merged main again (#236 rearranged the indexer page;
+the QoS panels sit above the P&L), all checks green. Read in a browser against production: pinax2.eth's
+six cards drew the full window. The long dispatch is graph-academy-v2#14, held for #231.
