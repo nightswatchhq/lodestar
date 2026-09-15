@@ -26,6 +26,8 @@ import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Pagination } from '@/components/ui/Pagination';
+import { SortHeader } from '@/components/ui/SortHeader';
+import { nextSort, sortAllocations, type AllocationSort, type AllocationSortKey } from '@/lib/allocation-sort';
 import { DelegationCalculator } from '@/components/ui/DelegationCalculator';
 import { ProvisionsPanel } from '@/components/ui/ProvisionsPanel';
 import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
@@ -74,6 +76,11 @@ export default function IndexerDetailPage({
   );
 
   const [allocPage, setAllocPage] = useState(0);
+  const [allocSort, setAllocSort] = useState<AllocationSort | null>(null);
+  const sortAllocationsBy = (key: AllocationSortKey) => {
+    setAllocSort((current) => nextSort(current, key));
+    setAllocPage(0);
+  };
   const ALLOC_PAGE_SIZE = 25;
 
   const grtPrice = priceData?.price ?? 0;
@@ -832,16 +839,16 @@ export default function IndexerDetailPage({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-[var(--border)]">
-                    <th className="px-4 py-2 text-left text-[11px] font-medium text-[var(--text-muted)]">Deployment</th>
-                    <th className="px-4 py-2 text-left text-[11px] font-medium text-[var(--text-muted)]">Status</th>
-                    <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)]" title="Foghorn: share of queries answered with HTTP 200 on this deployment (QoS oracle). Reveals synced-but-erroring allocations.">Query Success</th>
-                    <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)] hidden sm:table-cell">Blocks Behind</th>
-                    <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)]">Allocated</th>
-                    <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)] hidden lg:table-cell">Signalled</th>
+                    <SortHeader label="Deployment" sortKey="deployment" sort={allocSort} onSort={sortAllocationsBy} />
+                    <SortHeader label="Status" sortKey="status" sort={allocSort} onSort={sortAllocationsBy} />
+                    <SortHeader label="Query Success" sortKey="querySuccess" sort={allocSort} onSort={sortAllocationsBy} align="right" title="Foghorn: share of queries answered with HTTP 200 on this deployment (QoS oracle). Reveals synced-but-erroring allocations." />
+                    <SortHeader label="Blocks Behind" sortKey="blocksBehind" sort={allocSort} onSort={sortAllocationsBy} align="right" className="hidden sm:table-cell" />
+                    <SortHeader label="Allocated" sortKey="allocated" sort={allocSort} onSort={sortAllocationsBy} align="right" />
+                    <SortHeader label="Signalled" sortKey="signalled" sort={allocSort} onSort={sortAllocationsBy} align="right" className="hidden lg:table-cell" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {(statusData?.deployments ?? indexer.allocations.map((a) => ({
+                  {sortAllocations(statusData?.deployments ?? indexer.allocations.map((a) => ({
                     deploymentId: a.subgraphDeployment.id,
                     ipfsHash: a.subgraphDeployment.ipfsHash ?? '',
                     displayName: a.subgraphDeployment.displayName,
@@ -854,7 +861,7 @@ export default function IndexerDetailPage({
                     syncProgress: undefined as number | undefined,
                     blocksBehind: undefined as number | undefined,
                     fatalError: undefined as string | undefined,
-                  })))
+                  })), allocSort, (hash) => foghornAllocQos?.get(hash)?.successRate)
                     .slice(allocPage * ALLOC_PAGE_SIZE, (allocPage + 1) * ALLOC_PAGE_SIZE)
                     .map((dep) => {
                     const statusColor = {
