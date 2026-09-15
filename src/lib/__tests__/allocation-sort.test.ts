@@ -58,11 +58,20 @@ describe('sortAllocations', () => {
     expect(ids(sorted)).toEqual(['high', 'low', 'quiet']);
   });
 
-  it('orders status healthiest first, and names case-insensitively with the hash as fallback', () => {
+  it('orders status healthiest first, and names case-insensitively', () => {
     const byStatus = [row('f', { status: 'failed' }), row('u', { status: 'unreachable' }), row('s', { status: 'synced' }), row('y', { status: 'syncing' })];
     expect(ids(sortAllocations(byStatus, { key: 'status', dir: 'asc' }, noSuccess))).toEqual(['s', 'y', 'f', 'u']);
-    const byName = [row('x', { displayName: 'beta' }), row('y', { displayName: 'Alpha' }), row('z', { displayName: null, ipfsHash: 'QmZeta' })];
-    expect(ids(sortAllocations(byName, { key: 'deployment', dir: 'asc' }, noSuccess))).toEqual(['y', 'x', 'z']);
+    const byName = [row('x', { displayName: 'beta' }), row('y', { displayName: 'Alpha' })];
+    expect(ids(sortAllocations(byName, { key: 'deployment', dir: 'asc' }, noSuccess))).toEqual(['y', 'x']);
+  });
+
+  it('sorts an unnamed row by the deployment ID its cell shows, not by its IPFS hash', () => {
+    const rows = [
+      row('0xb911', { ipfsHash: 'QmAAA' }),
+      row('0xb2e0', { ipfsHash: 'QmZZZ' }),
+      row('0xb8e4', { ipfsHash: 'QmMMM' }),
+    ];
+    expect(ids(sortAllocations(rows, { key: 'deployment', dir: 'asc' }, noSuccess))).toEqual(['0xb2e0', '0xb8e4', '0xb911']);
   });
 
   it('breaks ties by deployment so a page never reshuffles', () => {

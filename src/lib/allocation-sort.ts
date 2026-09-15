@@ -41,7 +41,8 @@ function wei(value: string): bigint | null {
 function value(row: SortableAllocation, key: AllocationSortKey, successRate: (ipfsHash: string) => number | null | undefined): string | number | bigint | null {
   switch (key) {
     case 'deployment':
-      return (row.displayName ?? row.ipfsHash ?? row.deploymentId).toLowerCase();
+      // What the cell shows: the name, else the deployment ID it is shortened from.
+      return (row.displayName ?? row.deploymentId).toLowerCase();
     case 'status':
       return STATUS_ORDER[row.status];
     case 'querySuccess':
