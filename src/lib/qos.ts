@@ -142,16 +142,34 @@ export function chartSeries(points: IndexerQosPoint[], days: string[], foghorn: 
   });
 }
 
-/** Share of the window's queries that ran more than five minutes behind, weighted by queries. */
+/** A day's queries that had peers to be behind; the nest leaves deployments without three credible peers out. */
+function comparedQueries(p: IndexerQosPoint): number {
+  return (p.queryCount ?? 0) * (p.shareWithBlockTime ?? 0);
+}
+
+/** Share of the window's compared queries that ran more than five minutes behind their peers. */
 export function shareOver5Min(points: IndexerQosPoint[]): number | null {
   let weighted = 0;
   let weight = 0;
   for (const p of points) {
-    if (p.shareQueriesOver5MinBehind == null || !p.queryCount) continue;
-    weighted += p.shareQueriesOver5MinBehind * p.queryCount;
-    weight += p.queryCount;
+    if (p.shareQueriesOver5MinBehind == null) continue;
+    const compared = comparedQueries(p);
+    weighted += p.shareQueriesOver5MinBehind * compared;
+    weight += compared;
   }
   return weight > 0 ? weighted / weight : null;
+}
+
+/** Share of the window's queries that Behind Freshest Peer could be measured on. */
+export function shareCompared(points: IndexerQosPoint[]): number | null {
+  let compared = 0;
+  let total = 0;
+  for (const p of points) {
+    if (p.shareWithBlockTime == null || !p.queryCount) continue;
+    compared += comparedQueries(p);
+    total += p.queryCount;
+  }
+  return total > 0 ? compared / total : null;
 }
 
 /** True when the publisher has gone quiet, false when it is posting, null when nobody knows. */

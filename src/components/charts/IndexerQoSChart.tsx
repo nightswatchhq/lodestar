@@ -27,6 +27,7 @@ import {
   formatBehind,
   formatSpan,
   publisherSilent,
+  shareCompared,
   shareOver5Min,
   windowDays,
   type ChartDay,
@@ -39,6 +40,14 @@ const WINDOW_DAYS = 90;
 type SeriesKey = {
   [K in keyof ChartDay]: ChartDay[K] extends number | null ? K : never;
 }[keyof ChartDay];
+
+/** Behind Freshest Peer only means something where the deployment has peers, so say how much it covers. */
+function behindDetail(compared: number | null, over5: number | null): string | undefined {
+  const parts: string[] = [];
+  if (compared != null) parts.push(`measured on ${(compared * 100).toFixed(1)}% of queries`);
+  if (over5 != null) parts.push(`${(over5 * 100).toFixed(1)}% more than five minutes behind`);
+  return parts.length ? parts.join('; ') : undefined;
+}
 
 function shortDate(iso: string): string {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' });
@@ -220,6 +229,7 @@ export function IndexerQoSChart({ indexer }: { indexer: string }) {
 
   const s = data?.summary;
   const over5 = data ? shareOver5Min(data.qos) : null;
+  const compared = data ? shareCompared(data.qos) : null;
   const worst = worstBucketText(s?.worstBucket ?? null);
   const q = quality.status === 'success' ? quality.data : undefined;
 
@@ -336,11 +346,7 @@ export function IndexerQoSChart({ indexer }: { indexer: string }) {
                 dataKey="secondsBehind"
                 label="Behind Freshest Peer"
                 summary={orDash(s?.secondsBehind, formatBehind)}
-                detail={
-                  over5 == null
-                    ? undefined
-                    : `${(over5 * 100).toFixed(1)}% of queries answered more than five minutes behind`
-                }
+                detail={behindDetail(compared, over5)}
                 color="var(--amber)"
                 formatter={formatBehind}
                 tickFormatter={(v) => formatSpan(v).replace('~', '')}

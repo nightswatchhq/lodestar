@@ -5,6 +5,7 @@ import {
   foghornWindow,
   publisherSilent,
   qosGrade,
+  shareCompared,
   shareOver5Min,
   windowDays,
   PUBLISHER_SILENT_AFTER_SECONDS,
@@ -123,6 +124,28 @@ describe('shareOver5Min', () => {
 
   it('is null when no day carries the figure', () => {
     expect(shareOver5Min([point('a', { shareQueriesOver5MinBehind: null })])).toBeNull();
+  });
+
+  it('weights by the queries that had peers, not by every query', () => {
+    const share = shareOver5Min([
+      point('a', { queryCount: 1000, shareWithBlockTime: 0.1, shareQueriesOver5MinBehind: 1 }),
+      point('b', { queryCount: 100, shareWithBlockTime: 1, shareQueriesOver5MinBehind: 0 }),
+    ]);
+    expect(share).toBeCloseTo(0.5, 12);
+  });
+});
+
+describe('shareCompared', () => {
+  it('is the share of all queries that could be compared with peers', () => {
+    const share = shareCompared([
+      point('a', { queryCount: 900, shareWithBlockTime: 0.2 }),
+      point('b', { queryCount: 100, shareWithBlockTime: 1 }),
+    ]);
+    expect(share).toBeCloseTo(0.28, 12);
+  });
+
+  it('is null when no day carries the figure', () => {
+    expect(shareCompared([point('a', { shareWithBlockTime: null })])).toBeNull();
   });
 });
 
