@@ -1,15 +1,17 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useIndexerPayments, useGRTPrice, useEnrichedIndexers } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { Pagination } from '@/components/ui/Pagination';
 import { weiToGRT, formatGRT, formatUSD, shortenAddress, formatRelativeTime, cn, GATEWAY_ALIASES } from '@/lib/utils';
 
 const ARBISCAN = 'https://arbiscan.io/address/';
+const TX_PAGE_SIZE = 20;
 
 function PayerLink({ address }: { address: string }) {
   const alias = GATEWAY_ALIASES[address.toLowerCase()];
@@ -41,6 +43,7 @@ export default function IndexerPaymentsPage({
   const { data, isLoading, isError } = useIndexerPayments(address);
   const { data: priceData } = useGRTPrice();
   const { data: enrichedData } = useEnrichedIndexers();
+  const [txPage, setTxPage] = useState(0);
 
   const grtPrice = priceData?.price ?? 0;
 
@@ -280,7 +283,7 @@ export default function IndexerPaymentsPage({
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {data.recentTransactions.map((tx) => {
+              {data.recentTransactions.slice(txPage * TX_PAGE_SIZE, (txPage + 1) * TX_PAGE_SIZE).map((tx) => {
                 const amount = weiToGRT(tx.amount);
                 const timestamp = Number(tx.timestamp);
                 const typeColors: Record<string, string> = {
@@ -333,6 +336,14 @@ export default function IndexerPaymentsPage({
                 );
               })}
             </div>
+            {data.recentTransactions.length > TX_PAGE_SIZE && (
+              <Pagination
+                page={txPage}
+                pageSize={TX_PAGE_SIZE}
+                totalItems={data.recentTransactions.length}
+                onPageChange={setTxPage}
+              />
+            )}
           </CardContent>
         </Card>
       )}
