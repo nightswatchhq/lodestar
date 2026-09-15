@@ -136,26 +136,26 @@ describe('IndexerQoSChart', () => {
     expect(screen.getByText(/1 partial day \(fewer than 288 five-minute buckets\) drawn hollow; days with no postings are gaps, not zeros/)).toBeInTheDocument();
   });
 
-  it('tells no data apart from a publisher gone silent', () => {
+  it('distinguishes missing data from stale or unknown indexed publisher posts', () => {
     qos = ready(response({ qos: [], freshness: { publisherLastPostAt: nowSeconds() - 1800, newestDate: null, newestDateBuckets: null } }));
     const { unmount } = render(<IndexerQoSChart indexer="0x1" />);
-    expect(screen.getByText(/No QoS data for this indexer in the last 90 days: Edge & Node's gateway routed it no queries/)).toBeInTheDocument();
+    expect(screen.getByText(/No QoS data is available for this indexer in the last 90 days/)).toBeInTheDocument();
     unmount();
 
     qos = ready(response({ qos: [], freshness: { publisherLastPostAt: nowSeconds() - 3 * 3600, newestDate: null, newestDateBuckets: null } }));
     const second = render(<IndexerQoSChart indexer="0x1" />);
-    expect(screen.getByText(/Edge & Node's publisher has not posted for ~3 h/)).toBeInTheDocument();
+    expect(screen.getByText(/latest indexed publisher post is ~3 h old; recent data may be incomplete/)).toBeInTheDocument();
     second.unmount();
 
     qos = ready(response({ qos: [], freshness: { publisherLastPostAt: null, newestDate: null, newestDateBuckets: null } }));
     render(<IndexerQoSChart indexer="0x1" />);
-    expect(screen.getByText(/when Edge & Node's publisher last posted is unknown/)).toBeInTheDocument();
+    expect(screen.getByText(/latest indexed publisher post is unknown/)).toBeInTheDocument();
   });
 
-  it('warns above the charts when the publisher is silent but older figures exist', () => {
+  it('warns above the charts when indexed posts are stale but older figures exist', () => {
     qos = ready(response({ freshness: { publisherLastPostAt: nowSeconds() - 5 * 3600, newestDate: '2026-09-07', newestDateBuckets: 170 } }));
     render(<IndexerQoSChart indexer="0x1" />);
-    expect(screen.getByText(/publisher last posted ~5 h ago, so the newest figures are from/)).toBeInTheDocument();
+    expect(screen.getByText(/latest indexed publisher post is ~5 h old/)).toBeInTheDocument();
   });
 
   it('says the read failed rather than that there is nothing to show', () => {

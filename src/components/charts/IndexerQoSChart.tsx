@@ -249,17 +249,17 @@ export function IndexerQoSChart({ indexer }: { indexer: string }) {
           <div className="h-[200px] flex items-center justify-center text-center">
             <p className="text-sm text-[var(--text-faint)]">
               {silent === true
-                ? `No QoS data for this indexer, and Edge & Node's publisher has not posted for ${silentFor}.`
+                ? `No QoS data is available for this indexer. The latest indexed publisher post is ${silentFor} old; recent data may be incomplete.`
                 : silent === null
-                  ? "No QoS data for this indexer, and when Edge & Node's publisher last posted is unknown."
-                  : `No QoS data for this indexer in the last ${WINDOW_DAYS} days: Edge & Node's gateway routed it no queries.`}
+                  ? 'No QoS data is available for this indexer. The latest indexed publisher post is unknown.'
+                  : `No QoS data is available for this indexer in the last ${WINDOW_DAYS} days.`}
             </p>
           </div>
         ) : (
           <>
             {silent === true && (
               <p className="text-[11px] text-[var(--amber)] mb-3">
-                Edge &amp; Node&apos;s publisher last posted {silentFor} ago, so the newest figures are from{' '}
+                The latest indexed publisher post is {silentFor} old. This indexer&apos;s newest figures are from{' '}
                 {data.freshness.newestDate ?? 'an unknown day'}.
               </p>
             )}
