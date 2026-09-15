@@ -441,7 +441,7 @@ export interface FoghornQosBucket {
   latency_p99_ms: number | null;
   avg_indexer_blocks_behind: number | null;
   max_indexer_blocks_behind: number | null;
-  /** Responses comparable against a stake-weighted majority cluster. */
+  /** Answers comparable against a strict count majority (foghorn#3). */
   comparable_count: number;
   divergent_count: number;
   /** Null when nothing was comparable. Do NOT render null as 100%. */
@@ -518,8 +518,10 @@ export interface FoghornQosCompare {
 
 export const fetchQosStatus = () => foghornGet<FoghornQosStatus>('qos/status');
 
-export const fetchQosBuckets = (hours = 24, limit = 500) =>
-  foghornGet<FoghornQosBuckets>(`qos/buckets?hours=${hours}&limit=${limit}`);
+export const fetchQosBuckets = (hours = 24, limit = 500, indexer?: string) =>
+  foghornGet<FoghornQosBuckets>(
+    `qos/buckets?hours=${hours}&limit=${limit}${indexer ? `&indexer=${encodeURIComponent(indexer.toLowerCase())}` : ''}`,
+  );
 
 export const fetchQosCompare = (days = 3) =>
   foghornGet<FoghornQosCompare>(`qos/compare?days=${days}`);

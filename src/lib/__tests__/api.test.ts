@@ -24,6 +24,9 @@ import {
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
   fetchIndexerTrends,
+  fetchIndexerQos,
+  fetchIndexerQosScore,
+  fetchIndexerQosDeployments,
   fetchIndexerPnl,
   fetchParameterHistory,
   fetchSubgraphCuration,
@@ -391,6 +394,42 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   it('fetchIndexerTrends throws with status on failure', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, 503));
     await expect(fetchIndexerTrends('0xabc')).rejects.toThrow('Indexer trends failed: 503');
+  });
+
+  it('fetchIndexerQos asks for the day window on the path endpoint and unwraps .data', async () => {
+    const qos = {
+      qos: [{ date: '2026-09-07', buckets: 170, partial: true, badBuckets: 2, successRate: null }],
+      summary: { days: 1 },
+      freshness: { publisherLastPostAt: null },
+    };
+    mockFetch.mockResolvedValue(jsonResponse({ data: qos }));
+    expect(await fetchIndexerQos('0xI&x', 90)).toEqual(qos);
+    expect(mockFetch.mock.calls[0][0]).toBe(`/api/indexer/${encodeURIComponent('0xI&x')}/qos?days=90`);
+  });
+
+  it('fetchIndexerQos refuses a day with no bucket count rather than drawing it as complete', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { qos: [{ date: 'd', partial: false, badBuckets: 0 }], summary: {}, freshness: {} } }));
+    await expect(fetchIndexerQos('0xi')).rejects.toThrow(/buckets/);
+  });
+
+  it('fetchIndexerQos throws with status on failure', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchIndexerQos('0xabc')).rejects.toThrow('Indexer QoS failed: 503');
+  });
+
+  it('fetchIndexerQosScore and fetchIndexerQosDeployments unwrap .data from their path endpoints', async () => {
+    const score = { window_days: 30, latest: null, daily: [] };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: score }));
+    expect(await fetchIndexerQosScore('0xabc')).toEqual(score);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc/qos-score');
+
+    const deps = { window_days: 30, total: null, deployments: [{ deployment_id: 'Qm1', drag: 0.1, measured: true }] };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: deps }));
+    expect(await fetchIndexerQosDeployments('0xabc')).toEqual(deps);
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/indexer/0xabc/qos-deployments');
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 502));
+    await expect(fetchIndexerQosScore('0xabc')).rejects.toThrow('QoS score failed: 502');
   });
 
   it('fetchIndexerStakeHistory unwraps .data from the path endpoint', async () => {

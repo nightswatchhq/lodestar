@@ -25,6 +25,9 @@ import {
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
   fetchIndexerTrends,
+  fetchIndexerQos,
+  fetchIndexerQosScore,
+  fetchIndexerQosDeployments,
   fetchDelegationFlows,
   fetchDeveloperActivity,
   fetchTokenMetrics,
@@ -505,6 +508,36 @@ export function useIndexerTrends(indexer: string | null, days = 30) {
 /**
  * Hook for indexer stake history (26-week time-travel snapshots)
  */
+export function useIndexerQos(indexer: string | null, days = 90) {
+  return useQuery({
+    queryKey: ['indexerQos', indexer, days],
+    queryFn: () => fetchIndexerQos(indexer!, days),
+    staleTime: 10 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+export function useIndexerQosScore(indexer: string | null) {
+  return useQuery({
+    queryKey: ['indexerQosScore', indexer],
+    queryFn: () => fetchIndexerQosScore(indexer!),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+export function useIndexerQosDeployments(indexer: string | null) {
+  return useQuery({
+    queryKey: ['indexerQosDeployments', indexer],
+    queryFn: () => fetchIndexerQosDeployments(indexer!),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
 export function useIndexerStakeHistory(address: string | null) {
   return useQuery({
     queryKey: ['indexerStakeHistory', address],

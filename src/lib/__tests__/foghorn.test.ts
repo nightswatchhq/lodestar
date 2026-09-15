@@ -157,6 +157,12 @@ describe('query building', () => {
     expect(urlOf(4)).toBe('/api/foghorn/qos/status');
   });
 
+  it("asks for one indexer's buckets, lowercased, only when an indexer is given", async () => {
+    respond({ buckets: [] });
+    await fetchQosBuckets(720, 5000, '0xABC&x');
+    expect(urlOf()).toBe(`/api/foghorn/qos/buckets?hours=720&limit=5000&indexer=${encodeURIComponent('0xabc&x')}`);
+  });
+
   it('encodes a deployment hash into the qos path', async () => {
     respond({ deployment_id: 'Qm', indexers: [] });
     await fetchDeploymentQos('QmDeploy1');

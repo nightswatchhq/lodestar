@@ -32,6 +32,13 @@ const KITTIWAKE_ROW = {
 };
 
 describe('normaliseEnrichedResponse', () => {
+  it('carries the QoS Quality score, keeping an unmeasured indexer null rather than zero', () => {
+    const { indexers } = normaliseEnrichedResponse({
+      data: [{ ...KITTIWAKE_ROW, qScore: 63.233 }, { ...KITTIWAKE_ROW, qScore: null }, KITTIWAKE_ROW],
+    });
+    expect(indexers.map((e) => e.qScore)).toEqual([63.233, null, null]);
+  });
+
   it('maps the kittiwake payload onto the fields the table reads', () => {
     const { indexers } = normaliseEnrichedResponse({ data: [KITTIWAKE_ROW] });
     expect(indexers).toHaveLength(1);

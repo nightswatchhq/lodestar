@@ -64,6 +64,8 @@ export interface EnrichedIndexer {
   // Composite risk score (computed from all dimensions above)
   score: number;               // 0–100 composite
   scoreGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+  /** QoS Quality score, 0 to 100, from Edge & Node's oracle postings. Null where the oracle measured nothing. */
+  qScore: number | null;
   scoreBreakdown: {
     reo: number;
     selfStake: number;
