@@ -1068,3 +1068,20 @@ written against the merged `guard_coverage` rather than the draft, and four clai
 message ends with a sentence about RPC endpoints and the nest's name that the draft did not have, the
 downgrade clause names 3.8.3, a store holding no data re-records rather than refusing, and a record
 written under an older `COVERAGE_VERSION` is re-recorded rather than refused.
+
+**Merged, and the page is honest about both kinds of absence.** lodestar#240 went in at 07:46 UTC
+and deployed at 07:47 on `f06bbec`; #241 followed at 07:50. 0x090f...3ed3 read correctly on
+production afterwards: operators, both APR panels, 280 synced allocations and 500 closed ones, with
+no "could not load" anywhere, which is right while nothing is degraded. kittiwake#153 and #155
+merged behind them.
+
+#241 conflicted with #240 on the same block of `page.tsx`, and force-pushing is refused here, so it
+went in as a merge rather than a rebase. Both sides were additive and both were kept; the resulting
+tree is byte-identical to the rebase the suite had already passed on, and 1021 tests pass with the
+two together.
+
+kittiwake#155 came out of measuring #151 rather than reading it: production answered
+`Origin: http://localhost:3000` with that origin echoed back and `access-control-allow-credentials:
+true`, while a foreign origin got no header at all. The allow-list works; that entry was simply in
+it, so any page on a visitor's own localhost could read credentialed answers. The deployed config
+still carries it until `deploy/configure-cors.sh` is re-run.
