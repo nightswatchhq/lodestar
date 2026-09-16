@@ -820,10 +820,8 @@ export async function fetchIndexerDetail(address: string): Promise<IndexerDetail
     parseResponse('/api/indexer', body, { present: ['data'] });
     return null;
   }
-  // kittiwake#153 leaves a section its nest refused out of `data.indexer` and names it under
-  // `data.degraded`. Only the sections the answer admits to leaving out go unasserted: one that
-  // vanishes with nothing naming it is still the contract change this parser exists to catch, and
-  // the indexer's own figures are required either way.
+  // Only a section `data.degraded` admits to leaving out goes unasserted. One that vanishes with
+  // nothing naming it is still the contract change this parser exists to catch.
   const degraded = degradedSections(body);
   const leftOut = new Set(degraded.map((d) => d.part));
   const indexer = parseResponse<IndexerDetail>('/api/indexer', body, {
@@ -836,11 +834,8 @@ export async function fetchIndexerDetail(address: string): Promise<IndexerDetail
 }
 
 /**
- * The sections `data.degraded` names, or none.
- *
- * Checked rather than read: an answer that says it is degraded and then will not say what it lost
- * is the one shape that must not be treated as whole, because every assertion below is relaxed by
- * what it finds here.
+ * The sections `data.degraded` names, or none. Parsed rather than read: the assertions above are
+ * relaxed by what it finds, so a malformed `degraded` must fail rather than read as empty.
  */
 function degradedSections(body: unknown): DegradedPart[] {
   const named = (body as { data?: { degraded?: unknown } }).data?.degraded;

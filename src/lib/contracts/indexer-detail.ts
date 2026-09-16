@@ -64,8 +64,7 @@ export interface IndexerDetail {
   delegatedStakeRatio?: string;
   indexerRewardsOwnGenerationRatio?: string;
   provisionedTokens?: string;
-  // The four sections below are absent when kittiwake could not read them, which is not the same as
-  // empty. See `MISSABLE_SECTIONS`.
+  // Absent when kittiwake could not read them, which is not the same as empty.
   allocations?: ActiveAllocation[];
   closedAllocations?: ClosedAllocation[];
   delegators?: Array<{
@@ -79,15 +78,9 @@ export interface IndexerDetail {
 }
 
 /**
- * The parts of the profile kittiwake may leave out rather than fail the whole page.
- *
- * kittiwake#153: the indexer's row and the delegation ratio are required, and a nest that refuses
- * either is still a 502. These four are sections: one the nest refuses is left out of
- * `data.indexer` and named under `data.degraded`, and the answer is a 200. On 2026-09-14 the
- * delegators statement ran the allocation nest out of memory and took the page with it for half an
- * hour, which is what that buys.
- *
- * `operators` is spelled as it is in `degraded`; in the body it sits at `account.operators`.
+ * The sections kittiwake#153 may leave out rather than fail the page; the indexer's own row and the
+ * delegation ratio are still required. `operators` is spelled as `degraded` spells it, not as
+ * `account.operators`.
  */
 export const MISSABLE_SECTIONS = ['operators', 'delegators', 'allocations', 'closedAllocations'] as const;
 
@@ -103,14 +96,12 @@ export interface DegradedPart {
 const REASONS: Record<string, string> = {
   nest_upstream: 'The nest it is read from refused the read.',
   nest_busy: 'The nest it is read from was too busy to answer.',
+  nest_timeout: 'The nest it is read from did not answer in time.',
+  nest_unready: 'The nest it is read from is still catching up.',
+  nest_decode: 'The nest answered with something this page could not read.',
 };
 
-/**
- * Why the named section is absent, as a sentence to put beside it.
- *
- * Always a sentence, including when nothing named the section: a section that is simply gone is
- * still something the reader is owed a line about, and "we do not know why" is that line.
- */
+/** Why the named section is absent. Always a sentence, including when nothing named it. */
 export function whyMissing(indexer: { degraded?: DegradedPart[] }, part: MissableSection): string {
   const named = indexer.degraded?.find((d) => d.part === part);
   if (!named) return 'The answer did not say why.';

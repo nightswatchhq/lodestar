@@ -663,12 +663,7 @@ describe('panels that no longer fetch for themselves', () => {
  * from a page-load into a day, because an empty list is a sentence the UI is happy to render.
  */
 describe('the reads that moved out of the hooks', () => {
-  /**
-   * The profile with every part reading, which is what kittiwake answers when nothing is wrong.
-   *
-   * The four sections are the ones kittiwake#153 made missable, so a fixture without them could
-   * not notice one of them going quietly - and going quietly is the thing the contract is for.
-   */
+  /** A profile with every part reading. It carries all four missable sections on purpose. */
   type Profile = { data: { indexer: Record<string, unknown> } & Record<string, unknown> };
   const profile = (): Profile => ({
     data: {

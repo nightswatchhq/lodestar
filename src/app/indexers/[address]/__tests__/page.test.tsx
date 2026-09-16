@@ -1,16 +1,12 @@
 // @vitest-environment jsdom
 /**
- * The indexer profile when kittiwake leaves a section out.
- *
- * kittiwake#153 answers 200 without a section its nest refused, naming it under `degraded`, rather
- * than failing the whole page with a 502. What this holds the page to is that an absent section
- * reads as absent: its frame stays, it says which read failed and why, and nothing it feeds is
- * quietly rendered as zero or as an empty list. See lodestar#239.
+ * The profile when kittiwake#153 leaves a section out: the frame stays, it says which read failed
+ * and why, and nothing computed from it is rendered as zero or as empty. lodestar#239.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
-import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
+import type { IndexerDetail, MissableSection } from '@/lib/contracts/indexer-detail';
 
 type Query<T> = {
   status: string;
@@ -103,9 +99,10 @@ const whole = (): IndexerDetail => ({
 });
 
 /** The same profile with one section left out and named, as a degraded answer carries it. */
-const without = (part: 'delegators' | 'allocations', reason: string): IndexerDetail => {
+const without = (part: MissableSection, reason: string): IndexerDetail => {
   const indexer: IndexerDetail = { ...whole(), degraded: [{ part, reason }] };
-  delete indexer[part];
+  if (part === 'operators') delete indexer.account.operators;
+  else delete indexer[part];
   return indexer;
 };
 
@@ -162,5 +159,28 @@ describe('the indexer page when a section is missing', () => {
     expect(screen.queryByText('= Delegator APR')).toBeNull();
     // `allocationCount` is a column on the indexer's own row, not the section, so it still reads.
     expect(screen.getByText('3 allocations')).toBeInTheDocument();
+  });
+
+  it('says the operator list failed rather than showing the indexer as having none', async () => {
+    detail = answered(without('operators', 'nest_timeout'));
+    await renderPage();
+
+    expect(await screen.findByText(/The operator list could not be loaded/)).toBeInTheDocument();
+    expect(screen.getByText(/did not answer in time/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Operators?:$/)).toBeNull();
+  });
+
+  it('keeps the closed allocations frame, which an indexer with none does not get', async () => {
+    detail = answered(without('closedAllocations', 'nest_unready'));
+    await renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Closed Allocations' })).toBeInTheDocument();
+    expect(screen.getByText(/still catching up/)).toBeInTheDocument();
+  });
+
+  it('shows no frame for a section that answered with nothing in it', async () => {
+    await renderPage();
+    expect(screen.queryByRole('heading', { name: 'Closed Allocations' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Active Allocations' })).toBeNull();
   });
 });
