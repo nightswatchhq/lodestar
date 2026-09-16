@@ -9,6 +9,7 @@ import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrich
 import { useGRTBalance } from '@/hooks/useGRTBalance';
 import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { reoStatusOrUnknown, reoSourceOrHeuristic } from '@/lib/contracts/indexer-signals';
+import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -287,6 +288,15 @@ export default function DelegatePage({
                 </span>
               </div>
             </div>
+          )}
+
+          {/* Absent allocations are a failed read, not an indexer with none: without them there is
+              no projection to show, and a blank row would not say why. See lodestar#239. */}
+          {!indexer.allocations && (
+            <p className="text-xs text-[var(--red-text)]">
+              This indexer&apos;s active allocations could not be read, so the projected APR is left
+              out rather than estimated. {whyMissing(indexer, 'allocations')}
+            </p>
           )}
 
           {/* The delegation panel */}

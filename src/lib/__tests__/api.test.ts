@@ -663,23 +663,67 @@ describe('panels that no longer fetch for themselves', () => {
  * from a page-load into a day, because an empty list is a sentence the UI is happy to render.
  */
 describe('the reads that moved out of the hooks', () => {
+  /** A profile with every part reading. It carries all four missable sections on purpose. */
+  type Profile = { data: { indexer: Record<string, unknown> } & Record<string, unknown> };
+  const profile = (): Profile => ({
+    data: {
+      indexer: {
+        id: '0xabc',
+        account: { id: '0xabc', defaultDisplayName: null, operators: [] },
+        stakedTokens: '1',
+        delegatedTokens: '2',
+        allocations: [],
+        closedAllocations: [],
+        delegators: [],
+      },
+    },
+  });
+
   it('unwraps the indexer profile from its envelope', async () => {
-    mockFetch.mockResolvedValue(
-      jsonResponse({
-        data: {
-          indexer: {
-            id: '0xabc',
-            account: { id: '0xabc', defaultDisplayName: null },
-            stakedTokens: '1',
-            delegatedTokens: '2',
-            allocations: [],
-            delegators: [],
-          },
-        },
-      }),
-    );
+    mockFetch.mockResolvedValue(jsonResponse(profile()));
     await expect(fetchIndexerDetail('0xABC')).resolves.toMatchObject({ id: '0xabc' });
     expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc');
+  });
+
+  /**
+   * kittiwake#153. On 2026-09-14 the delegators statement ran the allocation nest out of memory and
+   * took the whole page with it for half an hour; the section is now left out and named instead.
+   */
+  it('accepts a profile whose delegators were left out, when degraded names them', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    body.data.degraded = [{ part: 'delegators', reason: 'nest_upstream' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+
+    const indexer = await fetchIndexerDetail('0xabc');
+    expect(indexer?.delegators).toBeUndefined();
+    expect(indexer?.degraded).toEqual([{ part: 'delegators', reason: 'nest_upstream' }]);
+    // The sections that did answer are still there, and still asserted.
+    expect(indexer?.allocations).toEqual([]);
+  });
+
+  it('refuses a section that went missing with nothing naming it', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.indexer.delegators');
+  });
+
+  it('refuses a profile missing a required part, however much of it is degraded', async () => {
+    const body = profile();
+    delete body.data.indexer.stakedTokens;
+    delete body.data.indexer.allocations;
+    body.data.degraded = [{ part: 'allocations', reason: 'nest_busy' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.indexer.stakedTokens');
+  });
+
+  it('refuses an answer that says it is degraded without saying what it lost', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    body.data.degraded = [{ reason: 'nest_busy' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.degraded');
   });
 
   /**

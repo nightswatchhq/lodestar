@@ -43,6 +43,8 @@ const PnlPanel = dynamic(() => import('@/components/indexer/PnlPanel').then(m =>
 import { ParameterHistory } from '@/components/ParameterHistory';
 import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore } from '@/lib/risk-score';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
+import { MissingSection } from '@/components/indexer/MissingSection';
+import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { nodeState } from '@/lib/contracts/indexer-node';
 
 export default function IndexerDetailPage({
@@ -163,6 +165,10 @@ export default function IndexerDetailPage({
   }
 
   const name = ensData?.ensName || resolveIndexerName(indexer.account, indexer.id);
+  // Absent is not empty. kittiwake#153 leaves a section its nest refused out of the answer and
+  // names it under `degraded`, so `undefined` here means the read failed and `[]` means none.
+  const { allocations, closedAllocations, delegators } = indexer;
+  const operators = indexer.account.operators;
   // A first probe still running is not an unreachable node (lodestar#238): kittiwake keeps the
   // per-deployment statuses at `unreachable` until it has an answer, so the node block decides.
   const node = nodeState(statusData?.node);
@@ -259,12 +265,16 @@ export default function IndexerDetailPage({
                 </svg>
               </a>
             </div>
-            {indexer.account.operators && indexer.account.operators.length > 0 && (
+            {operators == null ? (
+              <p className="text-[11px] text-[var(--red-text)] mt-1">
+                The operator list could not be loaded, so none is shown. {whyMissing(indexer, 'operators')}
+              </p>
+            ) : operators.length > 0 ? (
               <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                 <span className="text-[11px] text-[var(--text-faint)]">
-                  Operator{indexer.account.operators.length > 1 ? 's' : ''}:
+                  Operator{operators.length > 1 ? 's' : ''}:
                 </span>
-                {indexer.account.operators.map((op) => (
+                {operators.map((op) => (
                   <a
                     key={op.id}
                     href={`https://arbiscan.io/address/${op.id}`}
@@ -277,7 +287,7 @@ export default function IndexerDetailPage({
                   </a>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
@@ -410,26 +420,34 @@ export default function IndexerDetailPage({
       )}
 
       {/* APR Provenance — decomposition + on-chain reconcile + event trail */}
-      <AprProvenancePanel
-        address={address}
-        delegatedTokensWei={indexer.delegatedTokens}
-        delegatedThawingTokensWei={indexer.delegatedThawingTokens ?? '0'}
-        allocations={indexer.allocations.map((a) => ({
-          allocatedTokens: a.allocatedTokens,
-          subgraphDeployment: {
-            signalledTokens: a.subgraphDeployment.signalledTokens,
-            stakedTokens: a.subgraphDeployment.stakedTokens,
-          },
-        }))}
-        indexingRewardCutPPM={indexer.indexingRewardCut}
-        indexingRewardEffectiveCut={indexer.indexingRewardEffectiveCut ?? null}
-        ownStakeRatio={indexer.ownStakeRatio ?? null}
-        totalNetworkSignal={totalNetworkSignal}
-        annualIssuance={annualIssuance}
-        delegatorParameterCooldown={indexer.delegatorParameterCooldown}
-        lastDelegationParameterUpdate={indexer.lastDelegationParameterUpdate}
-        nowSec={nowSec}
-      />
+      {allocations ? (
+        <AprProvenancePanel
+          address={address}
+          delegatedTokensWei={indexer.delegatedTokens}
+          delegatedThawingTokensWei={indexer.delegatedThawingTokens ?? '0'}
+          allocations={allocations.map((a) => ({
+            allocatedTokens: a.allocatedTokens,
+            subgraphDeployment: {
+              signalledTokens: a.subgraphDeployment.signalledTokens,
+              stakedTokens: a.subgraphDeployment.stakedTokens,
+            },
+          }))}
+          indexingRewardCutPPM={indexer.indexingRewardCut}
+          indexingRewardEffectiveCut={indexer.indexingRewardEffectiveCut ?? null}
+          ownStakeRatio={indexer.ownStakeRatio ?? null}
+          totalNetworkSignal={totalNetworkSignal}
+          annualIssuance={annualIssuance}
+          delegatorParameterCooldown={indexer.delegatorParameterCooldown}
+          lastDelegationParameterUpdate={indexer.lastDelegationParameterUpdate}
+          nowSec={nowSec}
+        />
+      ) : (
+        <MissingSection
+          title="APR Provenance"
+          what="The APR decomposition"
+          detail={`It is a signal-weighted sum over this indexer's active allocations, which could not be read. ${whyMissing(indexer, 'allocations')}`}
+        />
+      )}
 
       {/* Greedy Indexer Warning */}
       {isGreedyCut(indexer.indexingRewardCut) && (
@@ -480,24 +498,32 @@ export default function IndexerDetailPage({
 
       {/* Paired rows, not two columns: a grid stretches a lone card to the height of the stack beside it. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        <DelegationCalculator
-          indexer={{
-            id: indexer.id,
-            name,
-            stakedTokens: indexer.stakedTokens,
-            lockedTokens: indexer.lockedTokens,
-            delegatedTokens: indexer.delegatedTokens,
-            delegatedThawingTokens: indexer.delegatedThawingTokens,
-            indexingRewardCut: indexer.indexingRewardCut,
-            queryFeeCut: indexer.queryFeeCut,
-            delegatorParameterCooldown: indexer.delegatorParameterCooldown,
-            lastDelegationParameterUpdate: indexer.lastDelegationParameterUpdate,
-            allocations: indexer.allocations,
-          }}
-          delegationRatio={delegationRatio}
-          totalNetworkSignal={totalNetworkSignal}
-          annualIssuance={annualIssuance}
-        />
+        {allocations ? (
+          <DelegationCalculator
+            indexer={{
+              id: indexer.id,
+              name,
+              stakedTokens: indexer.stakedTokens,
+              lockedTokens: indexer.lockedTokens,
+              delegatedTokens: indexer.delegatedTokens,
+              delegatedThawingTokens: indexer.delegatedThawingTokens,
+              indexingRewardCut: indexer.indexingRewardCut,
+              queryFeeCut: indexer.queryFeeCut,
+              delegatorParameterCooldown: indexer.delegatorParameterCooldown,
+              lastDelegationParameterUpdate: indexer.lastDelegationParameterUpdate,
+              allocations,
+            }}
+            delegationRatio={delegationRatio}
+            totalNetworkSignal={totalNetworkSignal}
+            annualIssuance={annualIssuance}
+          />
+        ) : (
+          <MissingSection
+            title="Delegation Calculator"
+            what="The APR estimate"
+            detail={`It is computed from this indexer's active allocations, which could not be read. ${whyMissing(indexer, 'allocations')}`}
+          />
+        )}
         <div className="space-y-6">
           {/* Capacity */}
           <Card>
@@ -792,7 +818,13 @@ export default function IndexerDetailPage({
       </div>
 
       {/* Allocations with Indexing Status */}
-      {indexer.allocations.length > 0 && (
+      {!allocations ? (
+        <MissingSection
+          title="Active Allocations"
+          what="The active allocations"
+          detail={whyMissing(indexer, 'allocations')}
+        />
+      ) : allocations.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -864,7 +896,7 @@ export default function IndexerDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {sortAllocations(statusData?.deployments ?? indexer.allocations.map((a) => ({
+                  {sortAllocations(statusData?.deployments ?? allocations.map((a) => ({
                     deploymentId: a.subgraphDeployment.id,
                     ipfsHash: a.subgraphDeployment.ipfsHash ?? '',
                     displayName: a.subgraphDeployment.displayName,
@@ -978,11 +1010,11 @@ export default function IndexerDetailPage({
                 </tbody>
               </table>
             </div>
-            {(statusData?.totalAllocations ?? indexer.allocations.length) > ALLOC_PAGE_SIZE && (
+            {(statusData?.totalAllocations ?? allocations.length) > ALLOC_PAGE_SIZE && (
               <Pagination
                 page={allocPage}
                 pageSize={ALLOC_PAGE_SIZE}
-                totalItems={statusData?.totalAllocations ?? indexer.allocations.length}
+                totalItems={statusData?.totalAllocations ?? allocations.length}
                 onPageChange={setAllocPage}
               />
             )}
@@ -991,18 +1023,24 @@ export default function IndexerDetailPage({
       )}
 
       {/* Closed / Historical Allocations */}
-      {indexer.closedAllocations && indexer.closedAllocations.length > 0 && (
+      {!closedAllocations ? (
+        <MissingSection
+          title="Closed Allocations"
+          what="The closed allocations"
+          detail={whyMissing(indexer, 'closedAllocations')}
+        />
+      ) : closedAllocations.length > 0 && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Closed Allocations</CardTitle>
               <span className="text-[10px] text-[var(--text-faint)]">
-                Most recent {indexer.closedAllocations.length}
+                Most recent {closedAllocations.length}
               </span>
             </div>
           </CardHeader>
           <CardContent>
-            <ClosedAllocationsTable allocations={indexer.closedAllocations} />
+            <ClosedAllocationsTable allocations={closedAllocations} />
           </CardContent>
         </Card>
       )}
@@ -1019,14 +1057,20 @@ export default function IndexerDetailPage({
       />
 
       {/* Top Delegators */}
-      {indexer.delegators.length > 0 && (
+      {!delegators ? (
+        <MissingSection
+          title="Top Delegators"
+          what="The delegator list"
+          detail={whyMissing(indexer, 'delegators')}
+        />
+      ) : delegators.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Top Delegators</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {[...indexer.delegators].sort((a, b) => { const ba = BigInt(b.stakedTokens), aa = BigInt(a.stakedTokens); return ba > aa ? 1 : ba < aa ? -1 : 0; }).slice(0, 10).map((del, i) => {
+              {[...delegators].sort((a, b) => { const ba = BigInt(b.stakedTokens), aa = BigInt(a.stakedTokens); return ba > aa ? 1 : ba < aa ? -1 : 0; }).slice(0, 10).map((del, i) => {
                 const delStake = weiToGRT(del.stakedTokens);
                 const sharePercent = delegated > 0 ? (delStake / delegated) * 100 : 0;
 

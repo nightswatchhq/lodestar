@@ -26,7 +26,12 @@ import type { Concentration } from '@/lib/concentration';
 import type { ServiceCensus } from '@/lib/service-census';
 import type { RequirementsJson } from '@/lib/operator-requirements';
 import type { IndexerNode } from '@/lib/contracts/indexer-node';
-import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
+import {
+  MISSABLE_SECTIONS,
+  type DegradedPart,
+  type IndexerDetail,
+  type MissableSection,
+} from '@/lib/contracts/indexer-detail';
 import type {
   SubgraphSearchAnswer,
   SubgraphSearchResult,
@@ -803,6 +808,14 @@ export async function fetchGrtFlow(): Promise<GrtFlowData> {
 // ended `json.data?.x ?? []`, so a 200 carrying a renamed field rendered as "nothing happened"
 // rather than as a contract change.
 
+/** Where each section kittiwake may leave out sits in the body. */
+const SECTION_PATHS: Record<MissableSection, string> = {
+  operators: 'data.indexer.account.operators',
+  delegators: 'data.indexer.delegators',
+  allocations: 'data.indexer.allocations',
+  closedAllocations: 'data.indexer.closedAllocations',
+};
+
 export async function fetchIndexerDetail(address: string): Promise<IndexerDetail | null> {
   const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address.toLowerCase())}`));
   if (!response.ok) throw new Error(`Indexer detail failed: ${response.status}`);
@@ -815,12 +828,30 @@ export async function fetchIndexerDetail(address: string): Promise<IndexerDetail
     parseResponse('/api/indexer', body, { present: ['data'] });
     return null;
   }
-  return parseResponse('/api/indexer', body, {
+  // Only a section `data.degraded` admits to leaving out goes unasserted. One that vanishes with
+  // nothing naming it is still the contract change this parser exists to catch.
+  const degraded = degradedSections(body);
+  const leftOut = new Set(degraded.map((d) => d.part));
+  const indexer = parseResponse<IndexerDetail>('/api/indexer', body, {
     objects: ['data', 'data.indexer', 'data.indexer.account'],
-    arrays: ['data.indexer.allocations', 'data.indexer.delegators'],
+    arrays: MISSABLE_SECTIONS.filter((s) => !leftOut.has(s)).map((s) => SECTION_PATHS[s]),
     present: ['data.indexer.stakedTokens', 'data.indexer.delegatedTokens'],
     pick: 'data.indexer',
   });
+  return degraded.length > 0 ? { ...indexer, degraded } : indexer;
+}
+
+/**
+ * The sections `data.degraded` names, or none. Parsed rather than read: the assertions above are
+ * relaxed by what it finds, so a malformed `degraded` must fail rather than read as empty.
+ */
+function degradedSections(body: unknown): DegradedPart[] {
+  const named = (body as { data?: { degraded?: unknown } }).data?.degraded;
+  if (named === undefined) return [];
+  return parseResponse<{ degraded: DegradedPart[] }>('/api/indexer', body, {
+    rows: { 'data.degraded': ['part', 'reason'] },
+    pick: 'data',
+  }).degraded;
 }
 
 export async function fetchSubgraphHistory(
