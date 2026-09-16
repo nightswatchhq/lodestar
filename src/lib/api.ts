@@ -25,6 +25,7 @@ import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import type { Concentration } from '@/lib/concentration';
 import type { ServiceCensus } from '@/lib/service-census';
 import type { RequirementsJson } from '@/lib/operator-requirements';
+import type { IndexerNode } from '@/lib/contracts/indexer-node';
 import {
   MISSABLE_SECTIONS,
   type DegradedPart,
@@ -347,6 +348,7 @@ export async function fetchIndexingStatus(hash: string): Promise<DeploymentIndex
 export async function fetchIndexerStatus(address: string): Promise<{
   indexerAddress: string;
   indexerUrl: string | null;
+  node?: IndexerNode;
   totalAllocations: number;
   syncedCount: number;
   syncingCount: number;
@@ -373,10 +375,16 @@ export async function fetchIndexerStatus(address: string): Promise<{
 }> {
   const response = await fetchShedAware(apiUrl(`/api/indexer-status/${encodeURIComponent(address)}`));
   if (!response.ok) throw new Error(`Indexer status failed: ${response.status}`);
-  return parseResponse('/api/indexer-status', await response.json(), {
-    objects: ['data'],
+  // `data.node` arrived with kittiwake#152 and is asserted only when the answer carries it, so a
+  // kittiwake without it still parses; its absence costs the page the "checking" state, not the page.
+  const body = await response.json();
+  const hasNode = (body as { data?: { node?: unknown } }).data?.node != null;
+  return parseResponse('/api/indexer-status', body, {
+    objects: hasNode ? ['data', 'data.node'] : ['data'],
     arrays: ['data.deployments'],
-    present: ['data.indexerAddress'],
+    present: hasNode
+      ? ['data.indexerAddress', 'data.node.pending', 'data.node.stale']
+      : ['data.indexerAddress'],
     pick: 'data',
   });
 }

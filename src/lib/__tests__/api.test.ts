@@ -726,6 +726,50 @@ describe('the reads that moved out of the hooks', () => {
     await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.degraded');
   });
 
+  /**
+   * kittiwake#152 added `data.node`. It is asserted when present and not required when absent, so a
+   * kittiwake without it still parses: its absence costs the page the "checking" state, not the page.
+   */
+  it('parses the node block when the status answer carries one', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          indexerAddress: '0xabc',
+          indexerUrl: null,
+          deployments: [],
+          node: {
+            reachable: null,
+            checkedAt: null,
+            ageSeconds: null,
+            stale: false,
+            lastReachedAt: null,
+            error: null,
+            pending: true,
+          },
+        },
+      }),
+    );
+    const status = await fetchIndexerStatus('0xabc');
+    expect(status.node?.pending).toBe(true);
+    expect(status.node?.reachable).toBeNull();
+  });
+
+  it('still parses a status answer from a kittiwake that has no node block', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ data: { indexerAddress: '0xabc', indexerUrl: null, deployments: [] } }),
+    );
+    await expect(fetchIndexerStatus('0xabc')).resolves.toMatchObject({ indexerAddress: '0xabc' });
+  });
+
+  it('refuses a node block that is not the shape it claims', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: { indexerAddress: '0xabc', indexerUrl: null, deployments: [], node: { reachable: true } },
+      }),
+    );
+    await expect(fetchIndexerStatus('0xabc')).rejects.toThrow('data.node.pending');
+  });
+
   it('treats a null indexer as an answer, because an unstaked address is one', async () => {
     mockFetch.mockResolvedValue(jsonResponse({ data: { indexer: null } }));
     await expect(fetchIndexerDetail('0xabc')).resolves.toBeNull();

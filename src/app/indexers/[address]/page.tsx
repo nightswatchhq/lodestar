@@ -45,6 +45,7 @@ import { calculateIndexerScore, SCORE_WEIGHTS, SCORE_LABELS, type IndexerScore }
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { whyMissing } from '@/lib/contracts/indexer-detail';
+import { nodeState } from '@/lib/contracts/indexer-node';
 
 export default function IndexerDetailPage({
   params,
@@ -168,6 +169,9 @@ export default function IndexerDetailPage({
   // names it under `degraded`, so `undefined` here means the read failed and `[]` means none.
   const { allocations, closedAllocations, delegators } = indexer;
   const operators = indexer.account.operators;
+  // A first probe still running is not an unreachable node (lodestar#238): kittiwake keeps the
+  // per-deployment statuses at `unreachable` until it has an answer, so the node block decides.
+  const node = nodeState(statusData?.node);
   const selfStake = weiToGRT(indexer.stakedTokens) - weiToGRT(indexer.lockedTokens ?? '0');
   const delegated = weiToGRT(indexer.delegatedTokens) - weiToGRT(indexer.delegatedThawingTokens ?? '0');
   const allocated = weiToGRT(indexer.allocatedTokens);
@@ -844,10 +848,22 @@ export default function IndexerDetailPage({
                         {statusData.failedCount} failed
                       </span>
                     )}
-                    {statusData.unreachableCount > 0 && (
+                    {node?.kind === 'checking' ? (
                       <span className="flex items-center gap-1.5 text-[var(--text-faint)]">
-                        {statusData.unreachableCount} unreachable
+                        <span className="w-2 h-2 rounded-full bg-[var(--text-faint)] animate-pulse" />
+                        checking the node
                       </span>
+                    ) : statusData.unreachableCount > 0 ? (
+                      <span
+                        className="flex items-center gap-1.5 text-[var(--text-faint)]"
+                        title={node?.kind === 'unreachable' ? `The indexer's node did not answer: ${node.note}` : undefined}
+                      >
+                        {statusData.unreachableCount} unreachable
+                        {node?.kind === 'unreachable' && <span className="text-[10px]">({node.note})</span>}
+                      </span>
+                    ) : null}
+                    {node?.kind === 'reachable' && node.note && (
+                      <span className="text-[10px] text-[var(--text-faint)]">{node.note}</span>
                     )}
                     <span className="w-px h-3 bg-[var(--border)]" />
                   </>
@@ -906,7 +922,10 @@ export default function IndexerDetailPage({
                       synced: 'Synced',
                       syncing: 'Syncing',
                       failed: 'Failed',
-                      unreachable: statusLoading ? '...' : '—',
+                      // `unreachable` is also what an unfinished first probe reads as, so it says
+                      // which of the two it is rather than asserting the node is down.
+                      unreachable:
+                        statusLoading || node?.kind === 'checking' ? 'Checking' : '—',
                     }[dep.status];
 
                     return (
