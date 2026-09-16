@@ -1037,3 +1037,34 @@ deployment, 21 to 23 July, 208,924 queries at 5,832,243 blocks behind while thre
 4.4 s cold, 0.9 s cached; deployments 0.5 s. #231 merged main again (#236 rearranged the indexer page;
 the QoS panels sit above the P&L), all checks green. Read in a browser against production: pinax2.eth's
 six cards drew the full window. The long dispatch is graph-academy-v2#14, held for #231.
+
+## 2026-09-16
+
+**The page survives a section it could not read.** kittiwake#153 answers 200 without a section its
+nest refused, naming it under `data.degraded`; until today Lodestar failed the whole page on that,
+because the parser required `allocations` and `delegators` to be arrays and the page read `.length`
+and `.map` on both. lodestar#240 makes the four sections optional and relaxes the parser's assertions
+only for the ones `degraded` actually names, so a section that vanishes unannounced still fails the
+parse. Each absent section keeps its frame and says which read failed and why; the APR decomposition
+and the delegation calculator show their own "could not load" rather than a sum over an empty list.
+
+Five deliberate breaks confirmed the tests were worth having: reverting the operators guard, making
+`MissingSection` render nothing, dropping the reason lookup, un-relaxing the parser and skipping
+`degraded`'s own shape check each turned one to four of the seven new tests red. 1006 tests, `tsc`
+and the production build are green.
+
+Three figures were checked for the same fault elsewhere and are honest: the risk score takes
+`allocationCount` and `allocatedTokens` from the indexer's own row, both APR chips read the directory
+feed, and `DelegatePanel` already withholds its projection rather than showing 0.00%.
+
+Read in a browser against production data through a proxy that strips all four sections and names
+them, which is what #153 will do: every frame appeared with its reason, the operator line read "could
+not be loaded" instead of showing an indexer with none, and nothing rendered as zero. With the proxy
+passing answers through untouched, 0x090f...3ed3 drew exactly what it draws today: two operators,
+both APR panels, 500 closed allocations, no notices.
+
+**3.8.4.** nuthatch#1426 carries #1423 alone, which merged after 3.8.3 was tagged. The notes were
+written against the merged `guard_coverage` rather than the draft, and four claims moved: the refusal
+message ends with a sentence about RPC endpoints and the nest's name that the draft did not have, the
+downgrade clause names 3.8.3, a store holding no data re-records rather than refusing, and a record
+written under an older `COVERAGE_VERSION` is re-recorded rather than refused.
