@@ -4,8 +4,8 @@ import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
-import { weiToGRT, formatGRT, formatUSD, formatPPM, shortenAddress, cn } from '@/lib/utils';
-import { calculateEstimatedAPR } from '@/lib/rewards';
+import { formatGRT, formatUSD, cn } from '@/lib/utils';
+
 
 interface IndexerOption {
   id: string;
@@ -13,6 +13,8 @@ interface IndexerOption {
   stakedTokens: string;
   delegatedTokens: string;
   indexingRewardCut: number;
+  /** Instant APR from kittiwake. Null when the directory has not computed one. */
+  delegatorAPR: number | null;
 }
 
 interface RedelegationCalculatorProps {
@@ -21,8 +23,6 @@ interface RedelegationCalculatorProps {
   delegationAmount: number;
   grtPrice: number;
   thawingPeriodDays?: number;
-  delegationRatio?: number;
-  networkRewardsPerYear?: number;
 }
 
 interface CalculationResult {
@@ -59,32 +59,9 @@ function calculateRedelegation(
   delegationAmount: number,
   grtPrice: number,
   thawingPeriodDays: number,
-  delegationRatio: number,
-  networkRewardsPerYear: number
 ): CalculationResult {
-  const currentDelegated = weiToGRT(currentIndexer.delegatedTokens);
-  const targetDelegated = weiToGRT(targetIndexer.delegatedTokens);
-
-  // Calculate APRs
-  const currentTotalStake = weiToGRT(currentIndexer.stakedTokens) + currentDelegated;
-  const targetTotalStake = weiToGRT(targetIndexer.stakedTokens) + targetDelegated;
-
-  const currentIndexerRewards = (currentTotalStake / 3000000000) * networkRewardsPerYear;
-  const targetIndexerRewards = (targetTotalStake / 3000000000) * networkRewardsPerYear;
-
-  const currentAPR = calculateEstimatedAPR(
-    currentIndexerRewards,
-    currentIndexer.indexingRewardCut,
-    currentDelegated,
-    delegationAmount
-  );
-
-  const targetAPR = calculateEstimatedAPR(
-    targetIndexerRewards,
-    targetIndexer.indexingRewardCut,
-    targetDelegated + delegationAmount, // Add your delegation to target
-    delegationAmount
-  );
+  const currentAPR = currentIndexer.delegatorAPR ?? 0;
+  const targetAPR = targetIndexer.delegatorAPR ?? 0;
 
   const aprDifference = targetAPR - currentAPR;
 
@@ -164,8 +141,6 @@ export function RedelegationCalculator({
   delegationAmount,
   grtPrice,
   thawingPeriodDays = 28,
-  delegationRatio = 16,
-  networkRewardsPerYear = 300000000,
 }: RedelegationCalculatorProps) {
   const result = useMemo(
     () =>
@@ -175,10 +150,8 @@ export function RedelegationCalculator({
         delegationAmount,
         grtPrice,
         thawingPeriodDays,
-        delegationRatio,
-        networkRewardsPerYear
       ),
-    [currentIndexer, targetIndexer, delegationAmount, grtPrice, thawingPeriodDays, delegationRatio, networkRewardsPerYear]
+    [currentIndexer, targetIndexer, delegationAmount, grtPrice, thawingPeriodDays]
   );
 
   const confidenceColors = {

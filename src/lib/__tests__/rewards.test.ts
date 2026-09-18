@@ -13,6 +13,7 @@ import {
   calculateExchangeRateAPY,
   calculateRollingAPY,
   calculateDelegatorAPRBreakdown,
+  projectDelegatorAPR,
 } from '../rewards';
 
 // ---------- calculateExchangeRate ----------
@@ -283,6 +284,47 @@ describe('calculateDelegatorAPR', () => {
     // Without P95 cap, the outlier would dominate. With cap, it should be reasonable
     expect(aprCapped).toBeGreaterThan(0);
     expect(aprCapped).toBeLessThan(100_000); // Sanity check — not astronomical
+  });
+});
+
+describe('projectDelegatorAPR', () => {
+  const allocations = [
+    {
+      allocatedTokens: '500000000000000000000000',
+      subgraphDeployment: {
+        signalledTokens: '100000000000000000000000',
+        stakedTokens: '1000000000000000000000000',
+      },
+    },
+  ];
+  const base = {
+    allocations,
+    protocolCutPPM: 100_000,
+    activeBase: 1_000_000,
+    totalNetworkSignal: 10_000_000,
+    annualIssuance: 100_000_000,
+    selfStakeGRT: 250_000,
+  };
+
+  it('matches calculateDelegatorAPR when nothing is added', () => {
+    const projected = projectDelegatorAPR(base);
+    const current = calculateDelegatorAPR(
+      allocations, 100_000, 1_000_000, 10_000_000, 100_000_000, undefined, 1_000_000 / 1_250_000,
+    );
+    expect(projected).toBeCloseTo(current);
+  });
+
+  it('falls when the amount is added, because the earning base grew', () => {
+    const current = projectDelegatorAPR(base);
+    const after = projectDelegatorAPR({ ...base, addedGRT: 1_000_000 });
+    expect(after).toBeGreaterThan(0);
+    expect(after).toBeLessThan(current);
+  });
+
+  it('is not the 300M-over-3B share-of-stake model', () => {
+    const projected = projectDelegatorAPR(base);
+    const fake = calculateEstimatedAPR((1_250_000 / 3_000_000_000) * 300_000_000, 100_000, 1_000_000, 10_000);
+    expect(projected).not.toBeCloseTo(fake, 0);
   });
 });
 

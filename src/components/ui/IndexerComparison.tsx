@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
 import { weiToGRT, formatGRT, formatPPM, shortenAddress, cn } from '@/lib/utils';
-import { calculateDelegationCapacity, calculateEstimatedAPR } from '@/lib/rewards';
+import { calculateDelegationCapacity } from '@/lib/rewards';
 
 interface IndexerForComparison {
   id: string;
@@ -21,13 +21,13 @@ interface IndexerForComparison {
   rewardsEarned: string;
   delegatorParameterCooldown: number;
   lastDelegationParameterUpdate: number;
+  /** kittiwake Instant APR. Null when the directory has not computed one. */
+  delegatorAPR?: number | null;
 }
 
 interface IndexerComparisonProps {
   indexers: IndexerForComparison[];
   delegationRatio?: number;
-  networkRewardsPerYear?: number;
-  delegationAmount?: number;
 }
 
 const METRICS = [
@@ -48,8 +48,6 @@ type MetricKey = typeof METRICS[number]['key'];
 export function IndexerComparison({
   indexers,
   delegationRatio = 16,
-  networkRewardsPerYear = 300000000,
-  delegationAmount = 10000,
 }: IndexerComparisonProps) {
   const [sortMetric, setSortMetric] = useState<MetricKey | null>(null);
   // Mount-stable "now" (seconds) — keeps render pure (no Date.now() during render).
@@ -63,15 +61,7 @@ export function IndexerComparison({
     const totalRewards = weiToGRT(indexer.rewardsEarned);
 
     const capacity = calculateDelegationCapacity(selfStake, delegated, delegationRatio);
-    const totalStake = selfStake + delegated;
-    const indexerRewardsPerYear = (totalStake / 3000000000) * networkRewardsPerYear;
-
-    const estimatedAPR = calculateEstimatedAPR(
-      indexerRewardsPerYear,
-      indexer.indexingRewardCut,
-      delegated,
-      delegationAmount
-    );
+    const estimatedAPR = indexer.delegatorAPR ?? null;
 
     const cooldownEnd = indexer.lastDelegationParameterUpdate + indexer.delegatorParameterCooldown;
     const isLocked = cooldownEnd > nowSec;
@@ -111,7 +101,9 @@ export function IndexerComparison({
   const formatValue = (value: unknown, format: string) => {
     if (format === 'grt') return `${formatGRT(value as number)} GRT`;
     if (format === 'ppm') return formatPPM(value as number);
-    if (format === 'percent') return `${(value as number).toFixed(2)}%`;
+    if (format === 'percent') {
+      return value == null || !Number.isFinite(value as number) ? '—' : `${(value as number).toFixed(2)}%`;
+    }
     if (format === 'boolean') return (value as boolean) ? 'Yes' : 'No';
     if (format === 'number') return String(value);
     return String(value);

@@ -743,6 +743,7 @@ export function IndexerTable() {
           rewardsEarned: row.raw.rewardsEarned,
           delegatorParameterCooldown: row.raw.delegatorParameterCooldown,
           lastDelegationParameterUpdate: row.raw.lastDelegationParameterUpdate,
+          delegatorAPR: row.apr,
         };
       });
   }, [rowSelection, tableData]);

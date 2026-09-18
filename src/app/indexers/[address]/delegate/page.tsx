@@ -305,7 +305,9 @@ export default function DelegatePage({
               stakedTokens: indexer.stakedTokens,
               lockedTokens: indexer.lockedTokens,
               delegatedTokens: indexer.delegatedTokens,
+              delegatedThawingTokens: indexer.delegatedThawingTokens,
               indexingRewardCut: indexer.indexingRewardCut,
+              indexingRewardEffectiveCut: indexer.indexingRewardEffectiveCut ?? null,
               allocations: indexer.allocations,
             }}
             riskGrade={indexerScore?.grade ?? null}

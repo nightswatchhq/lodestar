@@ -12,12 +12,13 @@ import { useDelegation, type DelegationStep } from '@/hooks/useDelegation';
 import {
   formatGRT,
   formatGRTFull,
+  weiToGRT,
   isGreedyCut,
   cn,
 } from '@/lib/utils';
 import {
   calculateDelegationCapacity,
-  calculateDelegatorAPR,
+  projectDelegatorAPR,
 } from '@/lib/rewards';
 
 interface DelegatePanelProps {
@@ -27,7 +28,10 @@ interface DelegatePanelProps {
     stakedTokens: string;
     lockedTokens?: string;
     delegatedTokens: string;
+    delegatedThawingTokens?: string;
+    delegatedThawingGRT?: number;
     indexingRewardCut: number;
+    indexingRewardEffectiveCut?: string | null;
     allocations?: Array<{
       allocatedTokens: string;
       subgraphDeployment: {
@@ -60,27 +64,33 @@ export function DelegatePanel({
   const [maxApproval, setMaxApproval] = useState(false);
 
   const amountGRT = parseFloat(amount) || 0;
-  const selfStake = Number(BigInt(indexer.stakedTokens.split('.')[0])) / 1e18
-    - Number(BigInt((indexer.lockedTokens ?? '0').split('.')[0])) / 1e18;
-  const currentDelegated = Number(BigInt(indexer.delegatedTokens.split('.')[0])) / 1e18;
+  const selfStake = weiToGRT(indexer.stakedTokens) - weiToGRT(indexer.lockedTokens ?? '0');
+  const thawing = indexer.delegatedThawingTokens != null
+    ? weiToGRT(indexer.delegatedThawingTokens)
+    : (indexer.delegatedThawingGRT ?? 0);
+  const currentDelegated = weiToGRT(indexer.delegatedTokens) - thawing;
+  const effectiveCut = indexer.indexingRewardEffectiveCut != null
+    ? parseFloat(indexer.indexingRewardEffectiveCut)
+    : null;
 
-  // Capacity
   const capacity = useMemo(
     () => calculateDelegationCapacity(selfStake, currentDelegated, delegationRatio),
     [selfStake, currentDelegated, delegationRatio]
   );
 
-  // APR projection after delegation
   const projectedAPR = useMemo(() => {
     if (!indexer.allocations?.length || totalNetworkSignal === 0 || annualIssuance === 0) return 0;
-    return calculateDelegatorAPR(
-      indexer.allocations,
-      indexer.indexingRewardCut,
-      currentDelegated + amountGRT || 1,
+    return projectDelegatorAPR({
+      allocations: indexer.allocations,
+      protocolCutPPM: indexer.indexingRewardCut,
+      activeBase: currentDelegated,
+      addedGRT: amountGRT,
       totalNetworkSignal,
-      annualIssuance
-    );
-  }, [indexer.allocations, indexer.indexingRewardCut, currentDelegated, amountGRT, totalNetworkSignal, annualIssuance]);
+      annualIssuance,
+      effectiveCut,
+      selfStakeGRT: selfStake,
+    });
+  }, [indexer.allocations, indexer.indexingRewardCut, currentDelegated, amountGRT, totalNetworkSignal, annualIssuance, effectiveCut, selfStake]);
 
   // Pre-flight warnings
   const isGreedy = isGreedyCut(indexer.indexingRewardCut);
