@@ -1,18 +1,11 @@
 'use client';
 
-import { useIndexers } from '@/hooks/useNetworkStats';
-import { useGRTPrice } from '@/hooks/useNetworkStats';
+import { useEnrichedIndexers, useGRTPrice } from '@/hooks/useNetworkStats';
 import { RedelegationPage } from '@/components/ui/RedelegationCalculator';
-import { weiToGRT, shortenAddress, resolveIndexerName } from '@/lib/utils';
-import type { Indexer } from '@/lib/queries';
+import { resolveIndexerName } from '@/lib/utils';
 
 export default function CalculatorPage() {
-  const { data: indexersData, isLoading: indexersLoading } = useIndexers({
-    first: 100,
-    orderBy: 'stakedTokens',
-    orderDirection: 'desc',
-  });
-
+  const { data: enrichedData, isLoading: indexersLoading } = useEnrichedIndexers();
   const { data: priceData } = useGRTPrice();
   const grtPrice = priceData?.price ?? 0;
 
@@ -24,12 +17,13 @@ export default function CalculatorPage() {
     );
   }
 
-  const indexers = (indexersData?.indexers || []).map((indexer: Indexer) => ({
+  const indexers = (enrichedData?.indexers || []).map((indexer) => ({
     id: indexer.id,
-    name: resolveIndexerName(indexer.account, indexer.id),
+    name: indexer.ensName ?? indexer.name ?? resolveIndexerName(undefined, indexer.id),
     stakedTokens: indexer.stakedTokens,
     delegatedTokens: indexer.delegatedTokens,
     indexingRewardCut: indexer.indexingRewardCut,
+    delegatorAPR: indexer.delegatorAPR,
   }));
 
   if (indexers.length < 2) {
@@ -84,11 +78,8 @@ export default function CalculatorPage() {
         </h3>
         <ul className="text-sm text-[var(--text-muted)] space-y-1">
           <li>
-            • APR estimates based on current delegation pool size and indexer
-            reward cut
-          </li>
-          <li>
-            • Assumes 300M GRT annual network rewards (issuance)
+            • APR is the Instantaneous figure from the directory. Daily rewards
+            scale with the amount you enter.
           </li>
           <li>
             • Gas costs estimated for Arbitrum One (~0.5 GRT per transaction)

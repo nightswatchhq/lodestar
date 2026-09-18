@@ -103,7 +103,7 @@ This is a projection of the current run-rate: for each active allocation,
 reward = annualIssuance × (subgraphSignal / totalNetworkSignal) × (allocatedTokens / subgraphStake)
 ```
 
-`annualIssuance` is the RewardsManager's allocated issuance (`getAllocatedIssuancePerBlock` × L1 blocks/year), read from `/api/dips`. It is not protocol-total issuance. Since GIP-0089 (1 September 2026) a fifth of issuance goes to the Innovation Allocation, so using `issuancePerBlock()` makes every estimate 1.25× high.
+`annualIssuance` is the RewardsManager's allocated issuance (`getAllocatedIssuancePerBlock` × L1 blocks/year), read from `/api/dips`. It is not protocol-total issuance. Since GIP-0089 (1 September 2026) a fifth of issuance goes to the Innovation Allocation, so using `issuancePerBlock()` makes every estimate 1.25× high. `/compare`, the directory comparison panel and `/calculator` use this Instant figure. They do not have a second model.
 
 summed across allocations, then split to delegators per the section above.
 Because it's a projection off live signal, a single anomalous allocation can

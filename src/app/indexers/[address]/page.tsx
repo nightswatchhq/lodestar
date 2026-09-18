@@ -508,10 +508,12 @@ export default function IndexerDetailPage({
               delegatorParameterCooldown: indexer.delegatorParameterCooldown,
               lastDelegationParameterUpdate: indexer.lastDelegationParameterUpdate,
               allocations,
+              indexingRewardEffectiveCut: indexer.indexingRewardEffectiveCut ?? null,
             }}
             delegationRatio={delegationRatio}
             totalNetworkSignal={totalNetworkSignal}
             annualIssuance={annualIssuance}
+            delegatorAPR={enrichedIndexer?.delegatorAPR ?? null}
           />
         ) : (
           <MissingSection
