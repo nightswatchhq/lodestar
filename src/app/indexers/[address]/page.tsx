@@ -49,6 +49,8 @@ import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { nodeState } from '@/lib/contracts/indexer-node';
 import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
+import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
+import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
 
 export default function IndexerDetailPage({
   params,
@@ -210,10 +212,17 @@ function IndexerDetailInner({ address }: { address: string }) {
   const capacity = calculateDelegationCapacity(selfStake, delegated, delegationRatio);
 
   // Combine Subgraph data with other data service provisions (Dispatch, etc.)
-  const SUBGRAPH_SERVICE = '0xb2bb92d0de618878e438b55d5846cfecd9301105';
   const nonSubgraphProvisions = (provisionsData?.provisions ?? []).filter(
-    p => p.dataService.id.toLowerCase() !== SUBGRAPH_SERVICE
+    p => p.dataService.id.toLowerCase() !== SUBGRAPH_SERVICE_ID
   );
+  const ssStake = provisions.kind === 'ready'
+    ? subgraphServiceStake(provisions.data.provisions, delegated)
+    : null;
+  const stakeKnown = provisions.kind === 'ready';
+  const effectiveCutPercent = (() => {
+    const v = indexer.indexingRewardEffectiveCut ? parseFloat(indexer.indexingRewardEffectiveCut) : null;
+    return v !== null && v >= 0 && v <= 1 ? v * 100 : null;
+  })();
   const extraAllocated = nonSubgraphProvisions.reduce((sum, p) => sum + weiToGRT(p.tokensAllocated), 0);
   const extraAllocationCount = nonSubgraphProvisions.reduce((sum, p) => sum + p.allocationCount, 0);
   const tapCollected = paymentsData?.totalCollected ? weiToGRT(paymentsData.totalCollected) : 0;
@@ -225,9 +234,6 @@ function IndexerDetailInner({ address }: { address: string }) {
   const totalAllocated = allocated + extraAllocated;
   const totalAllocationCount = indexer.allocationCount + extraAllocationCount;
   const totalRewardsCombined = totalRewards + extraRewards;
-
-  // Check parameter lock status
-  const createdDate = new Date(indexer.createdAt * 1000);
 
   // Compute risk score from available data
   const provisionedGRT = indexer.provisionedTokens ? weiToGRT(indexer.provisionedTokens) : null;
@@ -258,10 +264,7 @@ function IndexerDetailInner({ address }: { address: string }) {
     id: indexer.id,
     rewardCutPPM: indexer.indexingRewardCut,
     queryFeeCutPPM: indexer.queryFeeCut,
-    effectiveCutPercent: (() => {
-      const v = indexer.indexingRewardEffectiveCut ? parseFloat(indexer.indexingRewardEffectiveCut) : null;
-      return v !== null && v >= 0 && v <= 1 ? v * 100 : null;
-    })(),
+    effectiveCutPercent,
     queryFeesCollectedGRT: weiToGRT(indexer.queryFeesCollected ?? '0'),
     netFlowGRT,
     delegatedGRT: delegated,
@@ -272,113 +275,46 @@ function IndexerDetailInner({ address }: { address: string }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-        <div className="flex items-center gap-4 min-w-0">
-          {/* Avatar */}
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-[var(--accent-dim)] flex items-center justify-center flex-shrink-0">
-            <span className="text-xl sm:text-2xl font-bold text-[var(--accent-text)]">
-              {name.slice(0, 2).toUpperCase()}
-            </span>
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)] truncate">{name}</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <p className="text-xs sm:text-sm text-[var(--text-faint)] font-mono truncate">{indexer.id}</p>
-              <a
-                href={`https://arbiscan.io/address/${indexer.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--accent-text)] hover:underline flex-shrink-0"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
-            </div>
-            {operators == null ? (
-              <p className="text-[11px] text-[var(--red-text)] mt-1">
-                The operator list could not be loaded, so none is shown. {whyMissing(indexer, 'operators')}
-              </p>
-            ) : operators.length > 0 ? (
-              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                <span className="text-[11px] text-[var(--text-faint)]">
-                  Operator{operators.length > 1 ? 's' : ''}:
-                </span>
-                {operators.map((op) => (
-                  <a
-                    key={op.id}
-                    href={`https://arbiscan.io/address/${op.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] font-mono text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"
-                    title={op.id}
-                  >
-                    {shortenAddress(op.id)}
-                  </a>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
-          {(indexer.account.metadata?.website || indexer.url) && (
+      <IndexerCompactHeader
+        name={name}
+        address={indexer.id}
+        reoStatus={reoData?.status ? {
+          status: reoData.status.status,
+          daysRemaining: reoData.status.daysRemaining,
+        } : null}
+        availableGRT={stakeKnown ? (ssStake?.available ?? 0) : null}
+        provisionedGRT={stakeKnown ? (ssStake?.provisioned ?? 0) : null}
+        allocatedGRT={stakeKnown ? (ssStake?.allocated ?? 0) : null}
+        delegatedGRT={delegated}
+        allocationRatio={stakeKnown ? (ssStake?.allocationRatio ?? null) : null}
+        statedCutPPM={indexer.indexingRewardCut}
+        effectiveCutPercent={effectiveCutPercent}
+        rollingAPY30d={enrichedIndexer?.rollingAPY30d ?? null}
+      />
+
+      {operators == null ? (
+        <p className="text-[11px] text-[var(--red-text)]">
+          The operator list could not be loaded, so none is shown. {whyMissing(indexer, 'operators')}
+        </p>
+      ) : operators.length > 0 ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] text-[var(--text-faint)]">
+            Operator{operators.length > 1 ? 's' : ''}:
+          </span>
+          {operators.map((op) => (
             <a
-              href={indexer.account.metadata?.website || indexer.url!}
+              key={op.id}
+              href={`https://arbiscan.io/address/${op.id}`}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(
-                'px-3 py-2 text-sm rounded-[var(--radius-button)]',
-                'border border-[var(--border)] hover:border-[var(--accent-hover)]',
-                'transition-colors'
-              )}
+              className="text-[11px] font-mono text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"
+              title={op.id}
             >
-              Website
+              {shortenAddress(op.id)}
             </a>
-          )}
-          {/* REO Status Badge with tooltip — the oracle's isEligible is authoritative */}
-          {reoData?.status?.status && (
-            <div className="relative group">
-              <Badge
-                variant={
-                  reoData.status.status === 'eligible' ? 'success'
-                    : reoData.status.status === 'ineligible' ? 'error'
-                    : 'default'
-                }
-                className="cursor-help"
-              >
-                {reoData.status.status === 'eligible' ? 'Eligible'
-                  : reoData.status.status === 'ineligible' ? 'Ineligible'
-                  : 'Eligibility unavailable'}
-              </Badge>
-              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 p-3 rounded-lg bg-[var(--bg-elevated)] border border-[var(--border)] shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
-                <p className="text-xs font-semibold text-[var(--text)] mb-2">Rewards Eligibility (GIP-0079)</p>
-                {reoData.status.status === 'unknown' ? (
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    The on-chain REO oracle couldn&apos;t be reached, so eligibility can&apos;t be determined right now.
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-[11px] text-[var(--text-muted)] mb-2">
-                      Direct read from the on-chain REO oracle contract.
-                    </p>
-                    {/* `!= null`: the field is null when the oracle has no attestation, and the
-                        old `!== undefined` let that through to a comparison rather than skipping. */}
-                    {reoData.status.daysRemaining != null && reoData.status.daysRemaining > 0 && (
-                      <p className="text-[11px] text-[var(--text-faint)]">
-                        Next renewal in ~{reoData.status.daysRemaining.toFixed(1)} days
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-          <Badge variant="accent">
-            Active since {createdDate.toLocaleDateString()}
-          </Badge>
+          ))}
         </div>
-      </div>
+      ) : null}
 
       {isGreedyCut(indexer.indexingRewardCut) && (
         <div className="flex items-start gap-3 p-4 rounded-lg border bg-[var(--red-dim)] border-[var(--red)]">
@@ -611,15 +547,12 @@ function IndexerDetailInner({ address }: { address: string }) {
                   <span className="text-sm text-[var(--text-muted)]">Indexing Reward Cut</span>
                   <span className="font-mono text-[var(--text)]">{formatPPM(indexer.indexingRewardCut)}</span>
                 </div>
-                {(() => {
-                  const v = indexer.indexingRewardEffectiveCut ? parseFloat(indexer.indexingRewardEffectiveCut) : null;
-                  return v !== null && v >= 0 && v <= 1 ? (
-                    <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
-                      <span className="text-sm text-[var(--text-muted)]">Effective Cut</span>
-                      <span className="font-mono text-[var(--text)]">{(v * 100).toFixed(2)}%</span>
-                    </div>
-                  ) : null;
-                })()}
+                {effectiveCutPercent != null ? (
+                  <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
+                    <span className="text-sm text-[var(--text-muted)]">Effective Cut</span>
+                    <span className="font-mono text-[var(--text)]">{effectiveCutPercent.toFixed(2)}%</span>
+                  </div>
+                ) : null}
                 <div className="flex justify-between items-center py-2 border-b border-[var(--border)]">
                   <span className="text-sm text-[var(--text-muted)]">Query Fee Cut</span>
                   <span className="font-mono text-[var(--text)]">{formatPPM(indexer.queryFeeCut)}</span>
