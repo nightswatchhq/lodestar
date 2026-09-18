@@ -3,7 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import {
   weiToGRT,
   formatGRT,
@@ -72,6 +72,7 @@ export default function IndexerDetailPage({
   const { data: enrichedData } = useEnrichedIndexers();
   const { data: statusData, isLoading: statusLoading, dataUpdatedAt: statusUpdatedAt } = useIndexerStatus(address);
   const { data: paymentsData } = useIndexerPayments(address);
+  const annualIssuance = useAnnualIndexingIssuance();
 
   // Pull pre-computed fields from enriched cache (rolling APY, score)
   const enrichedIndexer = enrichedData?.indexers?.find(
@@ -90,12 +91,7 @@ export default function IndexerDetailPage({
   const network = networkData?.graphNetwork;
   const delegationRatio = network?.delegationRatio ?? 16;
 
-  // Derive annual issuance and total signal for APR calculation
   const totalNetworkSignal = network?.totalTokensSignalled ? weiToGRT(network.totalTokensSignalled) : 0;
-  // Ethereum L1 ~12s blocks → ~2,628,000 blocks/year
-  const annualIssuance = network?.networkGRTIssuancePerBlock
-    ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
-    : 0;
 
   // `isPending` rather than `isLoading`, and the difference is the whole bug. React-query pauses
   // retries when it believes the connection is gone, and a paused query is not fetching: with

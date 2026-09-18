@@ -43,7 +43,9 @@ import {
   fetchREOStatus,
   fetchDelegationEvents,
   fetchENSName,
+  fetchDips,
 } from '@/lib/api';
+import { annualIndexingIssuance, indexingIssuancePerBlock } from '@/lib/network-math';
 import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
 import type { DelegationEvent } from '@/lib/contracts/indexer-signals';
 
@@ -64,6 +66,25 @@ const TEN_MINUTES = 1000 * 60 * 10;
 const ONE_MINUTE = 1000 * 60;
 const THIRTY_SECONDS = 1000 * 30;
 const ONE_HOUR = 1000 * 60 * 60;
+
+/**
+ * Issuance split. Cached hard: the allocator's rates move on governance, not per block.
+ */
+export function useDips() {
+  return useQuery({
+    queryKey: ['dips'],
+    queryFn: fetchDips,
+    staleTime: TEN_MINUTES,
+    refetchInterval: FIVE_MINUTES,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Annual GRT the RewardsManager mints. Zero until `/api/dips` lands, never the protocol total. */
+export function useAnnualIndexingIssuance(): number {
+  const { data } = useDips();
+  return annualIndexingIssuance(indexingIssuancePerBlock(data));
+}
 
 /**
  * Hook for network statistics

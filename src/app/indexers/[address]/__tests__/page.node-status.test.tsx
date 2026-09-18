@@ -83,6 +83,7 @@ vi.mock('@/hooks/useNetworkStats', () => ({
   useEnrichedIndexers: () => answered({ indexers: [] }),
   useIndexerPayments: () => answered(undefined),
   useAprProvenance: () => answered({ reconcile: null, events: [] }),
+  useAnnualIndexingIssuance: () => 96.584 * 2_610_223,
 }));
 
 vi.mock('@/hooks/useFoghorn', () => ({ useIndexerAllocationsQos: () => answered(undefined) }));

@@ -49,6 +49,7 @@ vi.mock('@/hooks/useNetworkStats', () => ({
   useIndexerStatus: () => answered(undefined),
   useIndexerPayments: () => answered(undefined),
   useAprProvenance: () => answered({ reconcile: null, events: [] }),
+  useAnnualIndexingIssuance: () => 96.584 * 2_610_223,
 }));
 
 vi.mock('@/hooks/useFoghorn', () => ({ useIndexerAllocationsQos: () => answered(undefined) }));
