@@ -103,6 +103,8 @@ This is a projection of the current run-rate: for each active allocation,
 reward = annualIssuance × (subgraphSignal / totalNetworkSignal) × (allocatedTokens / subgraphStake)
 ```
 
+`annualIssuance` is the RewardsManager's allocated issuance (`getAllocatedIssuancePerBlock` × L1 blocks/year), read from `/api/dips`. It is not protocol-total issuance. Since GIP-0089 (1 September 2026) a fifth of issuance goes to the Innovation Allocation, so using `issuancePerBlock()` makes every estimate 1.25× high.
+
 summed across allocations, then split to delegators per the section above.
 Because it's a projection off live signal, a single anomalous allocation can
 dominate it — so we apply two robustness rules:
@@ -179,7 +181,7 @@ subgraph to the GRT — zero drift.
 | Concern | File |
 |---|---|
 | APR decomposition + effective-cut handling | `src/lib/rewards.ts` (`calculateDelegatorAPRBreakdown`) |
-| Central pipeline wiring | `src/lib/refresh.ts` |
+| Indexing issuance (RewardsManager rate, not protocol total) | `src/lib/network-math.ts` (`indexingIssuancePerBlock`); Instant APR in kittiwake `crates/ingest/src/refresh.rs` |
 | On-chain pool read + reconcile | `src/lib/staking-pool-contract.ts` |
 | Provenance API (reconcile + event trail) | `src/app/api/apr-provenance/[address]/route.ts` |
 | Indexer-page panel (decomposition, badge, trail) | `src/components/indexer/AprProvenancePanel.tsx` |
@@ -188,6 +190,7 @@ subgraph to the GRT — zero drift.
 
 - GIP-0066 — Horizon staking & provisions (delegation pool semantics)
 - GIP-0079 — Indexer Rewards Eligibility Oracle (advisory in Lodestar)
+- GIP-0089 — Innovation Allocation (20% of issuance, live 1 September 2026)
 - Forum thread #6882 — "Separate 'Withdrawable' Bucket for Fully-Thawed Delegation Tokens"
 - Network subgraph PR #331 — surfaces `delegatedTokensActive` as a first-class field
 - Docs PR graphprotocol/docs#1109 — divide rewards by the actively-earning base

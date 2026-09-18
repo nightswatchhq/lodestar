@@ -50,6 +50,7 @@ vi.mock('@/lib/api', () => ({
   fetchAprProvenance: vi.fn(),
   fetchDeveloperActivity: vi.fn(),
   fetchChainLag: vi.fn(),
+  fetchDips: vi.fn(),
 }));
 
 import * as api from '@/lib/api';
@@ -91,7 +92,9 @@ import {
   useCuratorLeaderboard,
   useREOStatus,
   useENSName,
+  useAnnualIndexingIssuance,
 } from '../useNetworkStats';
+import { L1_BLOCKS_PER_YEAR } from '@/lib/network-math';
 
 function wrapper() {
   const client = new QueryClient({
@@ -112,6 +115,29 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('useAnnualIndexingIssuance', () => {
+  it('annualises the RewardsManager rate from dips', async () => {
+    vi.mocked(api.fetchDips).mockResolvedValue({
+      available: true,
+      totalRate: 120.73,
+      indexingRate: 96.584,
+      agreementRate: 0,
+      live: false,
+      configuredNotDistributed: [],
+      allocations: [],
+    } as never);
+    const { result } = renderHook(() => useAnnualIndexingIssuance(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current).toBeGreaterThan(0));
+    expect(result.current).toBeCloseTo(96.584 * L1_BLOCKS_PER_YEAR);
+  });
+
+  it('is 0 until dips lands', () => {
+    vi.mocked(api.fetchDips).mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useAnnualIndexingIssuance(), { wrapper: wrapper() });
+    expect(result.current).toBe(0);
+  });
 });
 
 describe('useNetworkStats', () => {

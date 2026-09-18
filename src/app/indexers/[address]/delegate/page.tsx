@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrichedIndexers, useENSName } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrichedIndexers, useENSName, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import { useGRTBalance } from '@/hooks/useGRTBalance';
 import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { reoStatusOrUnknown, reoSourceOrHeuristic } from '@/lib/contracts/indexer-signals';
@@ -40,6 +40,7 @@ export default function DelegatePage({
   const { data: reoData } = useREOStatus(address);
   const { data: ensData } = useENSName(address);
   const { data: enrichedData } = useEnrichedIndexers();
+  const annualIssuance = useAnnualIndexingIssuance();
   const { isConnected } = useAccount();
   const { connect } = useConnect();
   const { balance } = useGRTBalance();
@@ -52,9 +53,6 @@ export default function DelegatePage({
   const network = networkData?.graphNetwork;
   const delegationRatio = network?.delegationRatio ?? 16;
   const totalNetworkSignal = network?.totalTokensSignalled ? weiToGRT(network.totalTokensSignalled) : 0;
-  const annualIssuance = network?.networkGRTIssuancePerBlock
-    ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
-    : 0;
 
   // See the note on the detail page: a paused retry is not fetching, so `isLoading` let this fall
   // through to "Indexer Not Found" and stay there. It matters more here, because this is the

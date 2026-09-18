@@ -35,6 +35,7 @@ import {
   fetchServiceCensus,
   fetchQosCapture,
   fetchGrtFlow,
+  fetchDips,
   fetchIndexerDetail,
   fetchSubgraphHistory,
   fetchSubgraphVersions,
@@ -652,6 +653,32 @@ describe('panels that no longer fetch for themselves', () => {
       }),
     );
     await expect(fetchGrtFlow()).resolves.toMatchObject({ supplyBreakdown: null });
+  });
+
+  it('unwraps the issuance split and does not require indexingRate', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          available: true,
+          totalRate: 120.73,
+          agreementRate: 0,
+          live: false,
+          configuredNotDistributed: [],
+          allocations: [{ target: '0x971b9d3d0ae3eca029cab5ea1fb0f72c85e6a525', rate: 96.584 }],
+        },
+      }),
+    );
+    await expect(fetchDips()).resolves.toMatchObject({
+      available: true,
+      totalRate: 120.73,
+      allocations: [{ rate: 96.584 }],
+    });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/dips');
+  });
+
+  it('refuses a dips payload with no allocations array', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { available: true, totalRate: 1 } }));
+    await expect(fetchDips()).rejects.toThrow('data.allocations');
   });
 });
 

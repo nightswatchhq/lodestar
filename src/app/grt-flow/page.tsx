@@ -108,7 +108,7 @@ export default function GrtFlowPage() {
         />
         <StatCard label="Annual Issuance" value={d ? `${d.issuanceRatePct.toFixed(2)}%` : '—'} subtitle={d ? `${formatGRT(d.annualIssuance)} GRT/yr` : undefined} loading={isLoading} tag="live" tooltip="Per-block protocol issuance annualised over the global GRT supply (L1 + L2 − bridge escrow). This is the basis Messari / Graph Explorer use, so it is directly comparable to the ~2.8% they report." />
         <StatCard label="L2 Net Supply" value={fmt(d?.supply)} subtitle="Arbitrum mint − burn" loading={isLoading} tooltip="The network subgraph's totalSupply: GRT minted minus burned on Arbitrum (net tokens present on L2). A subset of global supply, shown here as the L2 footprint, NOT the issuance denominator." />
-        <StatCard label="Issuance / Block" value={d ? d.issuancePerBlock.toFixed(2) : '—'} subtitle="GRT, linear (GIP-0037)" loading={isLoading} />
+        <StatCard label="Protocol issuance / block" value={d ? d.issuancePerBlock.toFixed(2) : '—'} subtitle="GRT, protocol total. Indexing rewards are the RewardsManager's share." loading={isLoading} />
         <StatCard label="Cumulative Indexing Rewards" value={fmt(d?.indexingRewards)} subtitle="lifetime issued to indexers + delegators" loading={isLoading} />
         <StatCard label="Cumulative Query Fees" value={fmt(d?.queryFees)} subtitle="GRT collected" loading={isLoading} />
       </StatGrid>

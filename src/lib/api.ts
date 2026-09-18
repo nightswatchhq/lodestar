@@ -62,6 +62,29 @@ import type {
   SubgraphVersion,
 } from '@/lib/contracts/indexer-signals';
 
+/** What `/api/dips` answers: where protocol issuance currently goes. */
+export interface DipsAllocation {
+  target: string;
+  label: string;
+  rate: number;
+  sharePct: number;
+  selfMinting: boolean;
+  lastDistributedAt: number | null;
+  configuredNotDistributed: boolean;
+  observed: boolean;
+}
+
+export interface DipsResponse {
+  available: boolean;
+  totalRate: number;
+  /** RewardsManager per-block GRT. Older kittiwake omits it; the RewardsManager row is the fallback. */
+  indexingRate?: number;
+  agreementRate: number;
+  live: boolean;
+  configuredNotDistributed: string[];
+  allocations: DipsAllocation[];
+}
+
 /** What `/api/dips/agreements` answers. */
 export interface DipsAgreementsResponse {
   available: boolean;
@@ -711,6 +734,17 @@ export async function fetchCuratorLeaderboard(params: { first?: number; skip?: n
 // and the panel returned null: the read failed and the page showed nothing, with nothing anywhere
 // saying so. `failed-reads-are-not-answers` exists to catch that and its pattern only matched the
 // `const r = await fetch(…)` form, so this shape walked past it.
+
+export async function fetchDips(): Promise<DipsResponse> {
+  const response = await fetchShedAware(apiUrl('/api/dips'));
+  if (!response.ok) throw new Error(`DIPS failed: ${response.status}`);
+  return parseResponse('/api/dips', await response.json(), {
+    objects: ['data'],
+    present: ['data.available', 'data.totalRate'],
+    arrays: ['data.allocations'],
+    pick: 'data',
+  });
+}
 
 /** `available: false` is a real answer here: the DIPS contracts may simply not be configured. */
 export async function fetchDipsAgreements(): Promise<DipsAgreementsResponse> {
