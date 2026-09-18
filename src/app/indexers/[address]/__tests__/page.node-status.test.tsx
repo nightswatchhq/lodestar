@@ -9,6 +9,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
+
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => {
+    const p = new URLSearchParams();
+    p.set('tab', 'allocations');
+    return p;
+  },
+  useRouter: () => ({ replace: vi.fn() }),
+  redirect: vi.fn(),
+}));
+vi.mock('wagmi', () => ({ useAccount: () => ({ address: undefined }) }));
 import type { IndexerNode } from '@/lib/contracts/indexer-node';
 
 const answered = <T,>(data: T) => ({

@@ -1,8 +1,9 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
+import { redirect, useRouter, useSearchParams } from 'next/navigation';
+import { useAccount } from 'wagmi';
 import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import {
   weiToGRT,
@@ -46,6 +47,8 @@ import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { nodeState } from '@/lib/contracts/indexer-node';
+import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
+import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 
 export default function IndexerDetailPage({
   params,
@@ -53,6 +56,18 @@ export default function IndexerDetailPage({
   params: Promise<{ address: string }>;
 }) {
   const { address } = use(params);
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center py-24">
+        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <IndexerDetailInner address={address} />
+    </Suspense>
+  );
+}
+
+function IndexerDetailInner({ address }: { address: string }) {
   // Mount-stable "now" (seconds) — keeps render pure (no Date.now() during render).
   const [nowSec] = useState(() => Math.floor(Date.now() / 1000));
 
@@ -73,6 +88,9 @@ export default function IndexerDetailPage({
   const { data: statusData, isLoading: statusLoading, dataUpdatedAt: statusUpdatedAt } = useIndexerStatus(address);
   const { data: paymentsData } = useIndexerPayments(address);
   const annualIssuance = useAnnualIndexingIssuance();
+  const { address: connected } = useAccount();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Pull pre-computed fields from enriched cache (rolling APY, score)
   const enrichedIndexer = enrichedData?.indexers?.find(
@@ -165,6 +183,23 @@ export default function IndexerDetailPage({
   // names it under `degraded`, so `undefined` here means the read failed and `[]` means none.
   const { allocations, closedAllocations, delegators } = indexer;
   const operators = indexer.account.operators;
+  const activeTab = parseIndexerTab(searchParams.get('tab'), {
+    connected,
+    indexerId: indexer.id,
+    operatorIds: operators?.map((op) => op.id),
+  });
+  const impliedTab = parseIndexerTab(null, {
+    connected,
+    indexerId: indexer.id,
+    operatorIds: operators?.map((op) => op.id),
+  });
+  const setTab = (tab: IndexerTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === impliedTab) params.delete('tab');
+    else params.set('tab', tab);
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+  };
   // A first probe still running is not an unreachable node (lodestar#238): kittiwake keeps the
   // per-deployment statuses at `unreachable` until it has an answer, so the node block decides.
   const node = nodeState(statusData?.node);
@@ -345,6 +380,54 @@ export default function IndexerDetailPage({
         </div>
       </div>
 
+      {isGreedyCut(indexer.indexingRewardCut) && (
+        <div className="flex items-start gap-3 p-4 rounded-lg border bg-[var(--red-dim)] border-[var(--red)]">
+          <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--red-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-[var(--red-text)]">
+              This indexer takes 100% of indexing rewards
+            </p>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Delegating here earns 0% APR. All indexing rewards go to the indexer.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <Link
+        href={`/indexers/${address}/delegate`}
+        className={cn(
+          'flex items-center justify-between gap-4 px-6 py-5',
+          'rounded-lg border border-[var(--accent)] bg-[var(--accent-dim)]',
+          'hover:bg-[var(--accent)]/20 transition-colors group'
+        )}
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-11 h-11 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-base font-semibold text-[var(--text)]">Delegate to {name}</p>
+            <p className="text-sm text-[var(--text-muted)]">
+              {formatGRT(capacity.availableCapacity)} GRT capacity available · {enrichedIndexer?.delegatorAPR != null ? `${enrichedIndexer.delegatorAPR.toFixed(1)}% APR` : '—'}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <svg className="w-5 h-5 text-[var(--accent-text)] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+        </div>
+      </Link>
+
+      <IndexerTabBar active={activeTab} onSelect={setTab} />
+
+      {activeTab === 'overview' && (
+      <>
       {/* Stats */}
       <StatGrid>
         <StatCard
@@ -444,55 +527,11 @@ export default function IndexerDetailPage({
           detail={`It is a signal-weighted sum over this indexer's active allocations, which could not be read. ${whyMissing(indexer, 'allocations')}`}
         />
       )}
-
-      {/* Greedy Indexer Warning */}
-      {isGreedyCut(indexer.indexingRewardCut) && (
-        <div className="flex items-start gap-3 p-4 rounded-lg border bg-[var(--red-dim)] border-[var(--red)]">
-          <svg className="w-5 h-5 flex-shrink-0 mt-0.5 text-[var(--red-text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-          <div>
-            <p className="text-sm font-medium text-[var(--red-text)]">
-              This indexer takes 100% of indexing rewards
-            </p>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              Delegating here earns 0% APR. All indexing rewards go to the indexer.
-            </p>
-          </div>
-        </div>
+      </>
       )}
 
-
-      {/* Delegate CTA */}
-      <Link
-        href={`/indexers/${address}/delegate`}
-        className={cn(
-          'flex items-center justify-between gap-4 px-6 py-5',
-          'rounded-lg border border-[var(--accent)] bg-[var(--accent-dim)]',
-          'hover:bg-[var(--accent)]/20 transition-colors group'
-        )}
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-full bg-[var(--accent)] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-base font-semibold text-[var(--text)]">Delegate to {name}</p>
-            <p className="text-sm text-[var(--text-muted)]">
-              {formatGRT(capacity.availableCapacity)} GRT capacity available · {enrichedIndexer?.delegatorAPR != null ? `${enrichedIndexer.delegatorAPR.toFixed(1)}% APR` : '—'}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <svg className="w-5 h-5 text-[var(--accent-text)] group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </svg>
-        </div>
-      </Link>
-
-      {/* Paired rows, not two columns: a grid stretches a lone card to the height of the stack beside it. */}
+      {activeTab === 'delegators' && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {allocations ? (
           <DelegationCalculator
@@ -522,6 +561,12 @@ export default function IndexerDetailPage({
             detail={`It is computed from this indexer's active allocations, which could not be read. ${whyMissing(indexer, 'allocations')}`}
           />
         )}
+      </div>
+      </>
+      )}
+
+      {activeTab === 'overview' && (
+      <>
         <div className="space-y-6">
           {/* Capacity */}
           <Card>
@@ -591,17 +636,26 @@ export default function IndexerDetailPage({
             </CardContent>
           </Card>
         </div>
-      </div>
+      </>
+      )}
 
-      {/* Query Performance: Edge & Node's oracle postings, with Foghorn's probes beside them */}
+      {activeTab === 'performance' && (
+      <>
       <IndexerQoSChart indexer={address} />
 
       {/* QoS Quality: the score, recomputed from the same postings */}
       <QosQualityPanel indexer={address} />
+      </>
+      )}
 
-      {/* Indexer P&L — query-fee (RAV) + indexing-reward revenue net of infra cost */}
+      {activeTab === 'rewards' && (
+      <>
       <PnlPanel indexer={address} grtPrice={grtPrice} />
+      </>
+      )}
 
+      {activeTab === 'overview' && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {/* Indexer Score Breakdown */}
         {indexerScore && (
@@ -751,27 +805,35 @@ export default function IndexerDetailPage({
             </Card>
           )}
 
-          {/* Foghorn network-quality grade — correctness/availability/freshness/coverage/value */}
-          <FoghornAlertBanner />
-          <FoghornScorecard address={address} />
         </div>
       </div>
+      </>
+      )}
 
+      {activeTab === 'performance' && (
+      <>
+          <FoghornAlertBanner />
+          <FoghornScorecard address={address} />
+      </>
+      )}
+
+      {activeTab === 'rewards' && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Stake History — self-stake vs delegated over 6 months */}
         <StakeHistoryChart indexer={address} />
-        {/* Daily rewards and query fees, per UTC day */}
         <IndexerTrendsChart indexer={address} />
       </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-        {/* Recent Delegation Activity — reusable feed component pre-filtered to this indexer */}
+      {activeTab === 'delegators' && (
         <DelegationFeed indexerAddress={address} />
-        <div className="space-y-6">
-          {/* Parameter Change History */}
-          <ParameterHistory address={address} />
+      )}
 
-          {/* Horizon Metrics */}
+      {activeTab === 'history' && (
+        <ParameterHistory address={address} />
+      )}
+
+      {activeTab === 'overview' && (
+      <>
           {(indexer.overDelegationDilution || indexer.ownStakeRatio || indexer.provisionedTokens) && (
             <Card>
               <CardHeader>
@@ -812,10 +874,11 @@ export default function IndexerDetailPage({
               </CardContent>
             </Card>
           )}
-        </div>
-      </div>
+      </>
+      )}
 
-      {/* Allocations with Indexing Status */}
+      {activeTab === 'allocations' && (
+      <>
       {!allocations ? (
         <MissingSection
           title="Active Allocations"
@@ -1042,19 +1105,24 @@ export default function IndexerDetailPage({
           </CardContent>
         </Card>
       )}
+      </>
+      )}
 
-      {/* Disputes & Slashing history */}
-      <DisputesSection address={address} />
+      {activeTab === 'history' && (
+        <DisputesSection address={address} />
+      )}
 
-      {/* Service Provisions */}
+      {activeTab === 'provisions' && (
       <ProvisionsPanel
         provisions={provisionsData?.provisions ?? []}
         isLoading={provisions.kind === 'loading'}
         unavailable={isUnavailable(provisions)}
         selfStakeGRT={selfStake}
       />
+      )}
 
-      {/* Top Delegators */}
+      {activeTab === 'delegators' && (
+      <>
       {!delegators ? (
         <MissingSection
           title="Top Delegators"
@@ -1100,6 +1168,8 @@ export default function IndexerDetailPage({
             </div>
           </CardContent>
         </Card>
+      )}
+      </>
       )}
     </div>
   );

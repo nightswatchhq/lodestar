@@ -8,6 +8,18 @@ import { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import type { IndexerDetail, MissableSection } from '@/lib/contracts/indexer-detail';
 
+const nav = { tab: null as string | null };
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => {
+    const p = new URLSearchParams();
+    if (nav.tab) p.set('tab', nav.tab);
+    return p;
+  },
+  useRouter: () => ({ replace: vi.fn() }),
+  redirect: vi.fn(),
+}));
+vi.mock('wagmi', () => ({ useAccount: () => ({ address: undefined }) }));
+
 type Query<T> = {
   status: string;
   fetchStatus: string;
@@ -108,7 +120,8 @@ const without = (part: MissableSection, reason: string): IndexerDetail => {
 };
 
 /** `params` is a promise the page reads with `use`, so the render has to be let settle. */
-async function renderPage() {
+async function renderPage(tab?: string) {
+  nav.tab = tab ?? null;
   await act(async () => {
     render(
       <Suspense fallback={null}>
@@ -119,21 +132,22 @@ async function renderPage() {
 }
 
 beforeEach(() => {
+  nav.tab = null;
   detail = answered(whole());
 });
 
 describe('the indexer page when a section is missing', () => {
   it('renders a whole answer as it always did', async () => {
     await renderPage();
-    expect(await screen.findByRole('heading', { name: 'Top Delegators' })).toBeInTheDocument();
-    expect(screen.getByText(/of pool/)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Delegation Calculator' })).toBeInTheDocument();
+    expect(await screen.findByText('Self-Stake')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Allocations' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Active Allocations' })).toBeNull();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
   });
 
   it('keeps the delegators frame, says the read failed and why, and shows no share of the pool', async () => {
     detail = answered(without('delegators', 'nest_upstream'));
-    await renderPage();
+    await renderPage('delegators');
 
     expect(await screen.findByRole('heading', { name: 'Top Delegators' })).toBeInTheDocument();
     expect(screen.getByText(/The delegator list could not be loaded/)).toBeInTheDocument();
@@ -141,25 +155,25 @@ describe('the indexer page when a section is missing', () => {
     // Nothing derived from the list: no rank, no share, no empty table standing in for it.
     expect(screen.queryByText(/of pool/)).toBeNull();
     expect(screen.queryByText('#1')).toBeNull();
-    // What the indexer's own row says is untouched by the section that failed.
-    expect(screen.getByText('Self-Stake')).toBeInTheDocument();
-    expect(screen.getByText('3 allocations')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '0x1234...5678' })).toBeInTheDocument();
   });
 
   it('withholds every figure computed from the allocations, and keeps the ones that are not', async () => {
     detail = answered(without('allocations', 'nest_busy'));
-    await renderPage();
+    await renderPage('overview');
+
+    expect(await screen.findByRole('heading', { name: 'APR Provenance' })).toBeInTheDocument();
+    expect(screen.getByText(/was too busy to answer/)).toBeInTheDocument();
+    expect(screen.queryByText('= Delegator APR')).toBeNull();
+    expect(screen.getByText('3 allocations')).toBeInTheDocument();
+  });
+
+  it('keeps the allocations frame when that section is missing', async () => {
+    detail = answered(without('allocations', 'nest_busy'));
+    await renderPage('allocations');
 
     expect(await screen.findByRole('heading', { name: 'Active Allocations' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'APR Provenance' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Delegation Calculator' })).toBeInTheDocument();
-    // Each frame that stood on the allocations says so, and says why, where its figures were.
-    expect(screen.getAllByText(/was too busy to answer/)).toHaveLength(3);
-    // The APR decomposition and the calculator's estimate are sums over the allocations.
-    expect(screen.queryByText('Current APR')).toBeNull();
-    expect(screen.queryByText('= Delegator APR')).toBeNull();
-    // `allocationCount` is a column on the indexer's own row, not the section, so it still reads.
-    expect(screen.getByText('3 allocations')).toBeInTheDocument();
+    expect(screen.getByText(/was too busy to answer/)).toBeInTheDocument();
   });
 
   it('says the operator list failed rather than showing the indexer as having none', async () => {
@@ -173,14 +187,14 @@ describe('the indexer page when a section is missing', () => {
 
   it('keeps the closed allocations frame, which an indexer with none does not get', async () => {
     detail = answered(without('closedAllocations', 'nest_unready'));
-    await renderPage();
+    await renderPage('allocations');
 
     expect(await screen.findByRole('heading', { name: 'Closed Allocations' })).toBeInTheDocument();
     expect(screen.getByText(/still catching up/)).toBeInTheDocument();
   });
 
   it('shows no frame for a section that answered with nothing in it', async () => {
-    await renderPage();
+    await renderPage('allocations');
     expect(screen.queryByRole('heading', { name: 'Closed Allocations' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Active Allocations' })).toBeNull();
   });
