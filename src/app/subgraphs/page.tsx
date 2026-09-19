@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
 import { useSubgraphDeployments, useSubgraphDeployments30d, useManifestAnalysis } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
+import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { fetchSubgraphSearch } from '@/lib/api';
 import type { ComplexityCategory } from '@/lib/manifest';
 import { emptySearchMessage } from '@/lib/search-backlog';
@@ -536,9 +537,12 @@ function SubgraphDirectory() {
                       <p className="text-sm font-medium text-[var(--text)]">
                         {s.metadata?.displayName || 'Unnamed'}
                       </p>
-                      <p className="text-xs font-mono text-[var(--text-faint)]">
-                        {dep.ipfsHash.slice(0, 12)}...{dep.ipfsHash.slice(-6)}
-                      </p>
+                      <CopyableId
+                        value={dep.ipfsHash}
+                        title="Copy hash"
+                        display={truncatedQm(dep.ipfsHash)}
+                        className="text-xs text-[var(--text-faint)]"
+                      />
                     </div>
                     <div className="flex items-center gap-4 text-xs font-mono text-[var(--text-muted)]">
                       <span>{formatGRT(signal)} signal</span>
@@ -586,9 +590,12 @@ function SubgraphDirectory() {
                           {row.displayName}
                         </span>
                       ) : (
-                        <span className="font-mono text-sm text-[var(--text)]" title={row.ipfsHash}>
-                          {row.ipfsHash.slice(0, 8)}...{row.ipfsHash.slice(-6)}
-                        </span>
+                        <CopyableId
+                          value={row.ipfsHash}
+                          title="Copy hash"
+                          display={truncatedQm(row.ipfsHash)}
+                          className="font-mono text-sm text-[var(--text)]"
+                        />
                       )}
                       {row.isElite && (
                         <span className="relative group/elite shrink-0">
@@ -605,11 +612,14 @@ function SubgraphDirectory() {
                         </span>
                       )}
                     </div>
-                    {row.displayName && (
-                      <p className="text-[10px] font-mono text-[var(--text-faint)] mt-0.5 ml-7">
-                        {row.ipfsHash.slice(0, 8)}...{row.ipfsHash.slice(-6)}
-                      </p>
-                    )}
+                    {row.displayName ? (
+                      <CopyableId
+                        value={row.ipfsHash}
+                        title="Copy hash"
+                        display={truncatedQm(row.ipfsHash)}
+                        className="text-[10px] text-[var(--text-faint)] mt-0.5 ml-7"
+                      />
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <ComplexityCell hash={row.ipfsHash} onComplexity={handleComplexity} />
@@ -735,27 +745,21 @@ function SubgraphDirectory() {
                     <td className={`px-4 py-3 text-sm text-[var(--text-faint)] ${tdBorder}`}>{page * PAGE_SIZE + idx + 1}</td>
                     <td className={`px-4 py-3 ${tdBorder}`}>
                       <div className="flex items-center gap-2">
-                        <Link
-                          href={`/subgraphs/${row.ipfsHash}`}
-                          className="hover:text-[var(--accent-text)] transition-colors"
-                          title={row.ipfsHash}
-                        >
-                          {row.displayName ? (
-                            <div>
-                              <span className="text-sm font-medium text-[var(--text)] block truncate max-w-[220px]">
-                                {row.displayName}
-                              </span>
-                              <span className="text-[10px] font-mono text-[var(--text-faint)]">
-                                {row.ipfsHash.slice(0, 8)}...{row.ipfsHash.slice(-6)}
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="font-mono text-sm text-[var(--text)]">
-                              {row.ipfsHash.slice(0, 8)}...{row.ipfsHash.slice(-6)}
-                            </span>
-                          )}
-                        </Link>
-                        {row.isElite && (
+                        <div className="flex flex-col min-w-0">
+                          <Link
+                            href={`/subgraphs/${row.ipfsHash}`}
+                            className="hover:text-[var(--accent-text)] transition-colors text-sm font-medium text-[var(--text)] truncate max-w-[220px]"
+                          >
+                            {row.displayName ?? truncatedQm(row.ipfsHash)}
+                          </Link>
+                          <CopyableId
+                            value={row.ipfsHash}
+                            title="Copy hash"
+                            display={truncatedQm(row.ipfsHash)}
+                            className="text-[10px] text-[var(--text-faint)]"
+                          />
+                        </div>
+                        {row.isElite ? (
                       <span className="relative group/elite">
                         <Badge
                           variant="warning"
@@ -768,7 +772,7 @@ function SubgraphDirectory() {
                           Earned over 1,000 GRT in query fees
                         </span>
                       </span>
-                    )}
+                    ) : null}
                       </div>
                     </td>
                     <td className={`px-4 py-3 text-center ${tdBorder}`}>

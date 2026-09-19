@@ -51,6 +51,8 @@ import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
+import { allocationsWithStatus } from '@/lib/allocation-rows';
+import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 
 export default function IndexerDetailPage({
   params,
@@ -890,20 +892,11 @@ function IndexerDetailInner({ address }: { address: string }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {sortAllocations(statusData?.deployments ?? allocations.map((a) => ({
-                    deploymentId: a.subgraphDeployment.id,
-                    ipfsHash: a.subgraphDeployment.ipfsHash ?? '',
-                    displayName: a.subgraphDeployment.displayName,
-                    allocatedTokens: a.allocatedTokens,
-                    signalledTokens: a.subgraphDeployment.signalledTokens,
-                    stakedTokens: a.subgraphDeployment.stakedTokens,
-                    createdAtEpoch: a.createdAtEpoch,
-                    status: 'unreachable' as const,
-                    network: undefined as string | undefined,
-                    syncProgress: undefined as number | undefined,
-                    blocksBehind: undefined as number | undefined,
-                    fatalError: undefined as string | undefined,
-                  })), allocSort, (hash) => foghornAllocQos?.get(hash)?.successRate)
+                  {sortAllocations(
+                    allocationsWithStatus(allocations, statusData?.deployments),
+                    allocSort,
+                    (hash) => foghornAllocQos?.get(hash)?.successRate,
+                  )
                     .slice(allocPage * ALLOC_PAGE_SIZE, (allocPage + 1) * ALLOC_PAGE_SIZE)
                     .map((dep) => {
                     const statusColor = {
@@ -923,21 +916,36 @@ function IndexerDetailInner({ address }: { address: string }) {
                     }[dep.status];
 
                     return (
-                      <tr key={dep.deploymentId} className="hover:bg-[var(--bg-elevated)]">
+                      <tr key={dep.allocationId} className="hover:bg-[var(--bg-elevated)]">
                         <td className="px-4 py-3">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-0.5">
                             <Link
                               href={dep.ipfsHash ? `/subgraphs/${dep.ipfsHash}` : '#'}
                               className="text-sm text-[var(--text)] hover:text-[var(--accent-text)] transition-colors truncate max-w-[200px]"
                             >
                               {dep.displayName ?? shortenAddress(dep.deploymentId)}
                             </Link>
-                            <span className="text-[10px] font-mono text-[var(--text-faint)]">
-                              {dep.ipfsHash ? `${dep.ipfsHash.slice(0, 8)}...${dep.ipfsHash.slice(-6)}` : shortenAddress(dep.deploymentId)}
-                            </span>
-                            {dep.network && (
-                              <span className="text-[10px] text-[var(--text-faint)]">{dep.network}</span>
+                            {dep.ipfsHash ? (
+                              <CopyableId
+                                value={dep.ipfsHash}
+                                title="Copy hash"
+                                display={truncatedQm(dep.ipfsHash)}
+                                className="text-[10px] text-[var(--text-faint)]"
+                              />
+                            ) : (
+                              <span className="text-[10px] font-mono text-[var(--text-faint)]">
+                                {shortenAddress(dep.deploymentId)}
+                              </span>
                             )}
+                            <CopyableId
+                              value={dep.allocationId}
+                              title="Copy allocation ID"
+                              display={shortenAddress(dep.allocationId)}
+                              className="text-[10px] text-[var(--text-faint)]"
+                            />
+                            {dep.network ? (
+                              <span className="text-[10px] text-[var(--text-faint)]">{dep.network}</span>
+                            ) : null}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -1004,11 +1012,11 @@ function IndexerDetailInner({ address }: { address: string }) {
                 </tbody>
               </table>
             </div>
-            {(statusData?.totalAllocations ?? allocations.length) > ALLOC_PAGE_SIZE && (
+            {allocations.length > ALLOC_PAGE_SIZE && (
               <Pagination
                 page={allocPage}
                 pageSize={ALLOC_PAGE_SIZE}
-                totalItems={statusData?.totalAllocations ?? allocations.length}
+                totalItems={allocations.length}
                 onPageChange={setAllocPage}
               />
             )}

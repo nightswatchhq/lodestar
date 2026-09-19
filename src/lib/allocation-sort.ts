@@ -8,6 +8,7 @@ export interface AllocationSort {
 }
 
 export interface SortableAllocation {
+  allocationId?: string;
   deploymentId: string;
   ipfsHash: string;
   displayName?: string | null;
@@ -75,6 +76,11 @@ export function sortAllocations<T extends SortableAllocation>(
     } else if (va !== vb) {
       return (va < vb ? -1 : 1) * sign;
     }
-    return a.deploymentId < b.deploymentId ? -1 : a.deploymentId > b.deploymentId ? 1 : 0;
+    if (a.deploymentId !== b.deploymentId) {
+      return a.deploymentId < b.deploymentId ? -1 : 1;
+    }
+    const idA = a.allocationId ?? '';
+    const idB = b.allocationId ?? '';
+    return idA < idB ? -1 : idA > idB ? 1 : 0;
   });
 }
