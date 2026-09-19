@@ -48,6 +48,7 @@ import { nodeState } from '@/lib/contracts/indexer-node';
 import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
+import { IndexerPagePending } from '@/components/indexer/IndexerPagePending';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
 
 export default function IndexerDetailPage({
@@ -121,9 +122,11 @@ function IndexerDetailInner({ address }: { address: string }) {
 
   if (isPending) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-      </div>
+      <IndexerPagePending
+        address={address}
+        enriched={enrichedIndexer}
+        ensName={ensData?.ensName ?? null}
+      />
     );
   }
 
