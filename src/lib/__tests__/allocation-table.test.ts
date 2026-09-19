@@ -33,6 +33,7 @@ function active(over: Partial<UnifiedAllocation> = {}): UnifiedAllocation {
     queryFeesCollected: null,
     poi: null,
     forceClosed: false,
+    lastPoiAt: null,
     ...over,
   };
 }

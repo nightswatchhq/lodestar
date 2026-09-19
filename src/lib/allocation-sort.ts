@@ -9,7 +9,8 @@ export type AllocationSortKey =
   | 'rewards'
   | 'fees'
   | 'closed'
-  | 'ratio';
+  | 'ratio'
+  | 'poi';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -34,6 +35,9 @@ export interface SortableAllocation {
   indexingRewards?: string | null;
   queryFeesCollected?: string | null;
   lifecycle?: 'active' | 'closed';
+  lastPoiAt?: number | null;
+  createdAtSec?: number;
+  nowSec?: number;
 }
 
 const STATUS_ORDER: Record<SortableAllocation['status'], number> = { synced: 0, syncing: 1, failed: 2, unreachable: 3 };
@@ -88,6 +92,9 @@ function value(row: SortableAllocation, key: AllocationSortKey, successRate: (ip
       if (sig == null || st == null || st === 0n) return null;
       return Number(sig) / Number(st);
     }
+    case 'poi':
+      if (row.lifecycle === 'closed' || row.nowSec == null || row.createdAtSec == null) return null;
+      return (row.lastPoiAt ?? row.createdAtSec) - row.nowSec;
   }
 }
 

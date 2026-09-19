@@ -3,6 +3,7 @@ import { SYNC_TOLERANCE_BLOCKS } from '@/lib/indexing-status-shape';
 import type { AllocationSort, AllocationSortKey } from '@/lib/allocation-sort';
 import { defaultDirection } from '@/lib/allocation-sort';
 import type { AllocationRow } from '@/lib/allocation-rows';
+import { poiClock, needsPoiAttention } from '@/lib/poi-clock';
 
 /** Same post-merge L1 block time as `L1_BLOCKS_PER_YEAR` in network-math. */
 const L1_BLOCK_SECONDS = 12.09;
@@ -18,6 +19,7 @@ export type UnifiedAllocation = AllocationRow & {
   queryFeesCollected: string | null;
   poi: string | null;
   forceClosed: boolean;
+  lastPoiAt: number | null;
 };
 
 export type AllocTableState = {
@@ -32,7 +34,7 @@ export type AllocTableState = {
 
 const SORT_KEYS: readonly AllocationSortKey[] = [
   'deployment', 'status', 'querySuccess', 'blocksBehind', 'allocated', 'signalled',
-  'age', 'rewards', 'fees', 'closed', 'ratio',
+  'age', 'rewards', 'fees', 'closed', 'ratio', 'poi',
 ];
 
 export function parseAllocTableState(params: URLSearchParams): AllocTableState {
@@ -110,6 +112,7 @@ export function unifyActive(rows: AllocationRow[]): UnifiedAllocation[] {
     queryFeesCollected: null,
     poi: null,
     forceClosed: false,
+    lastPoiAt: null,
   }));
 }
 
@@ -131,6 +134,7 @@ export function unifyClosed(rows: ClosedAllocation[]): UnifiedAllocation[] {
     queryFeesCollected: a.queryFeesCollected,
     poi: a.poi,
     forceClosed: a.forceClosed,
+    lastPoiAt: null,
   }));
 }
 
@@ -171,10 +175,20 @@ export function createdAtSec(
  * Amber and red in the allocations table: failed, still syncing, or lag past the
  * synced tolerance. POI age from #249 joins this predicate when that field exists.
  */
-export function needsAttention(row: UnifiedAllocation): boolean {
+export function needsAttention(
+  row: UnifiedAllocation,
+  nowSec?: number,
+  currentEpoch?: number,
+  epochLengthBlocks?: number,
+): boolean {
   if (row.lifecycle !== 'active') return false;
   if (row.status === 'failed' || row.status === 'syncing') return true;
-  return row.blocksBehind != null && row.blocksBehind > SYNC_TOLERANCE_BLOCKS;
+  if (row.blocksBehind != null && row.blocksBehind > SYNC_TOLERANCE_BLOCKS) return true;
+  if (nowSec != null && currentEpoch != null && epochLengthBlocks != null) {
+    const opened = createdAtSec(row.createdAtEpoch, currentEpoch, epochLengthBlocks, nowSec);
+    return needsPoiAttention(poiClock({ lastPoiAt: row.lastPoiAt, createdAtSec: opened, nowSec }));
+  }
+  return false;
 }
 
 export function filterAllocations(
@@ -188,7 +202,7 @@ export function filterAllocations(
     if (state.view === 'active' && row.lifecycle !== 'active') return false;
     if (state.view === 'closed' && row.lifecycle !== 'closed') return false;
     if (state.network && row.network !== state.network) return false;
-    if (state.attention && !needsAttention(row)) return false;
+    if (state.attention && !needsAttention(row, nowSec, currentEpoch, epochLengthBlocks)) return false;
     if (state.from || state.to) {
       const t = eventAtSec(row, nowSec, currentEpoch, epochLengthBlocks);
       if (t == null) return false;
