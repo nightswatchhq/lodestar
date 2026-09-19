@@ -62,6 +62,7 @@ function processIndexer(
   indexer: Indexer,
   delegationRatio: number,
   delegatorAPR: number | null,
+  effectiveCutPercent: number | null,
 ): ProcessedIndexer {
   const selfStake = weiToGRT(indexer.stakedTokens) - weiToGRT(indexer.lockedTokens ?? '0');
   const delegated = weiToGRT(indexer.delegatedTokens);
@@ -69,8 +70,9 @@ function processIndexer(
 
   const capacity = calculateDelegationCapacity(selfStake, delegated, delegationRatio);
 
-  const rawCut = indexer.indexingRewardCut / 1_000_000;
-  const effectiveCut = rawCut * 100;
+  // The raw cut stood in here for the effective one, which is lower wherever the indexer's own
+  // stake is a real share of the pool: ellipfra's 43% is 38.7% to its delegators.
+  const effectiveCut = effectiveCutPercent ?? (indexer.indexingRewardCut / 1_000_000) * 100;
 
   return {
     id: indexer.id,
@@ -248,15 +250,17 @@ function CompareContent() {
   const indexers = indexersData?.indexers ?? [];
 
   // Build maps from enriched data (has ENS names + allocation-level APR)
-  const { nameMap, aprMap } = useMemo(() => {
+  const { nameMap, aprMap, cutMap } = useMemo(() => {
     const names = new Map<string, string>();
     const aprs = new Map<string, number>();
+    const cuts = new Map<string, number | null>();
     const enrichedList = enrichedData && 'indexers' in enrichedData ? enrichedData.indexers : enrichedData ?? [];
     for (const e of enrichedList) {
       names.set(e.id, e.name ?? e.id);
       aprs.set(e.id, e.delegatorAPR);
+      cuts.set(e.id, e.effectiveCut);
     }
-    return { nameMap: names, aprMap: aprs };
+    return { nameMap: names, aprMap: aprs, cutMap: cuts };
   }, [enrichedData]);
 
   const setSlot = useCallback((idx: number, id: string) => {
@@ -284,11 +288,11 @@ function CompareContent() {
       if (!sel) return null;
       const ix = indexers.find((i) => i.id === sel);
       if (!ix) return null;
-      const p = processIndexer(ix, delegationRatio, aprMap.get(sel) ?? null);
+      const p = processIndexer(ix, delegationRatio, aprMap.get(sel) ?? null, cutMap.get(sel) ?? null);
       p.name = nameMap.get(sel) ?? p.name;
       return p;
     });
-  }, [selections, indexers, delegationRatio, aprMap, nameMap]);
+  }, [selections, indexers, delegationRatio, aprMap, cutMap, nameMap]);
 
   // Best values per metric
   const bestValues = useMemo(() => {
