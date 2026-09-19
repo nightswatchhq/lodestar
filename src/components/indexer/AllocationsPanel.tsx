@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import type { ActiveAllocation, ClosedAllocation } from '@/lib/contracts/indexer-detail';
@@ -23,6 +24,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
 import { SortHeader } from '@/components/ui/SortHeader';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
+import { CopyButton } from '@/components/ui/CopyButton';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { queueCommand, queueBlock } from '@/lib/indexer-cli';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocation-ratio';
@@ -67,6 +71,8 @@ export function AllocationsPanel({
   const router = useRouter();
   const searchParams = useSearchParams();
   const state = parseAllocTableState(searchParams);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { copy, copied } = useCopyToClipboard();
 
   const setState = (patch: Partial<AllocTableState>) => {
     const next: AllocTableState = { ...state, ...patch };
@@ -161,6 +167,24 @@ export function AllocationsPanel({
                 >
                   Needs attention
                 </button>
+                {selected.size > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lines = pageRows
+                        .filter((r) => selected.has(r.allocationId) && r.lifecycle === 'active' && r.ipfsHash)
+                        .map((r) => queueCommand('unallocate', {
+                          deploymentId: r.ipfsHash,
+                          allocationId: r.allocationId,
+                          network: r.network,
+                        }));
+                      void copy(queueBlock(lines));
+                    }}
+                    className="px-2.5 py-1.5 text-xs rounded-[var(--radius-button)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                  >
+                    {copied ? 'Copied' : `Copy unallocate (${selected.size})`}
+                  </button>
+                ) : null}
               </div>
             </div>
           </CardHeader>
@@ -174,6 +198,7 @@ export function AllocationsPanel({
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-[var(--border)]">
+                      <th className="px-2 py-2 w-8" />
                       <SortHeader label="Deployment" sortKey="deployment" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} />
                       {showActiveCols ? (
                         <>
@@ -207,6 +232,13 @@ export function AllocationsPanel({
                       <AllocRow
                         key={row.allocationId}
                         row={row}
+                        selected={selected.has(row.allocationId)}
+                        onToggle={() => setSelected((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(row.allocationId)) next.delete(row.allocationId);
+                          else next.add(row.allocationId);
+                          return next;
+                        })}
                         showActiveCols={showActiveCols}
                         showClosedCols={showClosedCols}
                         statusLoading={statusLoading}
@@ -300,6 +332,8 @@ function StatusCounts({
 
 function AllocRow({
   row,
+  selected,
+  onToggle,
   showActiveCols,
   showClosedCols,
   statusLoading,
@@ -311,6 +345,8 @@ function AllocRow({
   networkRatio,
 }: {
   row: UnifiedAllocation;
+  selected: boolean;
+  onToggle: () => void;
   showActiveCols: boolean;
   showClosedCols: boolean;
   statusLoading: boolean;
@@ -341,6 +377,15 @@ function AllocRow({
 
   return (
     <tr className="hover:bg-[var(--bg-elevated)]">
+      <td className="px-2 py-3">
+        <input
+          type="checkbox"
+          aria-label="Select allocation"
+          checked={selected}
+          onChange={onToggle}
+          className="accent-[var(--accent)]"
+        />
+      </td>
       <td className="px-4 py-3">
         <div className="flex flex-col gap-0.5">
           <Link
@@ -355,6 +400,18 @@ function AllocRow({
             <span className="text-[10px] font-mono text-[var(--text-faint)]">{shortenAddress(row.deploymentId)}</span>
           )}
           <CopyableId value={row.allocationId} title="Copy allocation ID" display={shortenAddress(row.allocationId)} className="text-[10px] text-[var(--text-faint)]" />
+          {row.lifecycle === 'active' && row.ipfsHash ? (
+            <CopyButton
+              text={queueCommand('unallocate', {
+                deploymentId: row.ipfsHash,
+                allocationId: row.allocationId,
+                network: row.network,
+              })}
+              variant="icon"
+              title="Copy unallocate command"
+              className="self-start mt-0.5"
+            />
+          ) : null}
           {row.lifecycle === 'closed' && showActiveCols ? (
             <span className="text-[10px] text-[var(--text-faint)]">closed</span>
           ) : null}
