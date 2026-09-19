@@ -8,7 +8,8 @@ export type AllocationSortKey =
   | 'age'
   | 'rewards'
   | 'fees'
-  | 'closed';
+  | 'closed'
+  | 'ratio';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -26,6 +27,7 @@ export interface SortableAllocation {
   blocksBehind?: number | null;
   allocatedTokens: string;
   signalledTokens: string;
+  stakedTokens?: string;
   createdAtEpoch?: number;
   closedAtEpoch?: number | null;
   closedAt?: number | null;
@@ -79,6 +81,13 @@ function value(row: SortableAllocation, key: AllocationSortKey, successRate: (ip
       return row.queryFeesCollected != null ? wei(row.queryFeesCollected) : null;
     case 'closed':
       return row.closedAt ?? row.closedAtEpoch ?? null;
+    case 'ratio': {
+      if (!row.stakedTokens) return null;
+      const sig = wei(row.signalledTokens);
+      const st = wei(row.stakedTokens);
+      if (sig == null || st == null || st === 0n) return null;
+      return Number(sig) / Number(st);
+    }
   }
 }
 

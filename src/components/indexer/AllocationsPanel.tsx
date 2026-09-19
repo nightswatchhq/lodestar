@@ -24,6 +24,7 @@ import { SortHeader } from '@/components/ui/SortHeader';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime, cn } from '@/lib/utils';
+import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocation-ratio';
 
 const PAGE_SIZE = 25;
 
@@ -40,6 +41,7 @@ export function AllocationsPanel({
   currentEpoch,
   epochLength,
   nowSec,
+  networkRatio,
 }: {
   allocations: ActiveAllocation[] | undefined;
   closedAllocations: ClosedAllocation[] | undefined;
@@ -58,6 +60,7 @@ export function AllocationsPanel({
   currentEpoch: number;
   epochLength: number;
   nowSec: number;
+  networkRatio: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -179,7 +182,10 @@ export function AllocationsPanel({
                       ) : null}
                       <SortHeader label="Allocated" sortKey="allocated" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" />
                       {showActiveCols ? (
-                        <SortHeader label="Signalled" sortKey="signalled" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden lg:table-cell" />
+                        <>
+                          <SortHeader label="Signalled" sortKey="signalled" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden lg:table-cell" />
+                          <SortHeader label="Ratio" sortKey="ratio" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title={RATIO_TOOLTIP} />
+                        </>
                       ) : null}
                       <SortHeader label="Age" sortKey="age" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Epochs and days since the allocation opened, or its duration once closed." />
                       {showClosedCols ? (
@@ -204,6 +210,7 @@ export function AllocationsPanel({
                         currentEpoch={currentEpoch}
                         epochLength={epochLength}
                         nowSec={nowSec}
+                        networkRatio={networkRatio}
                       />
                     ))}
                   </tbody>
@@ -296,6 +303,7 @@ function AllocRow({
   currentEpoch,
   epochLength,
   nowSec,
+  networkRatio,
 }: {
   row: UnifiedAllocation;
   showActiveCols: boolean;
@@ -306,6 +314,7 @@ function AllocRow({
   currentEpoch: number;
   epochLength: number;
   nowSec: number;
+  networkRatio: number;
 }) {
   const statusColor = {
     synced: 'var(--green)',
@@ -405,6 +414,7 @@ function AllocRow({
         <span className="font-mono text-sm text-[var(--text)]">{formatGRT(weiToGRT(row.allocatedTokens))}</span>
       </td>
       {showActiveCols ? (
+        <>
         <td className="px-4 py-3 text-right hidden lg:table-cell">
           {row.lifecycle === 'closed' ? (
             <span className="text-sm text-[var(--text-faint)]">—</span>
@@ -412,6 +422,15 @@ function AllocRow({
             <span className="font-mono text-sm text-[var(--green)]">{formatGRT(weiToGRT(row.signalledTokens))}</span>
           )}
         </td>
+        <td className="px-4 py-3 text-right">
+          <RatioCell
+            signal={weiToGRT(row.signalledTokens)}
+            stake={weiToGRT(row.stakedTokens)}
+            networkRatio={networkRatio}
+            closed={row.lifecycle === 'closed'}
+          />
+        </td>
+        </>
       ) : null}
       <td className="px-4 py-3 text-right">
         <span className="font-mono text-sm text-[var(--text-muted)]">{formatAgeLabel(epochs, days)}</span>
@@ -438,5 +457,32 @@ function AllocRow({
         </>
       ) : null}
     </tr>
+  );
+}
+
+function RatioCell({
+  signal,
+  stake,
+  networkRatio,
+  closed,
+}: {
+  signal: number;
+  stake: number;
+  networkRatio: number;
+  closed: boolean;
+}) {
+  if (closed) return <span className="text-sm text-[var(--text-faint)]">—</span>;
+  const ratio = signalStakeRatio(signal, stake);
+  if (ratio == null) return <span className="text-sm text-[var(--text-faint)]">—</span>;
+  const vs = ratioVsNetwork(ratio, networkRatio);
+  const above = vs != null && vs >= 1;
+  return (
+    <span
+      className={cn('font-mono text-sm', above ? 'text-[var(--green)]' : 'text-[var(--text)]')}
+      title={vs != null ? `${vs.toFixed(2)}× network average` : RATIO_TOOLTIP}
+    >
+      {ratio >= 1 ? ratio.toFixed(2) : ratio.toFixed(3)}
+      {vs != null ? <span className="text-[10px] text-[var(--text-faint)] ml-1">{vs.toFixed(1)}×</span> : null}
+    </span>
   );
 }

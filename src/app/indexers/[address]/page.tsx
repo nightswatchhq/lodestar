@@ -819,6 +819,11 @@ function IndexerDetailInner({ address }: { address: string }) {
           currentEpoch={network?.currentEpoch ?? 0}
           epochLength={network?.epochLength ?? 0}
           nowSec={nowSec}
+          networkRatio={
+            network?.totalTokensAllocated && weiToGRT(network.totalTokensAllocated) > 0
+              ? totalNetworkSignal / weiToGRT(network.totalTokensAllocated)
+              : 0
+          }
         />
       )}
 
