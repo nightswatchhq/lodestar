@@ -12,6 +12,7 @@ import {
   fetchEnrichedIndexers,
   fetchSubgraphDeployments,
   fetchSubgraphDeployments30d,
+  fetchSubgraphDirectory,
   fetchManifestAnalysis,
   fetchPOIOverview,
   fetchPOIDeployment,
@@ -233,6 +234,17 @@ export function useSubgraphDeployments(params: {
   return useQuery({
     queryKey: ['subgraphDeployments', params],
     queryFn: () => fetchSubgraphDeployments(params),
+    staleTime: FIVE_MINUTES,
+    refetchInterval: FIVE_MINUTES,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The directory, one page of it, as `directoryApiQuery` describes. */
+export function useSubgraphDirectory(query: string) {
+  return useQuery({
+    queryKey: ['subgraphDirectory', query],
+    queryFn: () => fetchSubgraphDirectory(query),
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
     placeholderData: keepPreviousData,
