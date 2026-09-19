@@ -14,6 +14,7 @@ import {
   ageEpochs,
   ageDays,
   formatAgeLabel,
+  createdAtSec,
   type AllocTableState,
   type UnifiedAllocation,
 } from '@/lib/allocation-table';
@@ -25,6 +26,7 @@ import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocation-ratio';
+import { poiClock } from '@/lib/poi-clock';
 
 const PAGE_SIZE = 25;
 
@@ -188,6 +190,9 @@ export function AllocationsPanel({
                         </>
                       ) : null}
                       <SortHeader label="Age" sortKey="age" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Epochs and days since the allocation opened, or its duration once closed." />
+                      {showActiveCols ? (
+                        <SortHeader label="POI" sortKey="poi" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Days since the last POI, or since creation if none, and days left before anyone can force-close." />
+                      ) : null}
                       {showClosedCols ? (
                         <>
                           <SortHeader label="Indexing Rewards" sortKey="rewards" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden sm:table-cell" />
@@ -435,6 +440,19 @@ function AllocRow({
       <td className="px-4 py-3 text-right">
         <span className="font-mono text-sm text-[var(--text-muted)]">{formatAgeLabel(epochs, days)}</span>
       </td>
+      {showActiveCols ? (
+        <td className="px-4 py-3 text-right">
+          {row.lifecycle === 'closed' ? (
+            <span className="text-sm text-[var(--text-faint)]">—</span>
+          ) : (
+            <PoiCell
+              lastPoiAt={row.lastPoiAt}
+              createdAtSec={createdAtSec(row.createdAtEpoch, currentEpoch, epochLength, nowSec)}
+              nowSec={nowSec}
+            />
+          )}
+        </td>
+      ) : null}
       {showClosedCols ? (
         <>
           <td className="px-4 py-3 text-right hidden sm:table-cell">
@@ -457,6 +475,26 @@ function AllocRow({
         </>
       ) : null}
     </tr>
+  );
+}
+
+function PoiCell({
+  lastPoiAt,
+  createdAtSec,
+  nowSec,
+}: {
+  lastPoiAt: number | null;
+  createdAtSec: number;
+  nowSec: number;
+}) {
+  const clock = poiClock({ lastPoiAt, createdAtSec, nowSec });
+  const color = clock.tone === 'fresh' ? 'text-[var(--green)]'
+    : clock.tone === 'due' ? 'text-[var(--amber)]'
+    : 'text-[var(--red-text)]';
+  return (
+    <span className={cn('text-xs font-medium', color)} title={`${clock.daysSince.toFixed(1)}d since last POI`}>
+      {clock.label}
+    </span>
   );
 }
 
