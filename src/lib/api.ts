@@ -282,6 +282,49 @@ export async function fetchSubgraphDeployments(params: {
   });
 }
 
+/** One row of `/api/subgraph-directory`. Wei as decimal strings, as everywhere else. */
+export interface DirectoryRow {
+  id: string;
+  ipfsHash: string;
+  displayName: string | null;
+  categories: string[];
+  signalledTokens: string;
+  stakedTokens: string;
+  queryFeesAmount: string;
+  queryFees30d: string;
+  createdAt: number;
+  indexerCount: number;
+  curatorCount: number;
+  /** Null when the manifest has not been read yet, or names no network. */
+  network: string | null;
+  complexity: 'Light' | 'Moderate' | 'Heavy' | 'Extreme' | null;
+}
+
+export interface DirectoryFacet {
+  id: string;
+  count: number;
+}
+
+export interface DirectoryPage {
+  data: DirectoryRow[];
+  /** Every match, not just this page. */
+  total: number;
+  /** Rows with no manifest read yet, which no network or complexity filter can match. */
+  unanalysed: number;
+  facets: { networks: DirectoryFacet[]; complexities: DirectoryFacet[]; categories: DirectoryFacet[] };
+}
+
+/** The deployments directory, filtered and paged by kittiwake over the whole set. */
+export async function fetchSubgraphDirectory(query: string): Promise<DirectoryPage> {
+  const response = await fetchShedAware(apiUrl(`/api/subgraph-directory?${query}`));
+  if (!response.ok) throw new Error(`Directory fetch failed: ${response.status}`);
+  return parseResponse('/api/subgraph-directory', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'queryFees30d', 'network', 'complexity'] },
+    present: ['total', 'unanalysed'],
+    arrays: ['facets.networks', 'facets.complexities', 'facets.categories'],
+  });
+}
+
 /**
  * Fetch subgraph deployments with 30-day query fees
  */
