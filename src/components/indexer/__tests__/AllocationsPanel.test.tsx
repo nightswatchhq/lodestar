@@ -72,6 +72,7 @@ function renderPanel(extra: Record<string, string> = {}) {
       currentEpoch={1000}
       epochLength={6646}
       nowSec={1_700_864_000}
+      networkRatio={0.006}
     />,
   );
 }
@@ -87,6 +88,7 @@ describe('AllocationsPanel', () => {
     expect(screen.getByText('Live Subgraph')).toBeInTheDocument();
     expect(screen.queryByText('Old Subgraph')).toBeNull();
     expect(screen.getByText(/10 ep/)).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: /Ratio/ })).toBeInTheDocument();
   });
 
   it('shows closed rewards, the force-closed flag, and a sortable closed column', () => {

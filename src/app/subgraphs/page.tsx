@@ -7,8 +7,9 @@ import { Card } from '@/components/ui/Card';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
-import { useSubgraphDeployments, useSubgraphDeployments30d, useManifestAnalysis } from '@/hooks/useNetworkStats';
+import { useSubgraphDeployments, useSubgraphDeployments30d, useManifestAnalysis, useNetworkStats } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
+import { RATIO_TOOLTIP } from '@/lib/allocation-ratio';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { fetchSubgraphSearch } from '@/lib/api';
 import type { ComplexityCategory } from '@/lib/manifest';
@@ -105,6 +106,13 @@ export default function SubgraphDirectoryPage() {
 function SubgraphDirectory() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { data: networkData } = useNetworkStats();
+  const networkRatio = (() => {
+    const n = networkData?.graphNetwork;
+    if (!n?.totalTokensSignalled || !n?.totalTokensAllocated) return 0;
+    const stake = weiToGRT(n.totalTokensAllocated);
+    return stake > 0 ? weiToGRT(n.totalTokensSignalled) / stake : 0;
+  })();
 
   // Initialise state from URL search params (or defaults)
   const [page, setPage] = useState(() => Number(searchParams.get('page')) || 0);
@@ -563,7 +571,7 @@ function SubgraphDirectory() {
       {/* Mobile cards */}
       <div className="block md:hidden space-y-3">
         {rows.map((row, idx) => {
-          const highRatio = row.signalStakeRatio > 0.5;
+          const highRatio = networkRatio > 0 && row.signalStakeRatio >= networkRatio;
           return (
             <Link key={row.id} href={`/subgraphs/${row.ipfsHash}`} className="block relative">
               <Card className={`transition-colors ${selectedHashes.has(row.ipfsHash) ? 'border-[var(--accent)]/50 bg-[var(--accent)]/5' : 'hover:border-[var(--accent-hover)]'}`}>
@@ -718,13 +726,13 @@ function SubgraphDirectory() {
                   Created{renderSortArrow('created')}
                 </th>
                 <th className={cn(thBase, 'text-right')}>Indexers</th>
-                <th className={cn(thBase, 'text-right')}>Signal/Stake</th>
+                <th className={cn(thBase, 'text-right')} title={RATIO_TOOLTIP}>Signal/Stake</th>
                 <th className={cn(thBase, 'text-right')}>Curators</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, idx) => {
-                const highRatio = row.signalStakeRatio > 0.5;
+                const highRatio = networkRatio > 0 && row.signalStakeRatio >= networkRatio;
                 return (
                   <tr
                     key={row.id}
