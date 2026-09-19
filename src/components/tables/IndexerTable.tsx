@@ -31,6 +31,7 @@ import {
 } from '@/lib/utils';
 import type { Indexer } from '@/lib/queries';
 import type { EnrichedIndexer } from '@/lib/enriched';
+import { CopyableId } from '@/components/ui/CopyableId';
 
 // Rows per page, and the measured height of a loaded row (name + address is two
 // lines). The loading skeleton mirrors both so the table doesn't grow when data
@@ -487,9 +488,12 @@ export function IndexerTable() {
                   </HoverTip>
                 )}
               </p>
-              <p className="text-xs text-[var(--text-faint)] font-mono">
-                {row.name ? shortenAddress(row.address) : urlHost(row.url)}
-              </p>
+              <CopyableId
+                value={row.address}
+                title="Copy address"
+                display={row.name ? shortenAddress(row.address) : (urlHost(row.url) || shortenAddress(row.address))}
+                className="text-xs text-[var(--text-faint)]"
+              />
             </div>
           );
         },
@@ -878,7 +882,12 @@ export function IndexerTable() {
                       <div className="flex items-start gap-1.5">
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-[var(--text)] truncate">{d.name}</p>
-                          <p className="text-xs text-[var(--text-faint)] font-mono">{shortenAddress(d.address)}</p>
+                          <CopyableId
+                            value={d.address}
+                            title="Copy address"
+                            display={shortenAddress(d.address)}
+                            className="text-xs text-[var(--text-faint)]"
+                          />
                         </div>
                         <div className="flex items-center gap-1 mt-1 flex-shrink-0">
                           <div className={cn(

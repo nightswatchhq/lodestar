@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ClosedAllocationsTable, type ClosedAllocation } from '../ClosedAllocationsTable';
 
 vi.mock('next/link', () => ({
@@ -62,6 +62,18 @@ describe('ClosedAllocationsTable', () => {
   it('does not flag normally-closed allocations', () => {
     render(<ClosedAllocationsTable allocations={[alloc({ forceClosed: false })]} />);
     expect(screen.queryByText('force closed')).not.toBeInTheDocument();
+  });
+
+  it('copies the full allocation id, not the shortened display', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+    render(<ClosedAllocationsTable allocations={[alloc()]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Copy allocation ID' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('0xalloc1'));
   });
 
   it('falls back to the deployment id when no display name exists', () => {

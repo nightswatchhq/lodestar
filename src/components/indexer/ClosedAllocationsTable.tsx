@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Pagination } from '@/components/ui/Pagination';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime } from '@/lib/utils';
+import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 
 export interface ClosedAllocation {
   id: string;
@@ -40,6 +41,7 @@ export function ClosedAllocationsTable({ allocations }: { allocations: ClosedAll
           <thead>
             <tr className="border-b border-[var(--border)]">
               <th className="px-4 py-2 text-left text-[11px] font-medium text-[var(--text-muted)]">Deployment</th>
+              <th className="px-4 py-2 text-left text-[11px] font-medium text-[var(--text-muted)] hidden md:table-cell">POI</th>
               <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)]">Allocated</th>
               <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)] hidden sm:table-cell">Indexing Rewards</th>
               <th className="px-4 py-2 text-right text-[11px] font-medium text-[var(--text-muted)] hidden md:table-cell">Query Fees</th>
@@ -57,22 +59,49 @@ export function ClosedAllocationsTable({ allocations }: { allocations: ClosedAll
               return (
                 <tr key={alloc.id} className="hover:bg-[var(--bg-elevated)]">
                   <td className="px-4 py-3">
-                    <div className="flex flex-col">
+                    <div className="flex flex-col gap-0.5">
                       <Link
                         href={ipfsHash ? `/subgraphs/${ipfsHash}` : '#'}
                         className="text-sm text-[var(--text)] hover:text-[var(--accent-text)] transition-colors truncate max-w-[200px]"
                       >
                         {displayName ?? shortenAddress(alloc.subgraphDeployment.id)}
                       </Link>
-                      <span className="text-[10px] font-mono text-[var(--text-faint)]">
-                        {ipfsHash ? `${ipfsHash.slice(0, 8)}...${ipfsHash.slice(-6)}` : shortenAddress(alloc.subgraphDeployment.id)}
-                      </span>
-                      {alloc.forceClosed && (
+                      {ipfsHash ? (
+                        <CopyableId
+                          value={ipfsHash}
+                          title="Copy hash"
+                          display={truncatedQm(ipfsHash)}
+                          className="text-[10px] text-[var(--text-faint)]"
+                        />
+                      ) : (
+                        <span className="text-[10px] font-mono text-[var(--text-faint)]">
+                          {shortenAddress(alloc.subgraphDeployment.id)}
+                        </span>
+                      )}
+                      <CopyableId
+                        value={alloc.id}
+                        title="Copy allocation ID"
+                        display={shortenAddress(alloc.id)}
+                        className="text-[10px] text-[var(--text-faint)]"
+                      />
+                      {alloc.forceClosed ? (
                         <span className="text-[10px] text-[var(--amber)]" title="Closed by another party (e.g. on subgraph deprecation)">
                           force closed
                         </span>
-                      )}
+                      ) : null}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {alloc.poi ? (
+                      <CopyableId
+                        value={alloc.poi}
+                        title="Copy POI"
+                        display={shortenAddress(alloc.poi)}
+                        className="text-[10px] text-[var(--text-faint)]"
+                      />
+                    ) : (
+                      <span className="text-sm text-[var(--text-faint)]">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span className="font-mono text-sm text-[var(--text)]">{formatGRT(weiToGRT(alloc.allocatedTokens))}</span>
