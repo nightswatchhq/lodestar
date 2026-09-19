@@ -8,11 +8,12 @@ import { Suspense } from 'react';
 import { act, render, screen } from '@testing-library/react';
 import type { IndexerDetail, MissableSection } from '@/lib/contracts/indexer-detail';
 
-const nav = { tab: null as string | null };
+const nav = { tab: null as string | null, extra: {} as Record<string, string> };
 vi.mock('next/navigation', () => ({
   useSearchParams: () => {
     const p = new URLSearchParams();
     if (nav.tab) p.set('tab', nav.tab);
+    for (const [k, v] of Object.entries(nav.extra)) p.set(k, v);
     return p;
   },
   useRouter: () => ({ replace: vi.fn() }),
@@ -120,8 +121,9 @@ const without = (part: MissableSection, reason: string): IndexerDetail => {
 };
 
 /** `params` is a promise the page reads with `use`, so the render has to be let settle. */
-async function renderPage(tab?: string) {
+async function renderPage(tab?: string, extra: Record<string, string> = {}) {
   nav.tab = tab ?? null;
+  nav.extra = extra;
   await act(async () => {
     render(
       <Suspense fallback={null}>
@@ -133,6 +135,7 @@ async function renderPage(tab?: string) {
 
 beforeEach(() => {
   nav.tab = null;
+  nav.extra = {};
   detail = answered(whole());
 });
 
@@ -187,15 +190,16 @@ describe('the indexer page when a section is missing', () => {
 
   it('keeps the closed allocations frame, which an indexer with none does not get', async () => {
     detail = answered(without('closedAllocations', 'nest_unready'));
-    await renderPage('allocations');
+    await renderPage('allocations', { view: 'closed' });
 
     expect(await screen.findByRole('heading', { name: 'Closed Allocations' })).toBeInTheDocument();
     expect(screen.getByText(/still catching up/)).toBeInTheDocument();
   });
 
-  it('shows no frame for a section that answered with nothing in it', async () => {
+  it('shows no missing-section frame for a section that answered with nothing in it', async () => {
     await renderPage('allocations');
-    expect(screen.queryByRole('heading', { name: 'Closed Allocations' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: 'Active Allocations' })).toBeNull();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Allocations' })).toBeInTheDocument();
+    expect(screen.getByText(/No allocations in this view/)).toBeInTheDocument();
   });
 });
