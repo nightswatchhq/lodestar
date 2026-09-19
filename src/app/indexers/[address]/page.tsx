@@ -15,7 +15,7 @@ import {
   isGreedyCut,
   cn,
 } from '@/lib/utils';
-import { ClosedAllocationsTable } from '@/components/indexer/ClosedAllocationsTable';
+import { AllocationsPanel } from '@/components/indexer/AllocationsPanel';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
 import { FoghornScorecard } from '@/components/foghorn/FoghornScorecard';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
@@ -26,9 +26,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { Pagination } from '@/components/ui/Pagination';
-import { SortHeader } from '@/components/ui/SortHeader';
-import { nextSort, sortAllocations, type AllocationSort, type AllocationSortKey } from '@/lib/allocation-sort';
+
 import { DelegationCalculator } from '@/components/ui/DelegationCalculator';
 import { ProvisionsPanel } from '@/components/ui/ProvisionsPanel';
 import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
@@ -51,8 +49,6 @@ import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
-import { allocationsWithStatus } from '@/lib/allocation-rows';
-import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 
 export default function IndexerDetailPage({
   params,
@@ -89,7 +85,7 @@ function IndexerDetailInner({ address }: { address: string }) {
   const { data: recentDelegations } = useRecentDelegations(address);
   const { data: ensData } = useENSName(address);
   const { data: enrichedData } = useEnrichedIndexers();
-  const { data: statusData, isLoading: statusLoading, dataUpdatedAt: statusUpdatedAt } = useIndexerStatus(address);
+  const { data: statusData, isLoading: statusLoading } = useIndexerStatus(address);
   const { data: paymentsData } = useIndexerPayments(address);
   const annualIssuance = useAnnualIndexingIssuance();
   const { address: connected } = useAccount();
@@ -100,14 +96,6 @@ function IndexerDetailInner({ address }: { address: string }) {
   const enrichedIndexer = enrichedData?.indexers?.find(
     (e) => e.id.toLowerCase() === address.toLowerCase()
   );
-
-  const [allocPage, setAllocPage] = useState(0);
-  const [allocSort, setAllocSort] = useState<AllocationSort | null>(null);
-  const sortAllocationsBy = (key: AllocationSortKey) => {
-    setAllocSort((current) => nextSort(current, key));
-    setAllocPage(0);
-  };
-  const ALLOC_PAGE_SIZE = 25;
 
   const grtPrice = priceData?.price ?? 0;
   const network = networkData?.graphNetwork;
@@ -813,240 +801,25 @@ function IndexerDetailInner({ address }: { address: string }) {
       )}
 
       {activeTab === 'allocations' && (
-      <>
-      {!allocations ? (
-        <MissingSection
-          title="Active Allocations"
-          what="The active allocations"
-          detail={whyMissing(indexer, 'allocations')}
+        <AllocationsPanel
+          allocations={allocations}
+          closedAllocations={closedAllocations}
+          whyAllocations={whyMissing(indexer, 'allocations')}
+          whyClosed={whyMissing(indexer, 'closedAllocations')}
+          statusDeployments={statusData?.deployments}
+          statusSummary={statusData ? {
+            syncedCount: statusData.syncedCount,
+            syncingCount: statusData.syncingCount,
+            failedCount: statusData.failedCount,
+            unreachableCount: statusData.unreachableCount,
+          } : undefined}
+          statusLoading={statusLoading}
+          node={node}
+          foghornSuccess={(hash) => foghornAllocQos?.get(hash)?.successRate}
+          currentEpoch={network?.currentEpoch ?? 0}
+          epochLength={network?.epochLength ?? 0}
+          nowSec={nowSec}
         />
-      ) : allocations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Active Allocations</CardTitle>
-              <div className="flex items-center gap-3 text-xs">
-                {statusData && (
-                  <>
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-[var(--green)]" />
-                      {statusData.syncedCount} synced
-                    </span>
-                    {statusData.syncingCount > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--amber)]" />
-                        {statusData.syncingCount} syncing
-                      </span>
-                    )}
-                    {statusData.failedCount > 0 && (
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[var(--red)]" />
-                        {statusData.failedCount} failed
-                      </span>
-                    )}
-                    {node?.kind === 'checking' ? (
-                      <span className="flex items-center gap-1.5 text-[var(--text-faint)]">
-                        <span className="w-2 h-2 rounded-full bg-[var(--text-faint)] animate-pulse" />
-                        checking the node
-                      </span>
-                    ) : statusData.unreachableCount > 0 ? (
-                      <span
-                        className="flex items-center gap-1.5 text-[var(--text-faint)]"
-                        title={node?.kind === 'unreachable' ? `The indexer's node did not answer: ${node.note}` : undefined}
-                      >
-                        {statusData.unreachableCount} unreachable
-                        {node?.kind === 'unreachable' && <span className="text-[10px]">({node.note})</span>}
-                      </span>
-                    ) : null}
-                    {node?.kind === 'reachable' && node.note && (
-                      <span className="text-[10px] text-[var(--text-faint)]">{node.note}</span>
-                    )}
-                    <span className="w-px h-3 bg-[var(--border)]" />
-                  </>
-                )}
-                {statusUpdatedAt > 0 ? (
-                  <span
-                    className="flex items-center gap-1 text-[10px] text-[var(--text-faint)] tabular-nums"
-                    title="Status fetched live from the indexer's own node · refreshes every 30s"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--green)] animate-pulse shrink-0" />
-                    {new Date(statusUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                ) : statusLoading ? (
-                  <span className="text-[10px] text-[var(--text-faint)]">Loading…</span>
-                ) : null}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <SortHeader label="Deployment" sortKey="deployment" sort={allocSort} onSort={sortAllocationsBy} />
-                    <SortHeader label="Status" sortKey="status" sort={allocSort} onSort={sortAllocationsBy} />
-                    <SortHeader label="Query Success" sortKey="querySuccess" sort={allocSort} onSort={sortAllocationsBy} align="right" title="Foghorn: share of queries answered with HTTP 200 on this deployment (QoS oracle). Reveals synced-but-erroring allocations." />
-                    <SortHeader label="Blocks Behind" sortKey="blocksBehind" sort={allocSort} onSort={sortAllocationsBy} align="right" className="hidden sm:table-cell" />
-                    <SortHeader label="Allocated" sortKey="allocated" sort={allocSort} onSort={sortAllocationsBy} align="right" />
-                    <SortHeader label="Signalled" sortKey="signalled" sort={allocSort} onSort={sortAllocationsBy} align="right" className="hidden lg:table-cell" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {sortAllocations(
-                    allocationsWithStatus(allocations, statusData?.deployments),
-                    allocSort,
-                    (hash) => foghornAllocQos?.get(hash)?.successRate,
-                  )
-                    .slice(allocPage * ALLOC_PAGE_SIZE, (allocPage + 1) * ALLOC_PAGE_SIZE)
-                    .map((dep) => {
-                    const statusColor = {
-                      synced: 'var(--green)',
-                      syncing: 'var(--amber)',
-                      failed: 'var(--red)',
-                      unreachable: 'var(--text-faint)',
-                    }[dep.status];
-                    const statusLabel = {
-                      synced: 'Synced',
-                      syncing: 'Syncing',
-                      failed: 'Failed',
-                      // `unreachable` is also what an unfinished first probe reads as, so it says
-                      // which of the two it is rather than asserting the node is down.
-                      unreachable:
-                        statusLoading || node?.kind === 'checking' ? 'Checking' : '—',
-                    }[dep.status];
-
-                    return (
-                      <tr key={dep.allocationId} className="hover:bg-[var(--bg-elevated)]">
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-0.5">
-                            <Link
-                              href={dep.ipfsHash ? `/subgraphs/${dep.ipfsHash}` : '#'}
-                              className="text-sm text-[var(--text)] hover:text-[var(--accent-text)] transition-colors truncate max-w-[200px]"
-                            >
-                              {dep.displayName ?? shortenAddress(dep.deploymentId)}
-                            </Link>
-                            {dep.ipfsHash ? (
-                              <CopyableId
-                                value={dep.ipfsHash}
-                                title="Copy hash"
-                                display={truncatedQm(dep.ipfsHash)}
-                                className="text-[10px] text-[var(--text-faint)]"
-                              />
-                            ) : (
-                              <span className="text-[10px] font-mono text-[var(--text-faint)]">
-                                {shortenAddress(dep.deploymentId)}
-                              </span>
-                            )}
-                            <CopyableId
-                              value={dep.allocationId}
-                              title="Copy allocation ID"
-                              display={shortenAddress(dep.allocationId)}
-                              className="text-[10px] text-[var(--text-faint)]"
-                            />
-                            {dep.network ? (
-                              <span className="text-[10px] text-[var(--text-faint)]">{dep.network}</span>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: statusColor }} />
-                            <span className="text-sm" style={{ color: statusColor }}>
-                              {statusLabel}
-                            </span>
-                          </div>
-                          {dep.status === 'syncing' && dep.syncProgress != null && (
-                            <div className="mt-1.5 w-24 h-1 rounded-full bg-[var(--bg)] overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-[var(--amber)] transition-all"
-                                style={{ width: `${dep.syncProgress}%` }}
-                              />
-                            </div>
-                          )}
-                          {dep.status === 'failed' && dep.fatalError && (
-                            <p className="text-[10px] text-[var(--red-text)] mt-0.5 max-w-[200px] truncate" title={dep.fatalError}>
-                              {dep.fatalError}
-                            </p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {(() => {
-                            const q = dep.ipfsHash ? foghornAllocQos?.get(dep.ipfsHash) : undefined;
-                            if (!q || q.successRate == null) {
-                              return <span className="text-sm text-[var(--text-faint)]" title="No recent query traffic measured (QoS oracle)">—</span>;
-                            }
-                            const pct = q.successRate * 100;
-                            const color = pct >= 90 ? 'var(--green)' : pct >= 50 ? 'var(--amber)' : 'var(--red)';
-                            return (
-                              <span className="font-mono text-sm" style={{ color }} title={`${q.queryCount?.toLocaleString()} queries`}>
-                                {pct.toFixed(pct < 100 ? 1 : 0)}%
-                              </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="px-4 py-3 text-right hidden sm:table-cell">
-                          {dep.blocksBehind != null ? (
-                            <span className={cn(
-                              'font-mono text-sm',
-                              dep.blocksBehind <= 50 ? 'text-[var(--green)]' : dep.blocksBehind <= 500 ? 'text-[var(--amber)]' : 'text-[var(--red-text)]'
-                            )}>
-                              {dep.blocksBehind === 0 ? 'At head' : dep.blocksBehind.toLocaleString()}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-[var(--text-faint)]">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="font-mono text-sm text-[var(--text)]">
-                            {formatGRT(weiToGRT(dep.allocatedTokens))}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right hidden lg:table-cell">
-                          <span className="font-mono text-sm text-[var(--green)]">
-                            {formatGRT(weiToGRT(dep.signalledTokens))}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {allocations.length > ALLOC_PAGE_SIZE && (
-              <Pagination
-                page={allocPage}
-                pageSize={ALLOC_PAGE_SIZE}
-                totalItems={allocations.length}
-                onPageChange={setAllocPage}
-              />
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Closed / Historical Allocations */}
-      {!closedAllocations ? (
-        <MissingSection
-          title="Closed Allocations"
-          what="The closed allocations"
-          detail={whyMissing(indexer, 'closedAllocations')}
-        />
-      ) : closedAllocations.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Closed Allocations</CardTitle>
-              <span className="text-[10px] text-[var(--text-faint)]">
-                Most recent {closedAllocations.length}
-              </span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ClosedAllocationsTable allocations={closedAllocations} />
-          </CardContent>
-        </Card>
-      )}
-      </>
       )}
 
       {activeTab === 'history' && (

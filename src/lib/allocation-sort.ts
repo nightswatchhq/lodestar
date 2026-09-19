@@ -1,4 +1,14 @@
-export type AllocationSortKey = 'deployment' | 'status' | 'querySuccess' | 'blocksBehind' | 'allocated' | 'signalled';
+export type AllocationSortKey =
+  | 'deployment'
+  | 'status'
+  | 'querySuccess'
+  | 'blocksBehind'
+  | 'allocated'
+  | 'signalled'
+  | 'age'
+  | 'rewards'
+  | 'fees'
+  | 'closed';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -16,11 +26,17 @@ export interface SortableAllocation {
   blocksBehind?: number | null;
   allocatedTokens: string;
   signalledTokens: string;
+  createdAtEpoch?: number;
+  closedAtEpoch?: number | null;
+  closedAt?: number | null;
+  indexingRewards?: string | null;
+  queryFeesCollected?: string | null;
+  lifecycle?: 'active' | 'closed';
 }
 
 const STATUS_ORDER: Record<SortableAllocation['status'], number> = { synced: 0, syncing: 1, failed: 2, unreachable: 3 };
 
-/** Names and status read best from the top of the alphabet or the healthiest; amounts and lag from the largest. */
+/** Names and status read best from the top of the alphabet or the healthiest; amounts, age and lag from the largest. */
 export function defaultDirection(key: AllocationSortKey): SortDirection {
   return key === 'deployment' || key === 'status' ? 'asc' : 'desc';
 }
@@ -54,6 +70,15 @@ function value(row: SortableAllocation, key: AllocationSortKey, successRate: (ip
       return wei(row.allocatedTokens);
     case 'signalled':
       return wei(row.signalledTokens);
+    case 'age':
+      if (row.createdAtEpoch == null) return null;
+      return (row.closedAtEpoch ?? 1_000_000_000) - row.createdAtEpoch;
+    case 'rewards':
+      return row.indexingRewards != null ? wei(row.indexingRewards) : null;
+    case 'fees':
+      return row.queryFeesCollected != null ? wei(row.queryFeesCollected) : null;
+    case 'closed':
+      return row.closedAt ?? row.closedAtEpoch ?? null;
   }
 }
 
