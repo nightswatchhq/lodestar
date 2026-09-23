@@ -259,6 +259,18 @@ export interface SubgraphDeployment {
   categories: string[];
 }
 
+/** One deployment's directory row by IPFS hash, or null when kittiwake has none. */
+export async function fetchSubgraphDeployment(hash: string): Promise<SubgraphDeployment | null> {
+  const response = await fetchShedAware(apiUrl(`/api/subgraph-deployment/${encodeURIComponent(hash)}`));
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Deployment fetch failed: ${response.status}`);
+  const rows = parseResponse<SubgraphDeployment[]>('/api/subgraph-deployment', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'displayName'] },
+    pick: 'data',
+  });
+  return rows.find((r) => r.ipfsHash === hash) ?? null;
+}
+
 export async function fetchSubgraphDeployments(params: {
   first?: number;
   skip?: number;

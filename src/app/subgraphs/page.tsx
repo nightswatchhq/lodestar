@@ -15,6 +15,7 @@ import { useSubgraphDirectory, useNetworkStats } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio } from '@/lib/allocation-ratio';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
+import { WatchStar } from '@/components/ui/WatchStar';
 import { fetchSubgraphDirectory, fetchSubgraphSearch, type DirectoryFacet, type DirectoryRow } from '@/lib/api';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import {
@@ -741,6 +742,7 @@ function SubgraphDirectory() {
                     ) : null}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <WatchStar kind="subgraph" id={row.ipfsHash} />
                     <ComplexityCell complexity={row.complexity} />
                     <NetworkCell network={row.network} />
                     {row.indexerCount <= 1 && (
@@ -882,6 +884,7 @@ function SubgraphDirectory() {
                     <td className={cn(pad, 'text-sm text-[var(--text-faint)]', tdBorder)}>{state.page * PAGE_SIZE + idx + 1}</td>
                     <td className={cn(pad, tdBorder)}>
                       <div className="flex items-center gap-2">
+                        <WatchStar kind="subgraph" id={row.ipfsHash} className="-ml-1" />
                         <div className="flex flex-col min-w-0">
                           <Link
                             href={`/subgraphs/${row.ipfsHash}`}
