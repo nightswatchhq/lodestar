@@ -529,10 +529,6 @@ export interface IndexersResponse {
  */
 // SERVICE_PROVISIONS_QUERY - use inline fetch in api.ts instead of gql tagged template
 
-/**
- * Provision thaw requests
- */
-// THAW_REQUESTS_QUERY - use inline fetch in api.ts instead of gql tagged template
 
 // =============================================================================
 // HORIZON TYPES
@@ -724,15 +720,74 @@ export interface DataService {
 }
 
 /**
- * Thaw request for a provision
+ * A provision thaw request not yet fulfilled. `tokens` and `valid` are contract reads, null when
+ * the chain was not read; `valid: false` means a slash invalidated it and it releases nothing.
  */
 export interface ThawRequest {
   id: string;
   shares: string;
-  tokens: string;
-  thawingUntil: string;
-  type: string;
-  fulfilled: boolean;
+  tokens: string | null;
+  thawingUntil: number | null;
+  createdAt: number | null;
+  txHash: string | null;
+  nonce: string | null;
+  valid: boolean | null;
+}
+
+/** PPM per payment type, each null when unread. */
+export interface DelegationFeeCuts {
+  queryFee: number | null;
+  indexingFee: number | null;
+  indexingRewards: number | null;
+}
+
+/** Decimal strings: a range's max can be 2^64 - 1, past what a JS number holds. */
+export interface ParamRange {
+  min: string;
+  max: string;
+}
+
+export interface ProvisionDetailService {
+  dataService: string;
+  tokensProvisioned: string;
+  tokensThawing: string;
+  maxVerifierCut: string | null;
+  thawingPeriod: string | null;
+  maxVerifierCutPending: number | null;
+  thawingPeriodPending: string | null;
+  thawingPeriodRange: ParamRange | null;
+  verifierCutRange: ParamRange | null;
+  delegationFeeCuts: DelegationFeeCuts;
+  /** HorizonStaking's own count of the list below, to tell when the index is behind. */
+  thawRequestCount: number | null;
+  thawRequests: ThawRequest[];
+}
+
+export type ProvisionActivityKind =
+  | 'ProvisionCreated'
+  | 'ProvisionIncreased'
+  | 'ProvisionThawed'
+  | 'TokensDeprovisioned'
+  | 'ProvisionSlashed'
+  | 'ThawRequestCreated'
+  | 'ThawRequestFulfilled'
+  | 'DelegationFeeCutSet';
+
+export interface ProvisionActivityEvent {
+  kind: ProvisionActivityKind;
+  dataService: string | null;
+  tokens: string | null;
+  shares: string | null;
+  thawingUntil: number | null;
+  thawRequestId: string | null;
+  valid: boolean | null;
+  paymentType: number | null;
+  feeCut: string | null;
+  /** Rows folded into this one: restaked rewards arrive as dozens of increases per transaction. */
+  events: number;
+  blockNumber: number | null;
+  timestamp: number | null;
+  txHash: string | null;
 }
 
 /**
@@ -789,8 +844,13 @@ export interface ServiceProvisionsResponse {
   provisions: ProvisionWithIndexer[];
 }
 
-export interface ThawRequestsResponse {
-  thawRequests: ThawRequest[];
+export interface ProvisionDetailResponse {
+  indexer: string;
+  /** The block the contract reads were made at, or null when the chain was not read. */
+  chain: { block: number; readAt: number } | null;
+  services: ProvisionDetailService[];
+  activity: ProvisionActivityEvent[];
+  degraded?: { part: string; reason: string }[];
 }
 
 // =============================================================================

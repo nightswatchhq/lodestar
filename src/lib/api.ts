@@ -3,6 +3,7 @@ import {
   type EpochHistoryResponse,
   type IndexersResponse,
   type IndexerProvisionsResponse,
+  type ProvisionDetailResponse,
   type DelegatorPortfolioResponse,
   type CuratorPortfolioResponse,
   type PaymentsOverview,
@@ -206,6 +207,18 @@ export async function fetchIndexerProvisions(indexer: string): Promise<IndexerPr
   return parseResponse('/api/provisions', await response.json(), {
     objects: ['data'],
     arrays: ['data.provisions'],
+    pick: 'data',
+  });
+}
+
+/** Thaw requests, fee cuts, service ranges and Horizon activity for one indexer's provisions. */
+export async function fetchProvisionDetail(indexer: string): Promise<ProvisionDetailResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/provisions/detail?indexer=${encodeURIComponent(indexer)}`));
+  if (!response.ok) throw new Error(`Provision detail failed: ${response.status}`);
+  return parseResponse('/api/provisions/detail', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.services', 'data.activity'],
+    rows: { 'data.services': ['dataService', 'delegationFeeCuts', 'thawRequests'] },
     pick: 'data',
   });
 }

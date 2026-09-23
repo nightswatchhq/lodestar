@@ -4,7 +4,7 @@ import { use, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { redirect, useRouter, useSearchParams } from 'next/navigation';
 import { useAccount } from 'wagmi';
-import { useGRTPrice, useNetworkStats, useIndexerProvisions, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useIndexerProvisions, useProvisionDetail, useREOStatus, useIndexerDetail, useRecentDelegations, useENSName, useEnrichedIndexers, useIndexerStatus, useIndexerPayments, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import {
   weiToGRT,
   formatGRT,
@@ -31,6 +31,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 
 import { DelegationCalculator } from '@/components/ui/DelegationCalculator';
 import { ProvisionsPanel } from '@/components/ui/ProvisionsPanel';
+import { ProvisionDetail } from '@/components/ui/ProvisionDetail';
 import { isUnavailable, useQueryState } from '@/hooks/useQueryState';
 import { DelegationFeed } from '@/components/feed/DelegationFeed';
 import { AprProvenancePanel } from '@/components/indexer/AprProvenancePanel';
@@ -97,6 +98,7 @@ function IndexerDetailInner({ address }: { address: string }) {
   const { address: connected } = useAccount();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const provisionDetail = useQueryState(useProvisionDetail(address, searchParams.get('tab') === 'provisions'));
 
   // Pull pre-computed fields from enriched cache (rolling APY, score)
   const enrichedIndexer = enrichedData?.indexers?.find(
@@ -860,12 +862,15 @@ function IndexerDetailInner({ address }: { address: string }) {
       )}
 
       {activeTab === 'provisions' && (
-      <ProvisionsPanel
-        provisions={provisionsData?.provisions ?? []}
-        isLoading={provisions.kind === 'loading'}
-        unavailable={isUnavailable(provisions)}
-        selfStakeGRT={selfStake}
-      />
+        <>
+          <ProvisionsPanel
+            provisions={provisionsData?.provisions ?? []}
+            isLoading={provisions.kind === 'loading'}
+            unavailable={isUnavailable(provisions)}
+            selfStakeGRT={selfStake}
+          />
+          <ProvisionDetail state={provisionDetail} nowSec={nowSec} />
+        </>
       )}
     </div>
   );
