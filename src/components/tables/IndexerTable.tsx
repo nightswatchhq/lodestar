@@ -48,6 +48,7 @@ import {
 } from '@/lib/indexer-directory';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { toCsv } from '@/lib/csv';
+import { WatchStar } from '@/components/ui/WatchStar';
 
 // Rows per page, and the measured height of a loaded row (name + address is two
 // lines). The loading skeleton mirrors both so the table doesn't grow when data
@@ -531,6 +532,7 @@ function IndexerDirectoryTable() {
           return (
             <div>
               <p className="font-medium text-[var(--text)] hover:text-[var(--accent-text)] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap">
+                <WatchStar kind="indexer" id={row.address} className="-ml-1" />
                 <Link href={`/indexers/${row.address}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
                   {info.getValue() ?? shortenAddress(row.address)}
                 </Link>
@@ -1040,6 +1042,7 @@ function IndexerDirectoryTable() {
                           />
                         </div>
                         <div className="flex items-center gap-1 mt-1 flex-shrink-0">
+                          <WatchStar kind="indexer" id={d.address} />
                           <div className={cn(
                             'w-2 h-2 rounded-full',
                             d.reoStatus === 'eligible' ? 'bg-[var(--green)]'

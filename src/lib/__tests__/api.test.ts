@@ -9,6 +9,7 @@ import {
   fetchDelegatorPortfolio,
   fetchCuratorPortfolio,
   fetchSubgraphDeployments,
+  fetchSubgraphDeployment,
   fetchManifestAnalysis,
   fetchTokenMetrics,
   fetchDelegationFlows,
@@ -188,6 +189,15 @@ describe('api: URL building', () => {
     expect(mockFetch.mock.calls[0][0]).toBe(
       '/api/subgraph-deployments?hash=Qm%2Fneeds%2Bescaping',
     );
+  });
+
+  it('reads one deployment by hash from its own route, and only that one', async () => {
+    const row = (ipfsHash: string) => ({ id: '0x1', ipfsHash, signalledTokens: '1', stakedTokens: '1', displayName: 'x' });
+    mockFetch.mockResolvedValue(jsonResponse({ data: [row('QmOther'), row('QmWanted')] }));
+    expect((await fetchSubgraphDeployment('QmWanted'))?.ipfsHash).toBe('QmWanted');
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/subgraph-deployment/QmWanted');
+    mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    expect(await fetchSubgraphDeployment('QmGone')).toBeNull();
   });
 
   it('builds delegation-flows URL with compare flag', async () => {

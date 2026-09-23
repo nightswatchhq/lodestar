@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { CopyButton } from '@/components/ui/CopyButton';
+import { WatchStar } from '@/components/ui/WatchStar';
 import { cn, formatGRT, formatPPM, formatPercent, formatRelativeTime, shortenAddress, weiToGRT } from '@/lib/utils';
 import { plainGRT } from '@/lib/subgraph-service-stake';
 import { ACCRUED_TOOLTIP, type AccruedTotal } from '@/lib/pending-rewards';
@@ -63,6 +64,7 @@ export function IndexerCompactHeader({
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
             <h1 className="text-base sm:text-lg font-semibold text-[var(--text)] truncate">{name}</h1>
+            <WatchStar kind="indexer" id={address} />
             {reoStatus?.status ? (
               <span className="hidden sm:inline-flex flex-shrink-0">
                 <Badge
