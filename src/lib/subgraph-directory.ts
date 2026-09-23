@@ -6,6 +6,8 @@
  * other pages (#252). A preset is just a set of these keys, and a saved view is a named query string.
  */
 
+import { parseColumnChoices } from '@/lib/table-prefs';
+
 export const DIRECTORY_PAGE_SIZE = 25;
 
 export type FeeWindow = '30d' | 'allTime';
@@ -181,7 +183,8 @@ export function applyPreset(id: Preset['id']): DirectoryState {
 
 // ---------- saved views ----------
 
-export type SavedView = { name: string; query: string };
+/** A view keeps its columns too, when the table had any chosen. */
+export type SavedView = { name: string; query: string; columns?: Record<string, boolean> };
 
 const STORAGE_KEY = 'lodestar:subgraph-views';
 
@@ -191,10 +194,15 @@ export function loadSavedViews(storage: Pick<Storage, 'getItem'> | undefined): S
     const raw = storage?.getItem(STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed)
-      ? parsed.filter(
-          (v): v is SavedView =>
-            typeof v === 'object' && v !== null && typeof v.name === 'string' && typeof v.query === 'string',
-        )
+      ? parsed
+          .filter(
+            (v): v is SavedView =>
+              typeof v === 'object' && v !== null && typeof v.name === 'string' && typeof v.query === 'string',
+          )
+          .map((v) => {
+            const columns = parseColumnChoices(v.columns);
+            return Object.keys(columns).length ? { name: v.name, query: v.query, columns } : { name: v.name, query: v.query };
+          })
       : [];
   } catch {
     return [];
@@ -215,10 +223,12 @@ export function saveView(
   storage: Pick<Storage, 'getItem' | 'setItem'> | undefined,
   name: string,
   state: DirectoryState,
+  columns: Record<string, boolean> = {},
 ): SavedView[] {
   const trimmed = name.trim();
   if (!trimmed) return loadSavedViews(storage);
-  const view = { name: trimmed, query: filterParams(state).toString() };
+  const view: SavedView = { name: trimmed, query: filterParams(state).toString() };
+  if (Object.keys(columns).length) view.columns = columns;
   const rest = loadSavedViews(storage).filter((v) => v.name !== trimmed);
   return store(storage, [...rest, view]);
 }

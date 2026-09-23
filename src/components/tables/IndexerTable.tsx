@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,6 +14,8 @@ import {
   type SortingState,
   type RowSelectionState,
   type FilterFn,
+  type Updater,
+  type VisibilityState,
 } from '@tanstack/react-table';
 import { useEnrichedIndexers, useIndexers, useNetworkStats } from '@/hooks/useNetworkStats';
 import { useFoghornGrades } from '@/hooks/useFoghorn';
@@ -32,6 +35,17 @@ import {
 import type { Indexer } from '@/lib/queries';
 import type { EnrichedIndexer } from '@/lib/enriched';
 import { CopyableId } from '@/components/ui/CopyableId';
+import { TableControls } from '@/components/ui/TableControls';
+import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
+import { useTablePrefs } from '@/hooks/useTablePrefs';
+import { isColumnVisible, type ColumnSpec } from '@/lib/table-prefs';
+import {
+  MIN_STAKE_OPTIONS,
+  applyIndexerDirectoryState,
+  parseIndexerDirectoryState,
+  type IndexerDirectoryState,
+  type IndexerSortKey,
+} from '@/lib/indexer-directory';
 
 // Rows per page, and the measured height of a loaded row (name + address is two
 // lines). The loading skeleton mirrors both so the table doesn't grow when data
@@ -98,6 +112,34 @@ export const nameAddressFilter: FilterFn<IndexerRow> = (row, _columnId, filterVa
 };
 
 const columnHelper = createColumnHelper<IndexerRow>();
+
+/** What the column picker offers. The name, selection and link columns always stay. */
+export const INDEXER_COLUMNS: readonly ColumnSpec[] = [
+  { id: 'score', label: 'Score' },
+  { id: 'foghornGrade', label: 'Foghorn' },
+  { id: 'qScore', label: 'QoS' },
+  { id: 'selfStake', label: 'Self-Stake' },
+  { id: 'delegated', label: 'Delegated' },
+  { id: 'capacity', label: 'Capacity' },
+  { id: 'rewardCut', label: 'Reward Cut' },
+  { id: 'queryCut', label: 'Query Cut', defaultVisible: false },
+  { id: 'apr', label: 'APR' },
+  { id: 'rollingAPY30d', label: 'APY 30d', defaultVisible: false },
+  { id: 'rollingAPY90d', label: 'APY 90d' },
+  { id: 'feesCollected', label: 'Fees' },
+  { id: 'rewards', label: 'Rewards', defaultVisible: false },
+  { id: 'allocated', label: 'Allocated', defaultVisible: false },
+  { id: 'allocations', label: 'Allocations' },
+];
+
+const MIN_STAKE_LABELS: Record<(typeof MIN_STAKE_OPTIONS)[number], string> = {
+  0: 'Any',
+  100_000: '100K GRT',
+  500_000: '500K GRT',
+  1_000_000: '1M GRT',
+  5_000_000: '5M GRT',
+  10_000_000: '10M GRT',
+};
 
 function foghornFlagsFor(
   map: Map<string, { verdictCount: number; needsAttention: boolean; sybilFlag: boolean }> | undefined,
@@ -254,11 +296,54 @@ function HeaderTip({ label, tip }: { label: string; tip: string }) {
 }
 
 export function IndexerTable() {
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: 'score', desc: true },
-  ]);
-  const [globalFilter, setGlobalFilter] = useState('');
-  const [minStake, setMinStake] = useState(100000);
+  return (
+    // useSearchParams bails out of prerendering up to here; the fallback holds the table's height.
+    <Suspense fallback={<ChartSkeleton height="2000px" />}>
+      <IndexerDirectoryTable />
+    </Suspense>
+  );
+}
+
+function IndexerDirectoryTable() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlState = useMemo(() => parseIndexerDirectoryState(searchParams), [searchParams]);
+  const { sort, minStake } = urlState;
+  const sorting: SortingState = useMemo(() => (sort ? [sort] : []), [sort]);
+
+  const navigate = (patch: Partial<IndexerDirectoryState>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    applyIndexerDirectoryState(params, { ...urlState, ...patch });
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  };
+
+  // Typed locally so the caret keeps up, and taken from the URL again on back or forward.
+  const [globalFilter, setGlobalFilter] = useState(urlState.q);
+  const [lastUrlQ, setLastUrlQ] = useState(urlState.q);
+  if (urlState.q !== lastUrlQ) {
+    setLastUrlQ(urlState.q);
+    setGlobalFilter(urlState.q);
+  }
+  const setSearch = (q: string) => {
+    setGlobalFilter(q);
+    setLastUrlQ(q);
+    navigate({ q });
+  };
+  const setSorting = (updater: Updater<SortingState>) => {
+    const next = typeof updater === 'function' ? updater(sorting) : updater;
+    const first = next[0];
+    navigate({ sort: first ? { id: first.id as IndexerSortKey, desc: first.desc } : null });
+  };
+
+  const { columns: columnChoices, density, setColumns, setDensity } = useTablePrefs('indexers');
+  const columnVisibility: VisibilityState = useMemo(
+    () => Object.fromEntries(INDEXER_COLUMNS.map((c) => [c.id, isColumnVisible(c, columnChoices)])),
+    [columnChoices],
+  );
+  const cellPad = density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-4';
+
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [showComparison, setShowComparison] = useState(false);
 
@@ -632,6 +717,12 @@ export function IndexerTable() {
           );
         },
       }),
+      columnHelper.accessor('queryCut', {
+        header: () => <HeaderTip label="Query Cut" tip="The % of query fees the indexer keeps before the rest goes to delegators." />,
+        cell: (info) => (
+          <span className="font-mono text-[var(--text)]">{formatPPM(info.getValue())}</span>
+        ),
+      }),
       columnHelper.accessor('apr', {
         header: () => <HeaderTip label="APR" tip="Forward-looking annualised return based on live allocations. Calculated against active delegation only; thawing tokens are excluded so they don't depress the figure. Snapshot, not a guarantee." />,
         cell: (info) => {
@@ -646,6 +737,19 @@ export function IndexerTable() {
             </span>
           );
         },
+      }),
+      columnHelper.accessor('rollingAPY30d', {
+        header: () => <HeaderTip label="APY 30d" tip="Compounded return over the last 30 days from delegation pool share growth." />,
+        cell: (info) => {
+          const value = info.getValue();
+          if (value === null) return <span className="text-[var(--text-faint)]">—</span>;
+          return (
+            <span className={cn('font-mono', value > 5 ? 'text-[var(--green)]' : 'text-[var(--text)]')}>
+              {value.toFixed(2)}%
+            </span>
+          );
+        },
+        sortUndefined: 'last',
       }),
       columnHelper.accessor('rollingAPY90d', {
         header: () => <HeaderTip label="APY 90d" tip="Compounded return over the last 90 days from delegation pool share growth. Per-share rate, immune to thawing distortion. Hover a value to see 30d APY." />,
@@ -683,6 +787,18 @@ export function IndexerTable() {
         },
         sortUndefined: 'last',
       }),
+      columnHelper.accessor('rewards', {
+        header: () => <HeaderTip label="Rewards" tip="Lifetime indexing rewards earned, indexer and delegators together." />,
+        cell: (info) => (
+          <span className="font-mono text-[var(--text)]">{formatGRT(info.getValue())} GRT</span>
+        ),
+      }),
+      columnHelper.accessor('allocated', {
+        header: () => <HeaderTip label="Allocated" tip="GRT currently allocated across the indexer's open allocations." />,
+        cell: (info) => (
+          <span className="font-mono text-[var(--text)]">{formatGRT(info.getValue())} GRT</span>
+        ),
+      }),
       columnHelper.accessor('allocations', {
         header: () => <HeaderTip label="Allocations" tip="Number of active subgraph allocations. More allocations generally means broader network coverage, but quality matters more than quantity." />,
         cell: (info) => (
@@ -712,11 +828,13 @@ export function IndexerTable() {
       sorting,
       globalFilter,
       rowSelection,
+      columnVisibility,
     },
     enableRowSelection: true,
+    enableMultiSort: false,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
+    onGlobalFilterChange: setSearch,
     globalFilterFn: nameAddressFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -820,7 +938,7 @@ export function IndexerTable() {
               type="text"
               placeholder="Search by name, address, or URL..."
               value={globalFilter}
-              onChange={(e) => setGlobalFilter(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className={cn(
                 'w-full px-3 py-2 text-sm rounded-[var(--radius-button)]',
                 'bg-[var(--bg-elevated)] border border-[var(--border)]',
@@ -835,7 +953,7 @@ export function IndexerTable() {
               <select
                 aria-label="Min stake"
                 value={minStake}
-                onChange={(e) => setMinStake(Number(e.target.value))}
+                onChange={(e) => navigate({ minStake: Number(e.target.value) })}
                 className={cn(
                   'appearance-none pl-3 pr-8 py-2 text-sm rounded-[var(--radius-button)]',
                   'bg-[var(--bg-elevated)] border border-[var(--border)]',
@@ -843,16 +961,21 @@ export function IndexerTable() {
                   'focus:outline-none focus:border-[var(--accent)]'
                 )}
               >
-                <option value={0}>Any</option>
-                <option value={100000}>100K GRT</option>
-                <option value={500000}>500K GRT</option>
-                <option value={1000000}>1M GRT</option>
-                <option value={5000000}>5M GRT</option>
-                <option value={10000000}>10M GRT</option>
+                {MIN_STAKE_OPTIONS.map((v) => (
+                  <option key={v} value={v}>{MIN_STAKE_LABELS[v]}</option>
+                ))}
               </select>
               <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
             </div>
           </div>
+          <TableControls
+            className="hidden md:flex"
+            specs={INDEXER_COLUMNS}
+            columns={columnChoices}
+            onColumnsChange={setColumns}
+            density={density}
+            onDensityChange={setDensity}
+          />
         </div>
 
         {/* Mobile card list */}
@@ -972,7 +1095,8 @@ export function IndexerTable() {
                       // cells beneath it with any header without this.
                       scope="col"
                       className={cn(
-                        'px-4 py-3 text-left text-[11px] font-medium text-[var(--text-muted)]',
+                        'text-left text-[11px] font-medium text-[var(--text-muted)]',
+                        density === 'compact' ? 'px-3 py-2' : 'px-4 py-3',
                         'border-r border-[var(--border)]/20 last:border-r-0',
                         header.column.getCanSort() && 'cursor-pointer select-none hover:text-[var(--text)]'
                       )}
@@ -995,8 +1119,8 @@ export function IndexerTable() {
               {isLoading ? (
                 Array.from({ length: PAGE_SIZE }).map((_, i) => (
                   <tr key={i} style={{ height: ROW_HEIGHT_PX }}>
-                    {columns.map((_, j) => (
-                      <td key={j} className="px-4 py-4">
+                    {table.getVisibleLeafColumns().map((_, j) => (
+                      <td key={j} className={cellPad}>
                         <div className="h-4 w-24 animate-pulse rounded bg-[var(--bg-elevated)]" />
                       </td>
                     ))}
@@ -1029,7 +1153,7 @@ export function IndexerTable() {
                     }}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-4 border-r border-[var(--border)]/20 last:border-r-0">
+                      <td key={cell.id} className={cn(cellPad, 'border-r border-[var(--border)]/20 last:border-r-0')}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
