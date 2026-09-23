@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountHits, indexerHits, pageHits, subgraphHits, subgraphSearchable } from '../omni-search';
+import { accountHits, actionHits, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable } from '../omni-search';
 import type { SubgraphSearchResult } from '../contracts/subgraph-search';
 
 const ADDR = '0x4e5c87772c29381bcabc58c3f182b6633b5a274a';
@@ -104,5 +104,39 @@ describe('pageHits', () => {
   it('puts a label prefix above a label that merely contains the query', () => {
     expect(pageHits(pages, 'index').map((h) => h.href)).toEqual(['/indexers', '/indexing', '/poi']);
     expect(pageHits(pages, 'oracle').map((h) => h.href)).toEqual(['/qos']);
+  });
+});
+
+describe('actionHits', () => {
+  it('runs a subgraph preset by its label or its description', () => {
+    const [hit] = actionHits('/', 'under-alloc');
+    expect(hit.label).toBe('Under-allocated');
+    expect(hit.href.startsWith('/subgraphs?')).toBe(true);
+    expect(actionHits('/', 'query fees').map((h) => h.label)).toContain('High query volume');
+  });
+
+  it('offers a saved view by name', () => {
+    const hits = actionHits('/', 'mine', [{ name: 'Mine on base', query: 'network=base' }]);
+    expect(hits).toEqual([expect.objectContaining({ label: 'Mine on base', href: '/subgraphs?network=base' })]);
+  });
+
+  it("opens a tab of the indexer being viewed, and only there", () => {
+    const tabs = (path: string) => actionHits(path, 'alloc').filter((h) => h.detail === 'this indexer');
+    expect(tabs(`/indexers/${ADDR}`).map((h) => h.href)).toEqual([`/indexers/${ADDR}?tab=allocations`]);
+    expect(tabs('/subgraphs')).toEqual([]);
+  });
+
+  it("copies the page's address or hash rather than navigating", () => {
+    expect(actionHits(`/delegators/${ADDR}`, 'copy')).toEqual([expect.objectContaining({ copy: ADDR, label: "Copy this page's address" })]);
+    expect(actionHits(`/subgraphs/${HASH}`, 'copy')[0]).toMatchObject({ copy: HASH, label: "Copy this page's hash" });
+    expect(actionHits('/indexers', 'copy')).toEqual([]);
+  });
+});
+
+describe('isEnsName', () => {
+  it('accepts plain .eth names and nothing else', () => {
+    expect(isEnsName('Vitalik.eth')).toBe(true);
+    expect(isEnsName('sub.name-1.eth')).toBe(true);
+    for (const bad of ['vitalik', 'vitalik.com', '.eth', 'vitalík.eth']) expect(isEnsName(bad)).toBe(false);
   });
 });

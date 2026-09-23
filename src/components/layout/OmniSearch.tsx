@@ -1,19 +1,30 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useEnrichedIndexers } from '@/hooks/useNetworkStats';
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
-import { fetchSubgraphSearch } from '@/lib/api';
+import { fetchENSAddress, fetchSubgraphSearch } from '@/lib/api';
+import { loadSavedViews } from '@/lib/subgraph-directory';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import { navigation } from './Sidebar';
-import { accountHits, indexerHits, pageHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
+import { accountHits, actionHits, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
 import { cn } from '@/lib/utils';
 
 const PAGES = navigation.flatMap((s) => s.items.map(({ label, href }) => ({ label, href })));
 
+/** Saved subgraph views live in this browser only; storage may be absent or refuse. */
+function savedViews() {
+  try {
+    return loadSavedViews(window.localStorage);
+  } catch {
+    return [];
+  }
+}
+
 const GROUPS: { kind: OmniKind; title: string }[] = [
+  { kind: 'action', title: 'Actions' },
   { kind: 'page', title: 'Pages' },
   { kind: 'indexer', title: 'Indexers' },
   { kind: 'subgraph', title: 'Subgraphs' },
@@ -30,6 +41,7 @@ function SearchIcon({ className }: { className?: string }) {
 
 export function OmniSearch() {
   const router = useRouter();
+  const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -67,6 +79,15 @@ export function OmniSearch() {
     queryFn: () => fetchSubgraphSearch(debounced),
   });
   const searchState = useQueryState(searchQuery);
+  const ensQuery = useQuery({
+    queryKey: ['ens-forward', debounced.toLowerCase()],
+    enabled: isEnsName(debounced),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+    queryFn: () => fetchENSAddress(debounced.toLowerCase()),
+  });
+  const ensState = useQueryState(ensQuery);
+  const ensAddress = ensState.kind === 'ready' && debounced === value.trim() ? ensState.data.address : null;
   const answer = searchState.kind === 'ready' ? searchState.data : undefined;
 
   const hits = useMemo<OmniHit[]>(() => {
@@ -74,14 +95,25 @@ export function OmniSearch() {
     if (q.length < 2) return [];
     // The subgraph answer is for the debounced query, so it is only shown while that still matches.
     const subgraphs = debounced === q ? subgraphHits(answer?.hits ?? []) : [];
-    return [...pageHits(PAGES, q), ...indexerHits(indexersQuery.data?.indexers ?? [], q), ...subgraphs, ...accountHits(q)];
-  }, [value, debounced, answer, indexersQuery.data]);
+    const indexers = indexersQuery.data?.indexers ?? [];
+    const ens = ensAddress ? [...indexerHits(indexers, ensAddress), ...accountHits(ensAddress)] : [];
+    const found = [
+      ...actionHits(pathname, q, savedViews()),
+      ...pageHits(PAGES, q),
+      ...indexerHits(indexers, q),
+      ...subgraphs,
+      ...accountHits(q),
+      ...ens,
+    ];
+    // An ENS name can match an indexer both by its name and by the address it resolves to.
+    return found.filter((h, i) => found.findIndex((o) => o.href === h.href && o.copy === h.copy) === i);
+  }, [value, debounced, answer, indexersQuery.data, ensAddress, pathname]);
 
   const q = value.trim();
   const show = open && q.length >= 1;
   const active = Math.max(0, hits.findIndex((h) => h.href === activeHref));
   const subgraphsPending = subgraphSearchable(q) && (debounced !== q || searchQuery.isFetching);
-  const searching = subgraphsPending || indexersState.kind === 'loading';
+  const searching = subgraphsPending || indexersState.kind === 'loading' || (isEnsName(q) && (debounced !== q || ensState.kind === 'loading'));
 
   function close() {
     setOpen(false);
@@ -90,7 +122,14 @@ export function OmniSearch() {
   }
 
   function go(hit: OmniHit) {
-    router.push(hit.href);
+    if (hit.copy) {
+      navigator.clipboard?.writeText(hit.copy).catch(() => {
+        // Refused by the browser (no permission, insecure context). The address is still in the
+        // URL bar, and a dropdown that has just closed has nowhere to say so.
+      });
+    } else {
+      router.push(hit.href);
+    }
     setValue('');
     close();
   }
@@ -116,6 +155,7 @@ export function OmniSearch() {
     if (searching) status = 'Searching…';
     else if (isUnavailable(indexersState)) status = `Indexers could not be searched: ${unavailableReason(indexersState)}`;
     else if (isUnavailable(searchState)) status = unavailableReason(searchState) ?? null;
+    else if (isEnsName(q) && isUnavailable(ensState)) status = `ENS names cannot be looked up right now, so “${q}” was not resolved.`;
     else if (subgraphSearchable(q)) status = emptySearchMessage(q, answer?.warmBacklog, 'pages, indexers or subgraphs');
     else status = `No pages or indexers found for “${q}”. A full 0x address or Qm… hash also searches subgraphs.`;
   }
@@ -192,7 +232,7 @@ export function OmniSearch() {
                     <p className="px-3.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wide text-[var(--text-faint)]">{title}</p>
                     {group.map(({ h, i }) => (
                       <button
-                        key={h.href}
+                        key={`${h.href}${h.copy ?? ''}`}
                         id={`omni-hit-${i}`}
                         role="option"
                         aria-selected={i === active}
