@@ -2,6 +2,9 @@
   "name": "lodestar",
   "version": "7.3.0",
   "private": true,
+  "engines": {
+    "node": "24.x"
+  },
   "license": "BUSL-1.1",
   "scripts": {
     "dev": "next dev",
