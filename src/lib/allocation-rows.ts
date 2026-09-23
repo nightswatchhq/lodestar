@@ -15,7 +15,10 @@ export type StatusDeployment = {
   fatalError?: string;
 };
 
-export type AllocationRow = StatusDeployment & { allocationId: string };
+export type AllocationRow = StatusDeployment & {
+  allocationId: string;
+  pendingRewards?: string | null;
+};
 
 /**
  * One row per open allocation, with node status joined from `/api/indexer-status`.
@@ -48,6 +51,7 @@ export function allocationsWithStatus(
       blocksBehind: status?.blocksBehind,
       syncProgress: status?.syncProgress,
       fatalError: status?.fatalError,
+      pendingRewards: a.pendingRewards,
     };
   });
 }

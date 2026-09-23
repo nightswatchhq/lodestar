@@ -26,6 +26,11 @@ export interface ActiveAllocation {
   allocatedTokens: string;
   createdAtEpoch: number;
   subgraphDeployment: AllocationDeployment;
+  /**
+   * Wei a POI would collect now, before cuts (kittiwake#162). Null where the chain read failed for
+   * this row; absent where kittiwake did not read it at all.
+   */
+  pendingRewards?: string | null;
 }
 
 export interface IndexerDetail {
@@ -67,6 +72,9 @@ export interface IndexerDetail {
   // Absent when kittiwake could not read them, which is not the same as empty.
   allocations?: ActiveAllocation[];
   closedAllocations?: ClosedAllocation[];
+  /** The block and unix time the cached pending-rewards read was taken at. */
+  pendingRewardsBlock?: number | null;
+  pendingRewardsAt?: number | null;
   delegators?: Array<{
     id: string;
     stakedTokens: string;

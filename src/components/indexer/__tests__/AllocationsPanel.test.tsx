@@ -45,12 +45,12 @@ function closed(): ClosedAllocation {
   };
 }
 
-function renderPanel(extra: Record<string, string> = {}) {
+function renderPanel(extra: Record<string, string> = {}, allocations: ActiveAllocation[] = [active()]) {
   for (const k of [...params.keys()]) params.delete(k);
   for (const [k, v] of Object.entries(extra)) params.set(k, v);
   return render(
     <AllocationsPanel
-      allocations={[active()]}
+      allocations={allocations}
       closedAllocations={[closed()]}
       whyAllocations="active failed"
       whyClosed="closed failed"
@@ -97,6 +97,30 @@ describe('AllocationsPanel', () => {
     expect(screen.getByText('force closed')).toBeInTheDocument();
     expect(screen.getByText('5.00')).toBeInTheDocument();
     expect(screen.queryByText('Live Subgraph')).toBeNull();
+  });
+
+  it('shows accrued rewards on active rows', () => {
+    renderPanel({}, [{ ...active(), pendingRewards: '3802500000000000000000' }]);
+    expect(screen.getByRole('columnheader', { name: /Accrued/ })).toBeInTheDocument();
+    expect(screen.getByText('3.80K')).toBeInTheDocument();
+  });
+
+  it('shows a dash, not zero, where no pending rewards were read', () => {
+    renderPanel();
+    expect(screen.getByTitle('Pending rewards were not read for this allocation.')).toHaveTextContent(/^—$/);
+  });
+
+  it('has no accrued column in the closed view', () => {
+    renderPanel({ view: 'closed' });
+    expect(screen.queryByRole('columnheader', { name: /Accrued/ })).toBeNull();
+  });
+
+  it('hides the accrued column from the column picker', () => {
+    renderPanel({}, [{ ...active(), pendingRewards: '3802500000000000000000' }]);
+    fireEvent.click(screen.getByRole('button', { name: /Columns/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Accrued' }));
+    expect(screen.queryByRole('columnheader', { name: /Accrued/ })).toBeNull();
+    expect(screen.queryByText('3.80K')).toBeNull();
   });
 
   it('writes the closed view into the URL', () => {

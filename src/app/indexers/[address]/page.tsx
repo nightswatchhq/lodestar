@@ -50,6 +50,7 @@ import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
 import { IndexerPagePending } from '@/components/indexer/IndexerPagePending';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
+import { accruedTotal } from '@/lib/pending-rewards';
 
 export default function IndexerDetailPage({
   params,
@@ -283,6 +284,8 @@ function IndexerDetailInner({ address }: { address: string }) {
         statedCutPPM={indexer.indexingRewardCut}
         effectiveCutPercent={effectiveCutPercent}
         rollingAPY30d={enrichedIndexer?.rollingAPY30d ?? null}
+        accrued={accruedTotal(allocations)}
+        accruedAt={indexer.pendingRewardsAt ?? null}
       />
 
       {operators == null ? (
