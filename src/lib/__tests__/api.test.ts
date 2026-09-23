@@ -198,6 +198,10 @@ describe('api: URL building', () => {
     expect(mockFetch.mock.calls[0][0]).toBe('/api/subgraph-deployment/QmWanted');
     mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
     expect(await fetchSubgraphDeployment('QmGone')).toBeNull();
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'bad_request', message: 'not a deployment hash' }, 400));
+    expect(await fetchSubgraphDeployment('QmNotAHash')).toBeNull();
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'internal' }, 500));
+    await expect(fetchSubgraphDeployment('QmWanted')).rejects.toThrow('500');
   });
 
   it('builds delegation-flows URL with compare flag', async () => {
