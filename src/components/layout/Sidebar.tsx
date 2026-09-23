@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { NightsWatchCTA } from '@/components/NightsWatchCTA';
 
@@ -285,8 +285,6 @@ export const navigation: NavSection[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [searchValue, setSearchValue] = useState('');
 
   // Collapsible sections: default collapsed unless the active path lives inside them
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
@@ -304,20 +302,6 @@ export function Sidebar() {
 
   const toggleSection = (title: string) => {
     setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
-  };
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const addr = searchValue.trim();
-    if (!addr) return;
-
-    if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
-      router.push(`/delegators/${addr}`);
-      setSearchValue('');
-    } else if (addr.endsWith('.eth')) {
-      router.push(`/delegators/${addr}`);
-      setSearchValue('');
-    }
   };
 
   return (
@@ -408,21 +392,6 @@ export function Sidebar() {
       {/* The Night's Watch — community CTA (dismissable per session) */}
       <NightsWatchCTA />
 
-      {/* Address search */}
-      <div className="p-3 border-t-[0.5px] border-[var(--border)]">
-        <form onSubmit={handleSearch} className="relative">
-          <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--text-faint)] pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-          </svg>
-          <input
-            type="text"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            placeholder="Search address..."
-            className="w-full pl-7 pr-3 py-2 text-[12px] text-[var(--text)] placeholder-[var(--text-faint)] bg-[var(--bg-elevated)] border-none rounded-[var(--radius-button)] outline-none focus:ring-1 focus:ring-[var(--accent)] transition-shadow"
-          />
-        </form>
-      </div>
     </aside>
   );
 }

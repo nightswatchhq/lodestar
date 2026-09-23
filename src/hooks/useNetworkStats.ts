@@ -134,10 +134,11 @@ export function useIndexers(params: {
 /**
  * Hook for enriched indexers (pre-computed by cron, the big win)
  */
-export function useEnrichedIndexers() {
+export function useEnrichedIndexers(enabled = true) {
   return useQuery({
     queryKey: ['enrichedIndexers'],
     queryFn: fetchEnrichedIndexers,
+    enabled,
     staleTime: TEN_MINUTES,
     refetchInterval: TEN_MINUTES,
     placeholderData: keepPreviousData,
