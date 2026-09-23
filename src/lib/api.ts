@@ -38,6 +38,7 @@ import type {
 } from '@/lib/contracts/subgraph-search';
 import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
 import type { IndexerTrendsResponse } from '@/lib/contracts/indexer-trends';
+import type { IndexerDelegatorsPage } from '@/lib/contracts/indexer-delegators';
 import type { IndexerQosResponse, QosDeploymentsResponse, QosScoreResponse } from '@/lib/contracts/indexer-qos';
 import type { DisassemblyReport } from '@/lib/disassembly/types';
 import type { DisassemblyDiff } from '@/lib/disassembly/diff';
@@ -916,6 +917,33 @@ export async function fetchIndexerDetail(address: string): Promise<IndexerDetail
     pick: 'data.indexer',
   });
   return degraded.length > 0 ? { ...indexer, degraded } : indexer;
+}
+
+/**
+ * One page of an indexer's delegators, or null from a kittiwake that does not serve the route yet
+ * (kittiwake#163), so the caller can fall back to the capped list and say that it has.
+ */
+export async function fetchIndexerDelegators(
+  address: string,
+  params: { first: number; skip: number; orderBy: string; orderDirection: 'asc' | 'desc' },
+): Promise<IndexerDelegatorsPage | null> {
+  const qs = new URLSearchParams({
+    first: String(params.first),
+    skip: String(params.skip),
+    orderBy: params.orderBy,
+    orderDirection: params.orderDirection,
+  });
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address.toLowerCase())}/delegators?${qs}`),
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Indexer delegators failed: ${response.status}`);
+  return parseResponse('/api/indexer/delegators', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.delegators': ['delegator', 'shareAmount', 'currentTokens', 'thawingTokens', 'delegatedAt', 'lastChangeAt'] },
+    present: ['data.total', 'data.pool'],
+    pick: 'data',
+  });
 }
 
 /**

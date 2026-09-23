@@ -78,6 +78,20 @@ describe('saved views', () => {
     expect(deleteView(storage, 'mine')).toEqual([]);
   });
 
+  it('keeps the columns chosen when the view was saved', () => {
+    const storage = memoryStorage();
+    saveView(storage, 'wide', parse('network=base'), { categories: true, curators: false });
+    saveView(storage, 'plain', parse('network=base'));
+    expect(loadSavedViews(storage)).toEqual([
+      { name: 'wide', query: 'network=base', columns: { categories: true, curators: false } },
+      { name: 'plain', query: 'network=base' },
+    ]);
+    const junk = memoryStorage({
+      'lodestar:subgraph-views': '[{"name":"a","query":"","columns":{"x":"yes"}}]',
+    });
+    expect(loadSavedViews(junk)).toEqual([{ name: 'a', query: '' }]);
+  });
+
   it('survives storage that refuses or holds something else', () => {
     const refusing = {
       getItem: () => {

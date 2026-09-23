@@ -45,6 +45,8 @@ let detail: Query<IndexerDetail | null>;
 
 vi.mock('@/hooks/useNetworkStats', () => ({
   useIndexerDetail: () => detail,
+  // A kittiwake without the delegators route, so the tab falls back to the list above.
+  useIndexerDelegators: () => answered(null),
   useGRTPrice: () => answered({ price: 0.1, change24h: 0 }),
   useNetworkStats: () =>
     answered({
@@ -152,7 +154,7 @@ describe('the indexer page when a section is missing', () => {
     detail = answered(without('delegators', 'nest_upstream'));
     await renderPage('delegators');
 
-    expect(await screen.findByRole('heading', { name: 'Top Delegators' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Delegators' })).toBeInTheDocument();
     expect(screen.getByText(/The delegator list could not be loaded/)).toBeInTheDocument();
     expect(screen.getByText(/The nest it is read from refused the read/)).toBeInTheDocument();
     // Nothing derived from the list: no rank, no share, no empty table standing in for it.
