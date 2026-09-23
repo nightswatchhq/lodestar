@@ -7,10 +7,14 @@ import { useEnrichedIndexers } from '@/hooks/useNetworkStats';
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { fetchSubgraphSearch } from '@/lib/api';
 import { emptySearchMessage } from '@/lib/search-backlog';
-import { accountHits, indexerHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
+import { navigation } from './Sidebar';
+import { accountHits, indexerHits, pageHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
 import { cn } from '@/lib/utils';
 
+const PAGES = navigation.flatMap((s) => s.items.map(({ label, href }) => ({ label, href })));
+
 const GROUPS: { kind: OmniKind; title: string }[] = [
+  { kind: 'page', title: 'Pages' },
   { kind: 'indexer', title: 'Indexers' },
   { kind: 'subgraph', title: 'Subgraphs' },
   { kind: 'account', title: 'Address' },
@@ -70,7 +74,7 @@ export function OmniSearch() {
     if (q.length < 2) return [];
     // The subgraph answer is for the debounced query, so it is only shown while that still matches.
     const subgraphs = debounced === q ? subgraphHits(answer?.hits ?? []) : [];
-    return [...indexerHits(indexersQuery.data?.indexers ?? [], q), ...subgraphs, ...accountHits(q)];
+    return [...pageHits(PAGES, q), ...indexerHits(indexersQuery.data?.indexers ?? [], q), ...subgraphs, ...accountHits(q)];
   }, [value, debounced, answer, indexersQuery.data]);
 
   const q = value.trim();
@@ -112,8 +116,8 @@ export function OmniSearch() {
     if (searching) status = 'Searching…';
     else if (isUnavailable(indexersState)) status = `Indexers could not be searched: ${unavailableReason(indexersState)}`;
     else if (isUnavailable(searchState)) status = unavailableReason(searchState) ?? null;
-    else if (subgraphSearchable(q)) status = emptySearchMessage(q, answer?.warmBacklog, 'indexers or subgraphs');
-    else status = `No indexers found for “${q}”. A full 0x address or Qm… hash also searches subgraphs.`;
+    else if (subgraphSearchable(q)) status = emptySearchMessage(q, answer?.warmBacklog, 'pages, indexers or subgraphs');
+    else status = `No pages or indexers found for “${q}”. A full 0x address or Qm… hash also searches subgraphs.`;
   }
 
   return (
@@ -165,7 +169,7 @@ export function OmniSearch() {
               setMobileOpen(false);
             }, 150)}
             onKeyDown={onKeyDown}
-            placeholder="Search indexer, subgraph, address or Qm… hash"
+            placeholder="Search pages, indexers, subgraphs, 0x… or Qm…"
             spellCheck={false}
             autoComplete="off"
             className="w-full pl-7 pr-10 py-1.5 text-[12px] text-[var(--text)] placeholder-[var(--text-faint)] bg-[var(--bg-surface)] border-[0.5px] border-[var(--border)] rounded-[var(--radius-button)] outline-none focus:border-[var(--border-mid)] transition-colors"

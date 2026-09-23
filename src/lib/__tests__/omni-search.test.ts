@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountHits, indexerHits, subgraphHits, subgraphSearchable } from '../omni-search';
+import { accountHits, indexerHits, pageHits, subgraphHits, subgraphSearchable } from '../omni-search';
 import type { SubgraphSearchResult } from '../contracts/subgraph-search';
 
 const ADDR = '0x4e5c87772c29381bcabc58c3f182b6633b5a274a';
@@ -75,5 +75,34 @@ describe('accountHits', () => {
       `/curators/${ADDR}`,
     ]);
     expect(accountHits('0x4e5c')).toEqual([]);
+  });
+});
+
+describe('pageHits', () => {
+  const pages = [
+    { label: 'Lodestar Oracle', href: '/qos' },
+    { label: 'Foghorn', href: '/foghorn' },
+    { label: 'POI Explorer', href: '/poi' },
+    { label: 'GRT Flow', href: '/grt-flow' },
+    { label: 'Indexers', href: '/indexers' },
+    { label: 'Indexing Status', href: '/indexing' },
+  ];
+
+  it('finds a page by its label', () => {
+    expect(pageHits(pages, 'foghorn').map((h) => h.href)).toEqual(['/foghorn']);
+  });
+
+  it('finds a page by its path when the label says something else', () => {
+    expect(pageHits(pages, 'qos').map((h) => h.href)).toEqual(['/qos']);
+    expect(pageHits(pages, 'grt flow').map((h) => h.href)).toEqual(['/grt-flow']);
+  });
+
+  it('finds a page by a keyword its label does not use', () => {
+    expect(pageHits(pages, 'proof of').map((h) => h.href)).toEqual(['/poi']);
+  });
+
+  it('puts a label prefix above a label that merely contains the query', () => {
+    expect(pageHits(pages, 'index').map((h) => h.href)).toEqual(['/indexers', '/indexing', '/poi']);
+    expect(pageHits(pages, 'oracle').map((h) => h.href)).toEqual(['/qos']);
   });
 });
