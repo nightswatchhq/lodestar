@@ -16,6 +16,8 @@ import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { formatGRT, formatGRTFull, formatUSD, cn } from '@/lib/utils';
 import { fetchIndexerRevenue, fetchIndexerPnl } from '@/lib/api';
+import { toCsv } from '@/lib/csv';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { denseDaily, labelWithNoCollections, utcDayLabel, utcDayStart } from '@/lib/day-series';
 
 const WINDOWS = [7, 30, 90, 365] as const;
@@ -67,16 +69,6 @@ interface PnlResponse {
     costModel: { totalMonthlyUsd: number };
     defaultChainCosts: Record<string, ChainCost>;
   };
-}
-
-function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: number }) {
@@ -137,8 +129,7 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
       d.query_fees_gross_grt.toFixed(2),
       d.indexing_rewards_gross_grt.toFixed(2),
     ]);
-    const csv = [header, ...rows].map((r) => r.join(',')).join('\n');
-    downloadCsv(`pnl-${addr}-${window}d.csv`, csv);
+    return toCsv(header, rows);
   };
 
   const isLoading = revenue.isLoading || pnl.isLoading;
@@ -169,17 +160,16 @@ export function PnlPanel({ indexer, grtPrice }: { indexer: string; grtPrice: num
                 {w}d
               </button>
             ))}
-            <button
-              onClick={exportCsv}
-              disabled={!hasData}
-              className={cn(
-                'ml-1 px-2.5 py-1 text-xs rounded-[var(--radius-button)] border border-[var(--border)]',
-                'hover:border-[var(--accent-hover)] transition-colors disabled:opacity-40',
-              )}
-              title="Export daily P&L as CSV"
-            >
-              CSV
-            </button>
+            <span className="ml-1">
+              <ExportButton
+                compact
+                onExport={exportCsv}
+                filename={`pnl-${addr}-${window}d`}
+                label="CSV"
+                disabled={!hasData}
+                title="Export daily P&L as CSV"
+              />
+            </span>
           </div>
         </div>
       </CardHeader>

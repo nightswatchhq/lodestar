@@ -8,6 +8,7 @@
  */
 
 import { weiToGRT } from './utils';
+import { toCsv } from './csv';
 
 /**
  * Calculate the current exchange rate for an indexer's delegation pool
@@ -513,5 +514,5 @@ export function generateRewardsCSV(
     '',
   ]);
 
-  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  return toCsv(headers, rows);
 }

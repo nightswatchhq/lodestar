@@ -50,6 +50,7 @@ function renderPanel(extra: Record<string, string> = {}, allocations: ActiveAllo
   for (const [k, v] of Object.entries(extra)) params.set(k, v);
   return render(
     <AllocationsPanel
+      indexer="0xindexer"
       allocations={allocations}
       closedAllocations={[closed()]}
       whyAllocations="active failed"

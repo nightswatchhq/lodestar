@@ -7,6 +7,9 @@ import {
   nextDelegatorSort,
   shareOfPool,
   sharesToTokens,
+  DELEGATOR_EXPORT_CAP,
+  collectDelegators,
+  delegatorsCsv,
 } from '../indexer-delegators';
 import type { IndexerDelegatorsPage } from '../contracts/indexer-delegators';
 
@@ -130,5 +133,39 @@ describe('delegatorsTabLabel', () => {
 
   it('claims no count when the list could not be read', () => {
     expect(delegatorsTabLabel({ delegators: undefined })).toBe('Delegators');
+  });
+});
+
+describe('collectDelegators', () => {
+  const row = (n: number) =>
+    ({ id: `p${n}`, delegator: { id: `0x${n}` }, shareAmount: '1', currentTokens: '0', totalDelegatedTokens: '0', thawingTokens: '0', thawingUntil: null, lockedTokens: '0', delegatedAt: null, lastChangeAt: null });
+  const served = (count: number) => async (first: number, skip: number) => ({
+    delegators: Array.from({ length: Math.max(0, Math.min(first, count - skip)) }, (_, i) => row(skip + i)),
+    total: count,
+    active: count,
+    pool: null,
+  });
+
+  it('pages until the list ends', async () => {
+    expect(await collectDelegators(served(2_500))).toHaveLength(2_500);
+  });
+
+  it('stops at the cap for the largest indexers', async () => {
+    const calls: number[] = [];
+    const rows = await collectDelegators(async (first, skip) => { calls.push(skip); return served(106_652)(first, skip); });
+    expect(rows).toHaveLength(DELEGATOR_EXPORT_CAP);
+    expect(calls).toEqual([0, 1_000, 2_000, 3_000, 4_000]);
+  });
+
+  it('fails rather than exporting nothing when the route is not served', async () => {
+    await expect(collectDelegators(async () => null)).rejects.toThrow();
+  });
+
+  it('writes one row per delegator with exact GRT and ISO dates', () => {
+    const csv = delegatorsCsv([{ ...row(1), currentTokens: '1500000000000000000', delegatedAt: 1_700_000_000 }]);
+    const [header, line] = csv.split('\n');
+    expect(header.startsWith('rank,delegator,current_grt')).toBe(true);
+    expect(line).toContain('1.5');
+    expect(line).toContain('2023-11-14T22:13:20.000Z');
   });
 });

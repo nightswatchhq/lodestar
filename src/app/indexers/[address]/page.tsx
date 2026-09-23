@@ -16,6 +16,8 @@ import {
   cn,
 } from '@/lib/utils';
 import { AllocationsPanel } from '@/components/indexer/AllocationsPanel';
+import { ExportButton } from '@/components/ui/ExportButton';
+import { fetchIndexerDelegators } from '@/lib/api';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
 import { FoghornScorecard } from '@/components/foghorn/FoghornScorecard';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
@@ -48,7 +50,7 @@ import { nodeState } from '@/lib/contracts/indexer-node';
 import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
 import { DelegatorsTable } from '@/components/indexer/DelegatorsTable';
-import { delegatorsTabLabel } from '@/lib/indexer-delegators';
+import { DELEGATOR_EXPORT_CAP, collectDelegators, delegatorsCsv, delegatorsTabLabel } from '@/lib/indexer-delegators';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
 import { IndexerPagePending } from '@/components/indexer/IndexerPagePending';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
@@ -470,7 +472,19 @@ function IndexerDetailInner({ address }: { address: string }) {
 
       {activeTab === 'delegators' && (
       <>
-      <DelegatorsTable address={address} indexer={indexer} nowSec={nowSec} />
+      <DelegatorsTable
+        address={address}
+        indexer={indexer}
+        nowSec={nowSec}
+        actions={
+          <ExportButton
+            compact
+            label={(indexer.delegatorCount ?? 0) > DELEGATOR_EXPORT_CAP ? `Export top ${DELEGATOR_EXPORT_CAP.toLocaleString()}` : 'Export CSV'}
+            filename={`delegators-${address.toLowerCase()}`}
+            onExport={async () => delegatorsCsv(await collectDelegators((first, skip) => fetchIndexerDelegators(address, { first, skip, orderBy: 'stake', orderDirection: 'desc' })))}
+          />
+        }
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {allocations ? (
           <DelegationCalculator
@@ -815,6 +829,7 @@ function IndexerDetailInner({ address }: { address: string }) {
 
       {activeTab === 'allocations' && (
         <AllocationsPanel
+          indexer={address}
           allocations={allocations}
           closedAllocations={closedAllocations}
           whyAllocations={whyMissing(indexer, 'allocations')}

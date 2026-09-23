@@ -10,11 +10,12 @@ import { Pagination } from '@/components/ui/Pagination';
 import { TableControls } from '@/components/ui/TableControls';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
 import { isColumnVisible, type ColumnSpec } from '@/lib/table-prefs';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { useSubgraphDirectory, useNetworkStats } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio } from '@/lib/allocation-ratio';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
-import { fetchSubgraphSearch, type DirectoryFacet, type DirectoryRow } from '@/lib/api';
+import { fetchSubgraphDirectory, fetchSubgraphSearch, type DirectoryFacet, type DirectoryRow } from '@/lib/api';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import {
   DIRECTORY_PAGE_SIZE as PAGE_SIZE,
@@ -24,8 +25,10 @@ import {
   applyPreset,
   deleteView,
   directoryApiQuery,
+  directoryCsv,
   directoryParams,
   emptyDirectoryState,
+  fetchWholeDirectory,
   hasFilters,
   loadSavedViews,
   parseDirectoryState,
@@ -590,14 +593,24 @@ function SubgraphDirectory() {
               Clear filters
             </button>
           )}
-          <TableControls
-            className="hidden md:flex ml-auto"
-            specs={SUBGRAPH_COLUMNS}
-            columns={columnChoices}
-            onColumnsChange={setColumns}
-            density={density}
-            onDensityChange={setDensity}
-          />
+          <span className="ml-auto flex items-center gap-2">
+            <ExportButton
+              compact
+              label={`Export CSV (${total.toLocaleString()})`}
+              filename={filtered ? 'subgraphs-filtered' : 'subgraphs'}
+              disabled={total === 0}
+              title="Every deployment matching these filters, not just this page"
+              onExport={async () => directoryCsv(await fetchWholeDirectory(state, fetchSubgraphDirectory))}
+            />
+            <TableControls
+              className="hidden md:flex"
+              specs={SUBGRAPH_COLUMNS}
+              columns={columnChoices}
+              onColumnsChange={setColumns}
+              density={density}
+              onDensityChange={setDensity}
+            />
+          </span>
         </div>
       </div>
 

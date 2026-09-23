@@ -7,6 +7,10 @@
  */
 
 import { parseColumnChoices } from '@/lib/table-prefs';
+import type { DirectoryPage, DirectoryRow } from '@/lib/api';
+import { signalStakeRatio } from '@/lib/allocation-ratio';
+import { toCsv, weiToGRTExact } from '@/lib/csv';
+import { weiToGRT } from '@/lib/utils';
 
 export const DIRECTORY_PAGE_SIZE = 25;
 
@@ -179,6 +183,50 @@ export function activePreset(state: DirectoryState): Preset['id'] | null {
 export function applyPreset(id: Preset['id']): DirectoryState {
   const preset = PRESETS.find((p) => p.id === id);
   return preset ? preset.apply(emptyDirectoryState()) : emptyDirectoryState();
+}
+
+// ---------- export ----------
+
+/** The largest page kittiwake serves. */
+export const DIRECTORY_EXPORT_PAGE = 100;
+
+/** Every row matching the state's filters, in its sort, walked a page at a time. */
+export async function fetchWholeDirectory(
+  state: DirectoryState,
+  fetchPage: (query: string) => Promise<DirectoryPage>,
+): Promise<DirectoryRow[]> {
+  const rows: DirectoryRow[] = [];
+  for (let page = 0; ; page++) {
+    const answer = await fetchPage(directoryApiQuery({ ...state, page }, DIRECTORY_EXPORT_PAGE));
+    rows.push(...answer.data);
+    if (answer.data.length < DIRECTORY_EXPORT_PAGE || rows.length >= answer.total) return rows;
+  }
+}
+
+export function directoryCsv(rows: DirectoryRow[]): string {
+  return toCsv(
+    [
+      'ipfs_hash', 'deployment_id', 'name', 'network', 'complexity', 'categories', 'signal_grt',
+      'stake_grt', 'signal_stake_ratio', 'query_fees_30d_grt', 'query_fees_all_time_grt', 'indexers',
+      'curators', 'created_at',
+    ],
+    rows.map((r) => [
+      r.ipfsHash,
+      r.id,
+      r.displayName,
+      r.network,
+      r.complexity,
+      r.categories.join('; '),
+      weiToGRTExact(r.signalledTokens),
+      weiToGRTExact(r.stakedTokens),
+      signalStakeRatio(weiToGRT(r.signalledTokens), weiToGRT(r.stakedTokens)),
+      weiToGRTExact(r.queryFees30d),
+      weiToGRTExact(r.queryFeesAmount),
+      r.indexerCount,
+      r.curatorCount,
+      r.createdAt ? new Date(r.createdAt * 1000).toISOString() : null,
+    ]),
+  );
 }
 
 // ---------- saved views ----------

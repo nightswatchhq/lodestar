@@ -15,6 +15,7 @@ import {
 import { parseResponse } from './contract';
 import { apiUrl } from './api-origin';
 import { fetchShedAware } from './shed';
+import { parseOpenApi, type ApiDoc } from './openapi';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status-shape';
@@ -1307,6 +1308,13 @@ export async function fetchSqlCatalog(): Promise<SqlCatalog> {
 
 /** Thrown when a query is refused, carrying what the route said about it. */
 export class SqlRefused extends Error {}
+
+/** kittiwake's own description of its routes, for the API page. */
+export async function fetchApiDoc(): Promise<ApiDoc> {
+  const response = await fetchShedAware(apiUrl('/openapi.json'));
+  if (!response.ok) throw new Error(`The API description could not be read: ${response.status}`);
+  return parseOpenApi(await response.json());
+}
 
 export async function runSqlQuery(dataset: string, q: string): Promise<QueryResult> {
   const response = await fetchShedAware(apiUrl('/api/sql/query'), {

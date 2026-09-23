@@ -33,6 +33,7 @@ import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { Pagination } from '@/components/ui/Pagination';
 import { ExportButton } from '@/components/ui/ExportButton';
+import { toCsv } from '@/lib/csv';
 import {
   useQosStatus,
   useQosBuckets,
@@ -430,7 +431,7 @@ export default function QosPage() {
     const head = [
       'indexer', 'ens_name', 'deployment', 'success_rate', 'correctness_rate',
       'avg_latency_ms', 'p95_latest_ms', 'blocks_behind', 'probes',
-    ].join(',');
+    ];
     const body = rows.map((r) =>
       [
         r.indexer,
@@ -442,9 +443,9 @@ export default function QosPage() {
         r.p95 ?? '',
         r.blocksBehind === null ? '' : Math.round(r.blocksBehind),
         r.probes,
-      ].join(',')
+      ]
     );
-    return [head, ...body].join('\n');
+    return toCsv(head, body);
   };
 
   /**
@@ -1121,7 +1122,7 @@ export default function QosPage() {
             <CardTitle>Lodestar&apos;s own measurements, worst first</CardTitle>
             <ExportButton
               onExport={exportCsv}
-              filename={`foghorn-qos-${hours}h.csv`}
+              filename={`foghorn-qos-${hours}h`}
               disabled={rows.length === 0}
             />
           </div>

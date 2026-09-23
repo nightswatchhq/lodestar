@@ -4,13 +4,16 @@ import {
   applyPreset,
   deleteView,
   directoryApiQuery,
+  directoryCsv,
   directoryParams,
   emptyDirectoryState,
+  fetchWholeDirectory,
   hasFilters,
   loadSavedViews,
   parseDirectoryState,
   saveView,
 } from '../subgraph-directory';
+import type { DirectoryRow } from '../api';
 
 const parse = (qs: string) => parseDirectoryState(new URLSearchParams(qs));
 
@@ -66,6 +69,44 @@ describe('presets', () => {
     expect(activePreset({ ...state, sort: 'signal' })).toBe('new');
     expect(activePreset({ ...state, network: 'base' })).toBeNull();
     expect(activePreset(emptyDirectoryState())).toBeNull();
+  });
+});
+
+describe('export', () => {
+  const row = (n: number): DirectoryRow => ({
+    id: `0x${n}`,
+    ipfsHash: `Qm${n}`,
+    displayName: n === 0 ? 'Graph, Network' : null,
+    categories: ['DeFi', 'NFT'],
+    signalledTokens: '2000000000000000000000',
+    stakedTokens: '1000000000000000000000',
+    queryFeesAmount: '0',
+    queryFees30d: '1500000000000000000',
+    createdAt: 1_700_000_000,
+    indexerCount: 3,
+    curatorCount: 1,
+    network: 'arbitrum-one',
+    complexity: 'Light',
+  });
+
+  it('walks every page of the filtered set in its sort, a hundred at a time', async () => {
+    const all = Array.from({ length: 230 }, (_, i) => row(i));
+    const asked: URLSearchParams[] = [];
+    const rows = await fetchWholeDirectory(parse('ratioMin=5&sort=signal&page=4'), async (q) => {
+      const p = new URLSearchParams(q);
+      asked.push(p);
+      const skip = Number(p.get('skip') ?? 0);
+      return { data: all.slice(skip, skip + Number(p.get('first'))), total: all.length, unanalysed: 0, facets: { networks: [], complexities: [], categories: [] } };
+    });
+    expect(rows).toHaveLength(230);
+    expect(asked.map((p) => p.get('skip'))).toEqual([null, '100', '200']);
+    expect(asked.every((p) => p.get('first') === '100' && p.get('ratioMin') === '5' && p.get('sort') === 'signal')).toBe(true);
+  });
+
+  it('writes full hashes and exact amounts, quoting names with commas', () => {
+    const [header, line] = directoryCsv([row(0)]).split('\n');
+    expect(header.split(',')[0]).toBe('ipfs_hash');
+    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z');
   });
 });
 
