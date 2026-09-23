@@ -16,6 +16,7 @@ import {
   ageDays,
   formatAgeLabel,
   createdAtSec,
+  allocationsCsv,
   type AllocTableState,
   type AllocView,
   type UnifiedAllocation,
@@ -29,6 +30,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { SortHeader } from '@/components/ui/SortHeader';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { CopyButton } from '@/components/ui/CopyButton';
+import { ExportButton } from '@/components/ui/ExportButton';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { queueCommand, queueBlock } from '@/lib/indexer-cli';
 import { MissingSection } from '@/components/indexer/MissingSection';
@@ -64,6 +66,7 @@ const ALLOC_COLUMNS: readonly AllocColumn[] = [
 type ColumnClasses = Record<string, string | null>;
 
 export function AllocationsPanel({
+  indexer,
   allocations,
   closedAllocations,
   whyAllocations,
@@ -78,6 +81,7 @@ export function AllocationsPanel({
   nowSec,
   networkRatio,
 }: {
+  indexer: string;
   allocations: ActiveAllocation[] | undefined;
   closedAllocations: ClosedAllocation[] | undefined;
   whyAllocations: string;
@@ -223,6 +227,13 @@ export function AllocationsPanel({
                     {copied ? 'Copied' : `Copy unallocate (${selected.size})`}
                   </button>
                 ) : null}
+                <ExportButton
+                  compact
+                  label={`Export CSV (${sorted.length})`}
+                  filename={`allocations-${state.view}-${indexer.toLowerCase()}`}
+                  disabled={sorted.length === 0}
+                  onExport={() => allocationsCsv(sorted, { currentEpoch, epochLengthBlocks: epochLength, nowSec, foghornSuccess })}
+                />
                 <TableControls
                   className="ml-auto"
                   specs={viewColumns}

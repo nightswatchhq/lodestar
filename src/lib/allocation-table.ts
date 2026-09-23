@@ -4,6 +4,7 @@ import type { AllocationSort, AllocationSortKey } from '@/lib/allocation-sort';
 import { defaultDirection } from '@/lib/allocation-sort';
 import type { AllocationRow } from '@/lib/allocation-rows';
 import { poiClock, needsPoiAttention } from '@/lib/poi-clock';
+import { toCsv, weiToGRTExact } from '@/lib/csv';
 
 /** Same post-merge L1 block time as `L1_BLOCKS_PER_YEAR` in network-math. */
 const L1_BLOCK_SECONDS = 12.09;
@@ -229,4 +230,56 @@ function eventAtSec(
     return createdAtSec(row.createdAtEpoch, currentEpoch, epochLengthBlocks, nowSec);
   }
   return createdAtSec(row.createdAtEpoch, currentEpoch, epochLengthBlocks, nowSec);
+}
+
+function isoSec(sec: number | null): string {
+  return sec != null && sec > 0 ? new Date(sec * 1000).toISOString() : '';
+}
+
+/**
+ * The allocations as a spreadsheet: every row of the filtered view, not one page, with IDs whole
+ * and amounts in exact GRT.
+ */
+export function allocationsCsv(
+  rows: UnifiedAllocation[],
+  ctx: {
+    currentEpoch: number;
+    epochLengthBlocks: number;
+    nowSec: number;
+    foghornSuccess: (ipfsHash: string) => number | null | undefined;
+  },
+): string {
+  const header = [
+    'allocation_id', 'deployment_ipfs_hash', 'deployment_id', 'deployment_name', 'network', 'lifecycle',
+    'status', 'blocks_behind', 'query_success', 'allocated_grt', 'signalled_grt', 'staked_grt',
+    'created_epoch', 'age_epochs', 'closed_epoch', 'closed_at', 'indexing_rewards_grt',
+    'query_fees_grt', 'accrued_grt', 'poi', 'force_closed',
+  ];
+  const body = rows.map((r) => {
+    const active = r.lifecycle === 'active';
+    return [
+      r.allocationId,
+      r.ipfsHash,
+      r.deploymentId,
+      r.displayName,
+      r.network,
+      r.lifecycle,
+      active ? r.status : null,
+      active ? r.blocksBehind : null,
+      active && r.ipfsHash ? ctx.foghornSuccess(r.ipfsHash) : null,
+      weiToGRTExact(r.allocatedTokens),
+      active ? weiToGRTExact(r.signalledTokens) : null,
+      active ? weiToGRTExact(r.stakedTokens) : null,
+      r.createdAtEpoch,
+      ageEpochs(r.createdAtEpoch, ctx.currentEpoch, r.closedAtEpoch),
+      r.closedAtEpoch,
+      isoSec(r.closedAt),
+      weiToGRTExact(r.indexingRewards),
+      weiToGRTExact(r.queryFeesCollected),
+      active ? weiToGRTExact(r.pendingRewards) : null,
+      r.poi,
+      active ? null : r.forceClosed,
+    ];
+  });
+  return toCsv(header, body);
 }

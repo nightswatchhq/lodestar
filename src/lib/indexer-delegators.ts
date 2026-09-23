@@ -1,4 +1,5 @@
-import type { IndexerDelegatorsPage } from '@/lib/contracts/indexer-delegators';
+import type { IndexerDelegatorsPage, ServedDelegator } from '@/lib/contracts/indexer-delegators';
+import { toCsv, weiToGRTExact } from '@/lib/csv';
 import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
 
 export type DelegatorSortKey = 'stake' | 'delegatedAt' | 'lastChangeAt' | 'thawingTokens';
@@ -128,3 +129,41 @@ export function delegatorsTabLabel(
   if (listed == null) return 'Delegators';
   return listed >= DETAIL_DELEGATOR_CAP ? `Delegators (${DETAIL_DELEGATOR_CAP}+)` : `Delegators (${listed})`;
 }
+
+/** An export pages through the served list; the largest indexer has over 100,000 delegators. */
+export const DELEGATOR_EXPORT_CAP = 5_000;
+const EXPORT_PAGE = 1_000;
+
+/** Every delegator in stake order up to the cap, or a thrown error if the route is not served. */
+export async function collectDelegators(
+  fetchPage: (first: number, skip: number) => Promise<IndexerDelegatorsPage | null>,
+): Promise<ServedDelegator[]> {
+  const out: ServedDelegator[] = [];
+  for (let skip = 0; skip < DELEGATOR_EXPORT_CAP; skip += EXPORT_PAGE) {
+    const page = await fetchPage(EXPORT_PAGE, skip);
+    if (!page) throw new Error('The delegator list is not served yet.');
+    out.push(...page.delegators);
+    if (page.delegators.length < EXPORT_PAGE) break;
+  }
+  return out.slice(0, DELEGATOR_EXPORT_CAP);
+}
+
+export function delegatorsCsv(rows: readonly ServedDelegator[]): string {
+  const iso = (sec: number | null) => (sec == null ? null : new Date(sec * 1000).toISOString());
+  return toCsv(
+    ['rank', 'delegator', 'current_grt', 'shares', 'total_delegated_grt', 'thawing_grt', 'thawing_until', 'locked_grt', 'delegated_at', 'last_change_at'],
+    rows.map((d, i) => [
+      i + 1,
+      d.delegator.id,
+      weiToGRTExact(d.currentTokens),
+      d.shareAmount,
+      weiToGRTExact(d.totalDelegatedTokens),
+      weiToGRTExact(d.thawingTokens),
+      iso(d.thawingUntil),
+      weiToGRTExact(d.lockedTokens),
+      iso(d.delegatedAt),
+      iso(d.lastChangeAt),
+    ]),
+  );
+}
+

@@ -7,6 +7,7 @@ import {
   needsAttention,
   ageEpochs,
   createdAtSec,
+  allocationsCsv,
   type UnifiedAllocation,
 } from '../allocation-table';
 import type { ClosedAllocation } from '@/lib/contracts/indexer-detail';
@@ -189,5 +190,36 @@ describe('createdAtSec', () => {
     const t = createdAtSec(EPOCH - 1, EPOCH, EPOCH_LEN, NOW);
     const oneEpoch = EPOCH_LEN * 12.09;
     expect(NOW - t).toBeCloseTo(oneEpoch, 3);
+  });
+});
+
+describe('allocationsCsv', () => {
+  const ctx = { currentEpoch: EPOCH, epochLengthBlocks: EPOCH_LEN, nowSec: NOW, foghornSuccess: () => 0.98 };
+  const ALLOC = '0x3f1c8a2b9d4e5f60718293a4b5c6d7e8f9012345';
+
+  it('writes every row it is given with the IDs whole and amounts exact', () => {
+    const rows = [
+      active({ allocationId: ALLOC, allocatedTokens: '1234567890123456789012', displayName: 'Uniswap, v3', network: 'mainnet' }),
+      ...unifyClosed([closed({ indexingRewards: '5000000000000000000', forceClosed: true })]),
+    ];
+    const [header, a, c, ...rest] = allocationsCsv(rows, ctx).split('\n');
+    expect(rest).toEqual([]);
+    const col = (line: string, name: string) => line.split(',')[header.split(',').indexOf(name)];
+    expect(a.startsWith(`${ALLOC},QmX,0xd,"Uniswap, v3",mainnet,active,synced,`)).toBe(true);
+    expect(a).toContain(',1234.567890123456789012,');
+    expect(col(c, 'lifecycle')).toBe('closed');
+    expect(col(c, 'status')).toBe('');
+    expect(col(c, 'indexing_rewards_grt')).toBe('5');
+    expect(col(c, 'poi')).toBe('0xpoi');
+    expect(col(c, 'force_closed')).toBe('true');
+    expect(col(c, 'closed_at')).toBe(new Date((NOW - 10 * 86400) * 1000).toISOString());
+  });
+
+  it('exports accrued rewards on open allocations, blank rather than zero where none was read', () => {
+    const rows = [active({ pendingRewards: '2500000000000000000' }), active({ pendingRewards: null })];
+    const [header, read, unread] = allocationsCsv(rows, ctx).split('\n');
+    const col = (line: string, name: string) => line.split(',')[header.split(',').indexOf(name)];
+    expect(col(read, 'accrued_grt')).toBe('2.5');
+    expect(col(unread, 'accrued_grt')).toBe('');
   });
 });
