@@ -143,24 +143,14 @@ With default preferences this is effectively "highest overall risk score among R
 
 The approval step is skipped on subsequent delegations if the existing GRT allowance covers the amount. First-time delegators need two transactions; all others need one.
 
-Code: [`src/app/delegate/`](src/app/delegate/) · API: [`src/app/api/delegate/recommend/`](src/app/api/delegate/recommend/)
+Code: [`src/app/delegate/`](src/app/delegate/) · API: `/api/delegate/recommend` in kittiwake's [`crates/read/src/recommend.rs`](https://github.com/nightswatchhq/kittiwake/blob/main/crates/read/src/recommend.rs)
 
-## Backend migration
+## Backend
 
-The API is moving from Next.js route handlers to **kittiwake**, a single Rust process that fronts
-the nuthatch nests. The two run side by side on one domain: the edge forwards the routes kittiwake
-serves and leaves the rest here, so there is no flag day.
-
-The count is deliberately not repeated here, because a number typed into a README is a number that
-goes stale. It lives in one generated place: [docs/MIGRATION.md](docs/MIGRATION.md), produced from
-`src/lib/migration.ts`. The same figures render at
-[`/migration`](https://www.lodestar-dashboard.com/migration) with `/api/migration` as the
-machine-readable form.
-
-That one file is also what `src/proxy.ts` routes from, so the progress figure and the routing
-decision cannot disagree. A test walks `src/app/api` and fails if a route exists without a line in
-the table, which is what stops a new route becoming an uncounted straggler. Regenerate the doc with
-`pnpm migration:doc` after changing the inventory; CI fails if the committed copy is stale.
+Lodestar is a frontend. Every API call goes to **kittiwake** ([nightswatchhq/kittiwake](https://github.com/nightswatchhq/kittiwake)),
+a single Rust process in front of the nuthatch nests, which also owns the database schema at
+`db/schema.sql` and runs every scheduled job. The history of the move is in
+[docs/MIGRATION.md](docs/MIGRATION.md) and on [`/migration`](https://www.lodestar-dashboard.com/migration).
 
 ## Tech Stack
 
