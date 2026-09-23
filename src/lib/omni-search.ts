@@ -25,11 +25,9 @@ export interface IndexerLike {
 }
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-const DEPLOYMENT_RE = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
 const PARTIAL_HEX_RE = /^0x[0-9a-fA-F]*$/;
 
 export const isAddress = (q: string) => ADDRESS_RE.test(q.trim());
-export const isDeployment = (q: string) => DEPLOYMENT_RE.test(q.trim());
 
 /**
  * Whether `/api/subgraph-search` can say anything useful about this query.
@@ -78,9 +76,8 @@ export function indexerHits(indexers: readonly IndexerLike[], q: string, limit =
     }));
 }
 
-/** Subgraph search results as hits, one per deployment, with a pasted hash always first. */
-export function subgraphHits(q: string, results: readonly SubgraphSearchResult[], limit = 6): OmniHit[] {
-  const t = q.trim();
+/** Subgraph search results as hits, one per deployment. */
+export function subgraphHits(results: readonly SubgraphSearchResult[], limit = 6): OmniHit[] {
   const hits: OmniHit[] = [];
   const seen = new Set<string>();
 
@@ -94,12 +91,6 @@ export function subgraphHits(q: string, results: readonly SubgraphSearchResult[]
       detail: shortenAddress(hash, 6),
       href: `/subgraphs/${hash}`,
     });
-  }
-
-  // A full hash is its own answer even when the search has not heard of it: the name index only
-  // knows current versions, and the detail page reads the deployment directly.
-  if (isDeployment(t) && !seen.has(t)) {
-    hits.unshift({ kind: 'subgraph', label: 'Subgraph deployment', detail: shortenAddress(t, 6), href: `/subgraphs/${t}` });
   }
 
   return hits.slice(0, limit);

@@ -1043,12 +1043,12 @@ export function IndexerTable() {
         {/* Pagination */}
         <div className="p-4 border-t border-[var(--border)] flex items-center justify-between">
           <div className="text-sm text-[var(--text-muted)]">
-            <span className="hidden sm:inline">Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
+            {table.getFilteredRowModel().rows.length > 0 && <span className="hidden sm:inline">Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
             {Math.min(
               (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
               table.getFilteredRowModel().rows.length
             )}{' '}
-            of </span>{table.getFilteredRowModel().rows.length} indexers
+            of </span>}{table.getFilteredRowModel().rows.length} indexers
           </div>
           <div className="flex items-center gap-2">
             <button

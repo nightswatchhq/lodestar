@@ -32,7 +32,8 @@ export function OmniSearch() {
   const [open, setOpen] = useState(false);
   const [touched, setTouched] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  // By link, not by row: late subgraph results insert rows above the address ones.
+  const [activeHref, setActiveHref] = useState<string | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebounced(value.trim()), 250);
@@ -46,6 +47,7 @@ export function OmniSearch() {
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
         e.preventDefault();
         inputRef.current?.focus();
+        inputRef.current?.select();
       }
     }
     document.addEventListener('keydown', onKey);
@@ -67,12 +69,13 @@ export function OmniSearch() {
     const q = value.trim();
     if (q.length < 2) return [];
     // The subgraph answer is for the debounced query, so it is only shown while that still matches.
-    const subgraphs = debounced === q ? subgraphHits(q, answer?.hits ?? []) : subgraphHits(q, []);
+    const subgraphs = debounced === q ? subgraphHits(answer?.hits ?? []) : [];
     return [...indexerHits(indexersQuery.data?.indexers ?? [], q), ...subgraphs, ...accountHits(q)];
   }, [value, debounced, answer, indexersQuery.data]);
 
   const q = value.trim();
-  const show = open && q.length >= 2;
+  const show = open && q.length >= 1;
+  const active = Math.max(0, hits.findIndex((h) => h.href === activeHref));
   const subgraphsPending = subgraphSearchable(q) && (debounced !== q || searchQuery.isFetching);
   const searching = subgraphsPending || indexersState.kind === 'loading';
 
@@ -91,26 +94,26 @@ export function OmniSearch() {
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, hits.length - 1));
+      setActiveHref(hits[Math.min(active + 1, hits.length - 1)]?.href ?? null);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
+      setActiveHref(hits[Math.max(active - 1, 0)]?.href ?? null);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const hit = hits[active] ?? hits[0];
-      if (hit) go(hit);
+      if (hits[active]) go(hits[active]);
     } else if (e.key === 'Escape') {
       close();
     }
   }
 
   let status: string | null = null;
-  if (hits.length === 0) {
+  if (q.length < 2) status = 'Keep typing…';
+  else if (hits.length === 0) {
     if (searching) status = 'Searching…';
     else if (isUnavailable(indexersState)) status = `Indexers could not be searched: ${unavailableReason(indexersState)}`;
     else if (isUnavailable(searchState)) status = unavailableReason(searchState) ?? null;
-    else if (subgraphSearchable(q)) status = emptySearchMessage(q, answer?.warmBacklog);
-    else status = 'No matches. Try a name, a full 0x address or a Qm… deployment hash.';
+    else if (subgraphSearchable(q)) status = emptySearchMessage(q, answer?.warmBacklog, 'indexers or subgraphs');
+    else status = `No indexers found for “${q}”. A full 0x address or Qm… hash also searches subgraphs.`;
   }
 
   return (
@@ -118,6 +121,8 @@ export function OmniSearch() {
       <button
         type="button"
         aria-label="Search"
+        aria-expanded={mobileOpen}
+        aria-controls="omni-search-bar"
         onClick={() => {
           setMobileOpen(true);
           setTimeout(() => inputRef.current?.focus(), 0);
@@ -128,8 +133,9 @@ export function OmniSearch() {
       </button>
 
       <div
+        id="omni-search-bar"
         className={cn(
-          'md:relative md:flex md:flex-1 md:max-w-md',
+          'gap-3 md:relative md:flex md:flex-1 md:max-w-md',
           mobileOpen
             ? 'absolute inset-x-0 top-[var(--safe-top)] h-[var(--topbar-height)] px-4 flex items-center bg-[var(--bg)] z-40 md:inset-auto md:h-auto md:px-0 md:bg-transparent'
             : 'hidden',
@@ -147,7 +153,7 @@ export function OmniSearch() {
             value={value}
             onChange={(e) => {
               setValue(e.target.value);
-              setActive(0);
+              setActiveHref(null);
               setOpen(true);
             }}
             onFocus={() => {
@@ -172,7 +178,7 @@ export function OmniSearch() {
             <div
               id="omni-search-results"
               role="listbox"
-              className="absolute left-0 right-0 mt-1.5 max-h-[70vh] overflow-y-auto rounded-[var(--radius-card)] bg-[var(--bg-surface)] border-[0.5px] border-[var(--border)] shadow-[var(--shadow-float)] z-50"
+              className="absolute left-0 right-0 mt-1.5 max-h-[70dvh] overflow-y-auto rounded-[var(--radius-card)] bg-[var(--bg-surface)] border-[0.5px] border-[var(--border)] shadow-[var(--shadow-float)] z-50"
             >
               {GROUPS.map(({ kind, title }) => {
                 const group = hits.map((h, i) => ({ h, i })).filter(({ h }) => h.kind === kind);
@@ -188,7 +194,7 @@ export function OmniSearch() {
                         aria-selected={i === active}
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
-                        onMouseEnter={() => setActive(i)}
+                        onMouseEnter={() => setActiveHref(h.href)}
                         onClick={() => go(h)}
                         className={cn(
                           'w-full flex items-center justify-between gap-3 px-3.5 py-2 text-left text-[13px] transition-colors',
@@ -209,6 +215,14 @@ export function OmniSearch() {
             </div>
           )}
         </div>
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={close}
+          className="md:hidden shrink-0 text-[13px] text-[var(--text-muted)]"
+        >
+          Cancel
+        </button>
       </div>
     </>
   );

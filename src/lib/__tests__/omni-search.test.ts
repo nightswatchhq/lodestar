@@ -62,18 +62,9 @@ describe('indexerHits', () => {
 
 describe('subgraphHits', () => {
   it('links each deployment once and skips results without one', () => {
-    const hits = subgraphHits('uni', [result(HASH, 'Uniswap'), result(HASH, 'Uniswap'), result(null, 'Orphan')]);
+    const hits = subgraphHits([result(HASH, 'Uniswap'), result(HASH, 'Uniswap'), result(null, 'Orphan')]);
     expect(hits).toHaveLength(1);
     expect(hits[0]).toMatchObject({ label: 'Uniswap', href: `/subgraphs/${HASH}` });
-  });
-
-  it('offers a pasted hash even when the search does not know it', () => {
-    expect(subgraphHits(HASH, [])[0].href).toBe(`/subgraphs/${HASH}`);
-  });
-
-  it('does not duplicate a pasted hash the search did find', () => {
-    const hits = subgraphHits(HASH, [result(HASH, 'Uniswap')]);
-    expect(hits.map((h) => h.label)).toEqual(['Uniswap']);
   });
 });
 
