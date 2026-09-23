@@ -17,7 +17,7 @@ export function Pagination({ page, pageSize, totalItems, onPageChange }: Paginat
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <span className="text-sm text-[var(--text-faint)]">
-        Showing {start}–{end} of {totalItems}
+        {totalItems > 0 ? `Showing ${start}–${end} of ${totalItems}` : 'Showing 0 of 0'}
       </span>
       <div className="flex items-center gap-3">
         <button

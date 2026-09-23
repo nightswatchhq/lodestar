@@ -34,9 +34,9 @@ export function isNameQuery(q: string): boolean {
  *   backlog > 0      some documents are unfetched, so the answer is "not yet", with the number
  *   backlog unknown  no warm run has completed, so we cannot claim either
  */
-export function emptySearchMessage(query: string, backlog: WarmBacklog): string {
+export function emptySearchMessage(query: string, backlog: WarmBacklog, subject = 'subgraphs'): string {
   const q = query.trim();
-  const found = q ? `No subgraphs found for “${q}”` : 'No subgraphs found';
+  const found = q ? `No ${subject} found for “${q}”` : `No ${subject} found`;
 
   if (!isNameQuery(q)) return `${found}.`;
 
