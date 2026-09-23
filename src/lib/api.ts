@@ -1039,6 +1039,13 @@ export async function fetchENSName(address: string): Promise<{ ensName: string |
   return parseResponse('/api/ens', await response.json(), { present: ['ensName'] });
 }
 
+/** The address a `.eth` name resolves to, or null when it resolves to nothing. */
+export async function fetchENSAddress(name: string): Promise<{ address: string | null }> {
+  const response = await fetchShedAware(apiUrl(`/api/ens?name=${encodeURIComponent(name)}`));
+  if (!response.ok) throw new Error(`ENS lookup failed: ${response.status}`);
+  return parseResponse('/api/ens', await response.json(), { present: ['address'] });
+}
+
 // ── The last of the reads that built their own requests ──────────────────────
 
 /**
