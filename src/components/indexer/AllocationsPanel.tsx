@@ -17,8 +17,12 @@ import {
   formatAgeLabel,
   createdAtSec,
   type AllocTableState,
+  type AllocView,
   type UnifiedAllocation,
 } from '@/lib/allocation-table';
+import { columnClass, isColumnVisible, type ColumnSpec } from '@/lib/table-prefs';
+import { useTablePrefs } from '@/hooks/useTablePrefs';
+import { TableControls } from '@/components/ui/TableControls';
 import { nextSort, sortAllocations } from '@/lib/allocation-sort';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Pagination } from '@/components/ui/Pagination';
@@ -33,6 +37,29 @@ import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocatio
 import { poiClock } from '@/lib/poi-clock';
 
 const PAGE_SIZE = 25;
+
+type AllocColumn = ColumnSpec & { views: readonly AllocView[] };
+const ACTIVE: readonly AllocView[] = ['active', 'all'];
+const CLOSED: readonly AllocView[] = ['closed', 'all'];
+const BOTH: readonly AllocView[] = ['active', 'closed', 'all'];
+
+/** What the column picker offers, each in the views that have it. Deployment always stays. */
+const ALLOC_COLUMNS: readonly AllocColumn[] = [
+  { id: 'status', label: 'Status', views: ACTIVE },
+  { id: 'querySuccess', label: 'Query Success', views: ACTIVE },
+  { id: 'blocksBehind', label: 'Blocks Behind', views: ACTIVE, hideBelow: 'sm' },
+  { id: 'allocated', label: 'Allocated', views: BOTH },
+  { id: 'signalled', label: 'Signalled', views: ACTIVE, hideBelow: 'lg' },
+  { id: 'ratio', label: 'Ratio', views: ACTIVE },
+  { id: 'age', label: 'Age', views: BOTH },
+  { id: 'poi', label: 'POI', views: ACTIVE },
+  { id: 'rewards', label: 'Indexing Rewards', views: CLOSED, hideBelow: 'sm' },
+  { id: 'fees', label: 'Query Fees', views: CLOSED, hideBelow: 'md' },
+  { id: 'closed', label: 'Closed', views: CLOSED },
+];
+
+/** Per column: null when not shown, otherwise the class it carries (a default breakpoint, or none). */
+type ColumnClasses = Record<string, string | null>;
 
 export function AllocationsPanel({
   allocations,
@@ -99,8 +126,17 @@ export function AllocationsPanel({
   const pageRows = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const networks = [...new Set(activeRows.map((r) => r.network).filter((n): n is string => !!n))].sort();
-  const showClosedCols = state.view !== 'active';
   const showActiveCols = state.view !== 'closed';
+
+  const { columns: columnChoices, density, setColumns, setDensity } = useTablePrefs('allocations');
+  const viewColumns = ALLOC_COLUMNS.filter((c) => c.views.includes(state.view));
+  const cls: ColumnClasses = Object.fromEntries(
+    ALLOC_COLUMNS.map((c) => [
+      c.id,
+      c.views.includes(state.view) && isColumnVisible(c, columnChoices) ? columnClass(c, columnChoices) : null,
+    ]),
+  );
+  const onSort = (k: Parameters<typeof nextSort>[1]) => setState({ sort: nextSort(state.sort, k) });
 
   const allocationsMissing = allocations == null && (state.view === 'active' || state.view === 'all');
   const closedMissing = closedAllocations == null && (state.view === 'closed' || state.view === 'all');
@@ -185,6 +221,14 @@ export function AllocationsPanel({
                     {copied ? 'Copied' : `Copy unallocate (${selected.size})`}
                   </button>
                 ) : null}
+                <TableControls
+                  className="ml-auto"
+                  specs={viewColumns}
+                  columns={columnChoices}
+                  onColumnsChange={setColumns}
+                  density={density}
+                  onDensityChange={setDensity}
+                />
               </div>
             </div>
           </CardHeader>
@@ -199,31 +243,39 @@ export function AllocationsPanel({
                   <thead>
                     <tr className="border-b border-[var(--border)]">
                       <th className="px-2 py-2 w-8" />
-                      <SortHeader label="Deployment" sortKey="deployment" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} />
-                      {showActiveCols ? (
-                        <>
-                          <SortHeader label="Status" sortKey="status" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} />
-                          <SortHeader label="Query Success" sortKey="querySuccess" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Foghorn: share of queries answered with HTTP 200 on this deployment (QoS oracle)." />
-                          <SortHeader label="Blocks Behind" sortKey="blocksBehind" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden sm:table-cell" />
-                        </>
+                      <SortHeader label="Deployment" sortKey="deployment" sort={state.sort} onSort={onSort} />
+                      {cls.status != null ? (
+                        <SortHeader label="Status" sortKey="status" sort={state.sort} onSort={onSort} className={cls.status} />
                       ) : null}
-                      <SortHeader label="Allocated" sortKey="allocated" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" />
-                      {showActiveCols ? (
-                        <>
-                          <SortHeader label="Signalled" sortKey="signalled" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden lg:table-cell" />
-                          <SortHeader label="Ratio" sortKey="ratio" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title={RATIO_TOOLTIP} />
-                        </>
+                      {cls.querySuccess != null ? (
+                        <SortHeader label="Query Success" sortKey="querySuccess" sort={state.sort} onSort={onSort} align="right" className={cls.querySuccess} title="Foghorn: share of queries answered with HTTP 200 on this deployment (QoS oracle)." />
                       ) : null}
-                      <SortHeader label="Age" sortKey="age" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Epochs and days since the allocation opened, or its duration once closed." />
-                      {showActiveCols ? (
-                        <SortHeader label="POI" sortKey="poi" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" title="Days since the last POI, or since creation if none, and days left before anyone can force-close." />
+                      {cls.blocksBehind != null ? (
+                        <SortHeader label="Blocks Behind" sortKey="blocksBehind" sort={state.sort} onSort={onSort} align="right" className={cls.blocksBehind} />
                       ) : null}
-                      {showClosedCols ? (
-                        <>
-                          <SortHeader label="Indexing Rewards" sortKey="rewards" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden sm:table-cell" />
-                          <SortHeader label="Query Fees" sortKey="fees" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" className="hidden md:table-cell" />
-                          <SortHeader label="Closed" sortKey="closed" sort={state.sort} onSort={(k) => setState({ sort: nextSort(state.sort, k) })} align="right" />
-                        </>
+                      {cls.allocated != null ? (
+                        <SortHeader label="Allocated" sortKey="allocated" sort={state.sort} onSort={onSort} align="right" className={cls.allocated} />
+                      ) : null}
+                      {cls.signalled != null ? (
+                        <SortHeader label="Signalled" sortKey="signalled" sort={state.sort} onSort={onSort} align="right" className={cls.signalled} />
+                      ) : null}
+                      {cls.ratio != null ? (
+                        <SortHeader label="Ratio" sortKey="ratio" sort={state.sort} onSort={onSort} align="right" className={cls.ratio} title={RATIO_TOOLTIP} />
+                      ) : null}
+                      {cls.age != null ? (
+                        <SortHeader label="Age" sortKey="age" sort={state.sort} onSort={onSort} align="right" className={cls.age} title="Epochs and days since the allocation opened, or its duration once closed." />
+                      ) : null}
+                      {cls.poi != null ? (
+                        <SortHeader label="POI" sortKey="poi" sort={state.sort} onSort={onSort} align="right" className={cls.poi} title="Days since the last POI, or since creation if none, and days left before anyone can force-close." />
+                      ) : null}
+                      {cls.rewards != null ? (
+                        <SortHeader label="Indexing Rewards" sortKey="rewards" sort={state.sort} onSort={onSort} align="right" className={cls.rewards} />
+                      ) : null}
+                      {cls.fees != null ? (
+                        <SortHeader label="Query Fees" sortKey="fees" sort={state.sort} onSort={onSort} align="right" className={cls.fees} />
+                      ) : null}
+                      {cls.closed != null ? (
+                        <SortHeader label="Closed" sortKey="closed" sort={state.sort} onSort={onSort} align="right" className={cls.closed} />
                       ) : null}
                     </tr>
                   </thead>
@@ -240,7 +292,8 @@ export function AllocationsPanel({
                           return next;
                         })}
                         showActiveCols={showActiveCols}
-                        showClosedCols={showClosedCols}
+                        cls={cls}
+                        compact={density === 'compact'}
                         statusLoading={statusLoading}
                         node={node}
                         foghornSuccess={foghornSuccess}
@@ -335,7 +388,8 @@ function AllocRow({
   selected,
   onToggle,
   showActiveCols,
-  showClosedCols,
+  cls,
+  compact,
   statusLoading,
   node,
   foghornSuccess,
@@ -348,7 +402,8 @@ function AllocRow({
   selected: boolean;
   onToggle: () => void;
   showActiveCols: boolean;
-  showClosedCols: boolean;
+  cls: ColumnClasses;
+  compact: boolean;
   statusLoading: boolean;
   node: NodeState | null;
   foghornSuccess: (ipfsHash: string) => number | null | undefined;
@@ -374,10 +429,11 @@ function AllocRow({
   const rewards = row.indexingRewards != null ? weiToGRT(row.indexingRewards) : 0;
   const fees = row.queryFeesCollected != null ? weiToGRT(row.queryFeesCollected) : 0;
   const qos = row.ipfsHash ? foghornSuccess(row.ipfsHash) : null;
+  const pad = compact ? 'px-3 py-1.5' : 'px-4 py-3';
 
   return (
     <tr className="hover:bg-[var(--bg-elevated)]">
-      <td className="px-2 py-3">
+      <td className={compact ? 'px-2 py-1.5' : 'px-2 py-3'}>
         <input
           type="checkbox"
           aria-label="Select allocation"
@@ -386,7 +442,7 @@ function AllocRow({
           className="accent-[var(--accent)]"
         />
       </td>
-      <td className="px-4 py-3">
+      <td className={pad}>
         <div className="flex flex-col gap-0.5">
           <Link
             href={row.ipfsHash ? `/subgraphs/${row.ipfsHash}` : '#'}
@@ -426,9 +482,8 @@ function AllocRow({
           ) : null}
         </div>
       </td>
-      {showActiveCols ? (
-        <>
-          <td className="px-4 py-3">
+      {cls.status != null ? (
+          <td className={cn(pad, cls.status)}>
             {row.lifecycle === 'closed' ? (
               <span className="text-sm text-[var(--text-faint)]">—</span>
             ) : (
@@ -446,7 +501,9 @@ function AllocRow({
               <p className="text-[10px] text-[var(--red-text)] mt-0.5 max-w-[200px] truncate" title={row.fatalError}>{row.fatalError}</p>
             ) : null}
           </td>
-          <td className="px-4 py-3 text-right">
+      ) : null}
+      {cls.querySuccess != null ? (
+          <td className={cn(pad, 'text-right', cls.querySuccess)}>
             {row.lifecycle === 'closed' || qos == null ? (
               <span className="text-sm text-[var(--text-faint)]">—</span>
             ) : (
@@ -458,7 +515,9 @@ function AllocRow({
               </span>
             )}
           </td>
-          <td className="px-4 py-3 text-right hidden sm:table-cell">
+      ) : null}
+      {cls.blocksBehind != null ? (
+          <td className={cn(pad, 'text-right', cls.blocksBehind)}>
             {row.lifecycle === 'closed' || row.blocksBehind == null ? (
               <span className="text-sm text-[var(--text-faint)]">—</span>
             ) : (
@@ -470,21 +529,23 @@ function AllocRow({
               </span>
             )}
           </td>
-        </>
       ) : null}
-      <td className="px-4 py-3 text-right">
-        <span className="font-mono text-sm text-[var(--text)]">{formatGRT(weiToGRT(row.allocatedTokens))}</span>
-      </td>
-      {showActiveCols ? (
-        <>
-        <td className="px-4 py-3 text-right hidden lg:table-cell">
+      {cls.allocated != null ? (
+        <td className={cn(pad, 'text-right', cls.allocated)}>
+          <span className="font-mono text-sm text-[var(--text)]">{formatGRT(weiToGRT(row.allocatedTokens))}</span>
+        </td>
+      ) : null}
+      {cls.signalled != null ? (
+        <td className={cn(pad, 'text-right', cls.signalled)}>
           {row.lifecycle === 'closed' ? (
             <span className="text-sm text-[var(--text-faint)]">—</span>
           ) : (
             <span className="font-mono text-sm text-[var(--green)]">{formatGRT(weiToGRT(row.signalledTokens))}</span>
           )}
         </td>
-        <td className="px-4 py-3 text-right">
+      ) : null}
+      {cls.ratio != null ? (
+        <td className={cn(pad, 'text-right', cls.ratio)}>
           <RatioCell
             signal={weiToGRT(row.signalledTokens)}
             stake={weiToGRT(row.stakedTokens)}
@@ -492,13 +553,14 @@ function AllocRow({
             closed={row.lifecycle === 'closed'}
           />
         </td>
-        </>
       ) : null}
-      <td className="px-4 py-3 text-right">
-        <span className="font-mono text-sm text-[var(--text-muted)]">{formatAgeLabel(epochs, days)}</span>
-      </td>
-      {showActiveCols ? (
-        <td className="px-4 py-3 text-right">
+      {cls.age != null ? (
+        <td className={cn(pad, 'text-right', cls.age)}>
+          <span className="font-mono text-sm text-[var(--text-muted)]">{formatAgeLabel(epochs, days)}</span>
+        </td>
+      ) : null}
+      {cls.poi != null ? (
+        <td className={cn(pad, 'text-right', cls.poi)}>
           {row.lifecycle === 'closed' ? (
             <span className="text-sm text-[var(--text-faint)]">—</span>
           ) : (
@@ -510,26 +572,28 @@ function AllocRow({
           )}
         </td>
       ) : null}
-      {showClosedCols ? (
-        <>
-          <td className="px-4 py-3 text-right hidden sm:table-cell">
+      {cls.rewards != null ? (
+          <td className={cn(pad, 'text-right', cls.rewards)}>
             <span className="font-mono text-sm text-[var(--green)]">
               {row.lifecycle === 'closed' && rewards > 0 ? formatGRT(rewards) : '—'}
             </span>
           </td>
-          <td className="px-4 py-3 text-right hidden md:table-cell">
+      ) : null}
+      {cls.fees != null ? (
+          <td className={cn(pad, 'text-right', cls.fees)}>
             <span className="font-mono text-sm text-[var(--text)]">
               {row.lifecycle === 'closed' && fees > 0 ? formatGRT(fees) : '—'}
             </span>
           </td>
-          <td className="px-4 py-3 text-right">
+      ) : null}
+      {cls.closed != null ? (
+          <td className={cn(pad, 'text-right', cls.closed)}>
             {row.lifecycle === 'closed' && row.closedAt != null ? (
               <span className="text-sm text-[var(--text-muted)]">{formatRelativeTime(row.closedAt)}</span>
             ) : (
               <span className="text-sm text-[var(--text-faint)]">—</span>
             )}
           </td>
-        </>
       ) : null}
     </tr>
   );

@@ -7,6 +7,9 @@ import { Card } from '@/components/ui/Card';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Badge } from '@/components/ui/Badge';
 import { Pagination } from '@/components/ui/Pagination';
+import { TableControls } from '@/components/ui/TableControls';
+import { useTablePrefs } from '@/hooks/useTablePrefs';
+import { isColumnVisible, type ColumnSpec } from '@/lib/table-prefs';
 import { useSubgraphDirectory, useNetworkStats } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio } from '@/lib/allocation-ratio';
@@ -226,6 +229,21 @@ function toRow(d: DirectoryRow, is30d: boolean): Row {
   };
 }
 
+/** What the column picker offers. Selection, rank and deployment always stay. */
+const SUBGRAPH_COLUMNS: readonly ColumnSpec[] = [
+  { id: 'complexity', label: 'Complexity' },
+  { id: 'network', label: 'Network' },
+  { id: 'categories', label: 'Categories', defaultVisible: false },
+  { id: 'signal', label: 'Signal' },
+  { id: 'stake', label: 'Stake' },
+  { id: 'queryFees', label: 'Query Fees' },
+  { id: 'created', label: 'Created' },
+  { id: 'indexers', label: 'Indexers' },
+  { id: 'ratio', label: 'Signal/Stake' },
+  { id: 'curators', label: 'Curators' },
+];
+const SPEC = Object.fromEntries(SUBGRAPH_COLUMNS.map((c) => [c.id, c]));
+
 const RANGE_LABELS: Record<RangeKey, string> = {
   signal: 'Signal (GRT)',
   stake: 'Stake (GRT)',
@@ -277,6 +295,10 @@ function SubgraphDirectory() {
   /** Set when the search itself failed, which is not the same as it matching nothing. */
   const [searchError, setSearchError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const { columns: columnChoices, density, setColumns, setDensity } = useTablePrefs('subgraphs');
+  const show = (id: string) => isColumnVisible(SPEC[id], columnChoices);
+  const pad = density === 'compact' ? 'px-3 py-1.5' : 'px-4 py-3';
 
   const [savedViews, setSavedViews] = useState<SavedView[]>([]);
   const [viewName, setViewName] = useState('');
@@ -452,7 +474,9 @@ function SubgraphDirectory() {
             value={currentView?.name ?? ''}
             onChange={(e) => {
               const view = savedViews.find((v) => v.name === e.target.value);
-              if (view) navigate(parseDirectoryState(new URLSearchParams(view.query)), searchQuery);
+              if (!view) return;
+              if (view.columns) setColumns(view.columns);
+              navigate(parseDirectoryState(new URLSearchParams(view.query)), searchQuery);
             }}
             className={cn(
               'px-3 py-1.5 text-xs rounded-[var(--radius-button)]',
@@ -480,7 +504,7 @@ function SubgraphDirectory() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!viewName.trim()) return;
-                setSavedViews(saveView(safeStorage(), viewName, state));
+                setSavedViews(saveView(safeStorage(), viewName, state, columnChoices));
                 setViewName('');
               }}
             >
@@ -566,6 +590,14 @@ function SubgraphDirectory() {
               Clear filters
             </button>
           )}
+          <TableControls
+            className="hidden md:flex ml-auto"
+            specs={SUBGRAPH_COLUMNS}
+            columns={columnChoices}
+            onColumnsChange={setColumns}
+            density={density}
+            onDensityChange={setDensity}
+          />
         </div>
       </div>
 
@@ -773,29 +805,44 @@ function SubgraphDirectory() {
                 </th>
                 <th className={cn(thBase, 'text-left w-12')}>#</th>
                 <th className={cn(thBase, 'text-left')}>Deployment ID</th>
-                <th className={cn(thBase, 'text-center')}>Complexity</th>
-                <th className={cn(thBase, 'text-center')}>Network</th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('signal')}>
-                  Signal (GRT){renderSortArrow('signal')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('stake')}>
-                  Stake (GRT){renderSortArrow('stake')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('queryFees')}>
-                  {is30d ? 'Fees 30d (GRT)' : 'Query Fees (GRT)'}{renderSortArrow('queryFees')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('created')}>
-                  Created{renderSortArrow('created')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('indexers')}>
-                  Indexers{renderSortArrow('indexers')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} title={RATIO_TOOLTIP} onClick={() => handleSort('ratio')}>
-                  Signal/Stake{renderSortArrow('ratio')}
-                </th>
-                <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('curators')}>
-                  Curators{renderSortArrow('curators')}
-                </th>
+                {show('complexity') && <th className={cn(thBase, 'text-center')}>Complexity</th>}
+                {show('network') && <th className={cn(thBase, 'text-center')}>Network</th>}
+                {show('categories') && <th className={cn(thBase, 'text-left')}>Categories</th>}
+                {show('signal') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('signal')}>
+                    Signal (GRT){renderSortArrow('signal')}
+                  </th>
+                )}
+                {show('stake') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('stake')}>
+                    Stake (GRT){renderSortArrow('stake')}
+                  </th>
+                )}
+                {show('queryFees') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('queryFees')}>
+                    {is30d ? 'Fees 30d (GRT)' : 'Query Fees (GRT)'}{renderSortArrow('queryFees')}
+                  </th>
+                )}
+                {show('created') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('created')}>
+                    Created{renderSortArrow('created')}
+                  </th>
+                )}
+                {show('indexers') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('indexers')}>
+                    Indexers{renderSortArrow('indexers')}
+                  </th>
+                )}
+                {show('ratio') && (
+                  <th className={cn(thSortable, 'text-right')} title={RATIO_TOOLTIP} onClick={() => handleSort('ratio')}>
+                    Signal/Stake{renderSortArrow('ratio')}
+                  </th>
+                )}
+                {show('curators') && (
+                  <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('curators')}>
+                    Curators{renderSortArrow('curators')}
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className={cn(isFetching && 'opacity-60 transition-opacity')}>
@@ -808,7 +855,7 @@ function SubgraphDirectory() {
                     className={`border-b border-[0.5px] border-[var(--border)] transition-colors ${isSelected ? 'bg-[var(--accent)]/5' : 'hover:bg-[var(--bg-elevated)]'}`}
                   >
                     <td
-                      className={`px-3 py-3 text-center ${tdBorder}`}
+                      className={cn(density === 'compact' ? 'px-3 py-1.5' : 'px-3 py-3', 'text-center', tdBorder)}
                       onClick={(e) => { e.stopPropagation(); toggleSelection(row); }}
                     >
                       <input
@@ -819,8 +866,8 @@ function SubgraphDirectory() {
                         onChange={() => {}}
                       />
                     </td>
-                    <td className={`px-4 py-3 text-sm text-[var(--text-faint)] ${tdBorder}`}>{state.page * PAGE_SIZE + idx + 1}</td>
-                    <td className={`px-4 py-3 ${tdBorder}`}>
+                    <td className={cn(pad, 'text-sm text-[var(--text-faint)]', tdBorder)}>{state.page * PAGE_SIZE + idx + 1}</td>
+                    <td className={cn(pad, tdBorder)}>
                       <div className="flex items-center gap-2">
                         <div className="flex flex-col min-w-0">
                           <Link
@@ -839,48 +886,73 @@ function SubgraphDirectory() {
                         {row.isHighVolume ? highVolumeBadge : null}
                       </div>
                     </td>
-                    <td className={`px-4 py-3 text-center ${tdBorder}`}>
-                      <ComplexityCell complexity={row.complexity} />
-                    </td>
-                    <td className={`px-4 py-3 text-center ${tdBorder}`}>
-                      <NetworkCell network={row.network} />
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-sm text-[var(--text)] ${tdBorder}`}>
-                      {formatGRT(row.signal)}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-sm text-[var(--text)] ${tdBorder}`}>
-                      {formatGRT(row.stake)}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-sm text-[var(--text)] ${tdBorder}`}>
-                      {formatGRT(row.queryFees)}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-sm text-[var(--text-muted)] ${tdBorder}`}>
-                      {row.createdAt ? new Date(row.createdAt * 1000).toLocaleDateString() : '--'}
-                    </td>
-                    <td className={`px-4 py-3 text-right font-mono text-sm text-[var(--text)] ${tdBorder}`}>
-                      <span className="inline-flex items-center justify-end gap-1.5">
-                        {row.indexerCount}
-                        {row.indexerCount <= 1 && (
-                          <span className="relative group/lowidx">
-                            <span className="text-[var(--amber)] text-xs cursor-default">&#9888;</span>
-                            <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 px-2 py-1 text-[10px] text-white bg-[var(--bg-elevated)] border border-[var(--border)] rounded whitespace-nowrap opacity-0 group-hover/lowidx:opacity-100 transition-opacity z-50">
-                              Only {row.indexerCount} active indexer, so it may be hard to sync
+                    {show('complexity') && (
+                      <td className={cn(pad, 'text-center', tdBorder)}>
+                        <ComplexityCell complexity={row.complexity} />
+                      </td>
+                    )}
+                    {show('network') && (
+                      <td className={cn(pad, 'text-center', tdBorder)}>
+                        <NetworkCell network={row.network} />
+                      </td>
+                    )}
+                    {show('categories') && (
+                      <td className={cn(pad, 'text-xs text-[var(--text-muted)]', tdBorder)}>
+                        {row.categories.length ? row.categories.join(', ') : <span className="text-[var(--text-faint)]">--</span>}
+                      </td>
+                    )}
+                    {show('signal') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text)]', tdBorder)}>
+                        {formatGRT(row.signal)}
+                      </td>
+                    )}
+                    {show('stake') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text)]', tdBorder)}>
+                        {formatGRT(row.stake)}
+                      </td>
+                    )}
+                    {show('queryFees') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text)]', tdBorder)}>
+                        {formatGRT(row.queryFees)}
+                      </td>
+                    )}
+                    {show('created') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text-muted)]', tdBorder)}>
+                        {row.createdAt ? new Date(row.createdAt * 1000).toLocaleDateString() : '--'}
+                      </td>
+                    )}
+                    {show('indexers') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text)]', tdBorder)}>
+                        <span className="inline-flex items-center justify-end gap-1.5">
+                          {row.indexerCount}
+                          {row.indexerCount <= 1 && (
+                            <span className="relative group/lowidx">
+                              <span className="text-[var(--amber)] text-xs cursor-default">&#9888;</span>
+                              <span className="pointer-events-none absolute bottom-full right-0 mb-1.5 px-2 py-1 text-[10px] text-white bg-[var(--bg-elevated)] border border-[var(--border)] rounded whitespace-nowrap opacity-0 group-hover/lowidx:opacity-100 transition-opacity z-50">
+                                Only {row.indexerCount} active indexer, so it may be hard to sync
+                              </span>
                             </span>
-                          </span>
+                          )}
+                        </span>
+                      </td>
+                    )}
+                    {show('ratio') && (
+                      <td
+                        className={cn(
+                          pad,
+                          'text-right font-mono text-sm',
+                          tdBorder,
+                          highRatio ? 'text-[var(--green)] font-semibold' : 'text-[var(--text)]'
                         )}
-                      </span>
-                    </td>
-                    <td
-                      className={cn(
-                        `px-4 py-3 text-right font-mono text-sm ${tdBorder}`,
-                        highRatio ? 'text-[var(--green)] font-semibold' : 'text-[var(--text)]'
-                      )}
-                    >
-                      <RatioText ratio={row.ratio} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-sm text-[var(--text)]">
-                      {row.curatorCount}
-                    </td>
+                      >
+                        <RatioText ratio={row.ratio} />
+                      </td>
+                    )}
+                    {show('curators') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm text-[var(--text)]', tdBorder)}>
+                        {row.curatorCount}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
