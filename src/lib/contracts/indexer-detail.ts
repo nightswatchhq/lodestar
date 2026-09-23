@@ -57,6 +57,8 @@ export interface IndexerDetail {
   rewardsEarned: string;
   queryFeesCollected: string;
   delegatorShares: string;
+  /** Delegators still holding shares. Absent from a kittiwake older than #163. */
+  delegatorCount?: number | null;
   delegatorParameterCooldown: number;
   lastDelegationParameterUpdate: number;
   url: string | null;

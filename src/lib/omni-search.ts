@@ -7,15 +7,19 @@
  */
 
 import type { SubgraphSearchResult } from '@/lib/contracts/subgraph-search';
+import { INDEXER_TAB_LABELS } from '@/lib/indexer-tabs';
+import { PRESETS, applyPreset, directoryParams } from '@/lib/subgraph-directory';
 import { shortenAddress } from '@/lib/utils';
 
-export type OmniKind = 'page' | 'indexer' | 'subgraph' | 'account';
+export type OmniKind = 'action' | 'page' | 'indexer' | 'subgraph' | 'account';
 
 export interface OmniHit {
   kind: OmniKind;
   label: string;
   detail: string;
   href: string;
+  /** Set on an action that copies rather than navigates. */
+  copy?: string;
 }
 
 export interface IndexerLike {
@@ -26,8 +30,12 @@ export interface IndexerLike {
 
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const PARTIAL_HEX_RE = /^0x[0-9a-fA-F]*$/;
+// What kittiwake's forward lookup accepts: plain ASCII labels, since it does no UTS-46 normalisation.
+const ENS_RE = /^([a-z0-9-]+\.)+eth$/;
+const PAGE_ID_RE = /^\/(indexers|delegators|curators|payments|subgraphs|poi|disassembly)\/(0x[0-9a-fA-F]{40}|Qm[1-9A-HJ-NP-Za-km-z]{44})/;
 
 export const isAddress = (q: string) => ADDRESS_RE.test(q.trim());
+export const isEnsName = (q: string) => ENS_RE.test(q.trim().toLowerCase());
 
 export interface PageLike {
   label: string;
@@ -136,4 +144,45 @@ export function accountHits(q: string): OmniHit[] {
     { kind: 'account', label: 'Delegator portfolio', detail: shortenAddress(a), href: `/delegators/${a}` },
     { kind: 'account', label: 'Curator portfolio', detail: shortenAddress(a), href: `/curators/${a}` },
   ];
+}
+
+const matches = (text: string, t: string) => text.toLowerCase().includes(t);
+
+/**
+ * Things to do rather than places to go: subgraph presets and saved views, the tabs of the indexer
+ * being viewed, and copying the address or hash the current page is about.
+ */
+export function actionHits(
+  pathname: string,
+  q: string,
+  savedViews: readonly { name: string; query: string }[] = [],
+): OmniHit[] {
+  const t = q.trim().toLowerCase();
+  if (t.length < 2) return [];
+  const hits: OmniHit[] = [];
+
+  for (const p of PRESETS) {
+    if (matches(p.label, t) || matches(p.title, t)) {
+      hits.push({ kind: 'action', label: p.label, detail: 'subgraph preset', href: `/subgraphs?${directoryParams(applyPreset(p.id))}` });
+    }
+  }
+  for (const v of savedViews) {
+    if (matches(v.name, t)) {
+      hits.push({ kind: 'action', label: v.name, detail: 'saved view', href: v.query ? `/subgraphs?${v.query}` : '/subgraphs' });
+    }
+  }
+
+  const id = pathname.match(PAGE_ID_RE);
+  if (id?.[1] === 'indexers') {
+    for (const tab of INDEXER_TAB_LABELS) {
+      if (matches(tab.label, t)) {
+        hits.push({ kind: 'action', label: `${tab.label} tab`, detail: 'this indexer', href: `/indexers/${id[2]}?tab=${tab.id}` });
+      }
+    }
+  }
+  if (id && 'copy address hash'.includes(t)) {
+    const what = id[2].startsWith('Qm') ? 'hash' : 'address';
+    hits.push({ kind: 'action', label: `Copy this page's ${what}`, detail: shortenAddress(id[2]), href: pathname, copy: id[2] });
+  }
+  return hits.slice(0, 5);
 }

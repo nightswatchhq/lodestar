@@ -47,6 +47,8 @@ import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { nodeState } from '@/lib/contracts/indexer-node';
 import { parseIndexerTab, type IndexerTab } from '@/lib/indexer-tabs';
 import { IndexerTabBar } from '@/components/indexer/IndexerTabBar';
+import { DelegatorsTable } from '@/components/indexer/DelegatorsTable';
+import { delegatorsTabLabel } from '@/lib/indexer-delegators';
 import { IndexerCompactHeader } from '@/components/indexer/IndexerCompactHeader';
 import { IndexerPagePending } from '@/components/indexer/IndexerPagePending';
 import { SUBGRAPH_SERVICE_ID, subgraphServiceStake } from '@/lib/subgraph-service-stake';
@@ -177,7 +179,7 @@ function IndexerDetailInner({ address }: { address: string }) {
   const name = ensData?.ensName || resolveIndexerName(indexer.account, indexer.id);
   // Absent is not empty. kittiwake#153 leaves a section its nest refused out of the answer and
   // names it under `degraded`, so `undefined` here means the read failed and `[]` means none.
-  const { allocations, closedAllocations, delegators } = indexer;
+  const { allocations, closedAllocations } = indexer;
   const operators = indexer.account.operators;
   const activeTab = parseIndexerTab(searchParams.get('tab'), {
     connected,
@@ -356,7 +358,11 @@ function IndexerDetailInner({ address }: { address: string }) {
         </div>
       </Link>
 
-      <IndexerTabBar active={activeTab} onSelect={setTab} />
+      <IndexerTabBar
+        active={activeTab}
+        onSelect={setTab}
+        labels={{ delegators: delegatorsTabLabel(indexer) }}
+      />
 
       {activeTab === 'overview' && (
       <>
@@ -464,6 +470,7 @@ function IndexerDetailInner({ address }: { address: string }) {
 
       {activeTab === 'delegators' && (
       <>
+      <DelegatorsTable address={address} indexer={indexer} nowSec={nowSec} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {allocations ? (
           <DelegationCalculator
@@ -844,57 +851,6 @@ function IndexerDetailInner({ address }: { address: string }) {
         unavailable={isUnavailable(provisions)}
         selfStakeGRT={selfStake}
       />
-      )}
-
-      {activeTab === 'delegators' && (
-      <>
-      {!delegators ? (
-        <MissingSection
-          title="Top Delegators"
-          what="The delegator list"
-          detail={whyMissing(indexer, 'delegators')}
-        />
-      ) : delegators.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Delegators</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {[...delegators].sort((a, b) => { const ba = BigInt(b.stakedTokens), aa = BigInt(a.stakedTokens); return ba > aa ? 1 : ba < aa ? -1 : 0; }).slice(0, 10).map((del, i) => {
-                const delStake = weiToGRT(del.stakedTokens);
-                const sharePercent = delegated > 0 ? (delStake / delegated) * 100 : 0;
-
-                return (
-                  <div
-                    key={del.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-elevated)]"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-sm text-[var(--text-faint)] flex-shrink-0">#{i + 1}</span>
-                      <Link
-                        href={`/delegators/${del.delegator.id}`}
-                        className="font-mono text-sm text-[var(--text)] hover:text-[var(--accent-text)] transition-colors truncate"
-                      >
-                        {del.delegator.id}
-                      </Link>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-mono text-sm text-[var(--text)]">
-                        {formatGRT(delStake)} GRT
-                      </p>
-                      <p className="text-xs text-[var(--text-faint)]">
-                        {sharePercent.toFixed(2)}% of pool
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-      </>
       )}
     </div>
   );
