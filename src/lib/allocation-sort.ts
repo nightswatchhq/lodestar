@@ -10,7 +10,8 @@ export type AllocationSortKey =
   | 'fees'
   | 'closed'
   | 'ratio'
-  | 'poi';
+  | 'poi'
+  | 'accrued';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -38,6 +39,7 @@ export interface SortableAllocation {
   lastPoiAt?: number | null;
   createdAtSec?: number;
   nowSec?: number;
+  pendingRewards?: string | null;
 }
 
 const STATUS_ORDER: Record<SortableAllocation['status'], number> = { synced: 0, syncing: 1, failed: 2, unreachable: 3 };
@@ -95,6 +97,8 @@ function value(row: SortableAllocation, key: AllocationSortKey, successRate: (ip
     case 'poi':
       if (row.lifecycle === 'closed' || row.nowSec == null || row.createdAtSec == null) return null;
       return (row.lastPoiAt ?? row.createdAtSec) - row.nowSec;
+    case 'accrued':
+      return row.lifecycle === 'closed' || row.pendingRewards == null ? null : wei(row.pendingRewards);
   }
 }
 

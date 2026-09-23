@@ -3,8 +3,9 @@
 import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/Badge';
 import { CopyButton } from '@/components/ui/CopyButton';
-import { cn, formatGRT, formatPPM, formatPercent, shortenAddress } from '@/lib/utils';
+import { cn, formatGRT, formatPPM, formatPercent, formatRelativeTime, shortenAddress, weiToGRT } from '@/lib/utils';
 import { plainGRT } from '@/lib/subgraph-service-stake';
+import { ACCRUED_TOOLTIP, type AccruedTotal } from '@/lib/pending-rewards';
 
 export function IndexerCompactHeader({
   name,
@@ -18,6 +19,8 @@ export function IndexerCompactHeader({
   statedCutPPM,
   effectiveCutPercent,
   rollingAPY30d,
+  accrued = { kind: 'unavailable' },
+  accruedAt = null,
 }: {
   name: string;
   address: string;
@@ -30,7 +33,19 @@ export function IndexerCompactHeader({
   statedCutPPM: number;
   effectiveCutPercent: number | null;
   rollingAPY30d: number | null;
+  accrued?: AccruedTotal;
+  accruedAt?: number | null;
 }) {
+  const ineligible = reoStatus?.status === 'ineligible';
+  const accruedTitle = [
+    ACCRUED_TOOLTIP,
+    accrued.kind === 'unavailable' ? 'Not available: the API sent no pending-rewards reading.' : null,
+    accrued.kind === 'ready' && accrued.unread > 0
+      ? `${accrued.unread} allocation${accrued.unread === 1 ? '' : 's'} could not be read and ${accrued.unread === 1 ? 'is' : 'are'} not counted.`
+      : null,
+    accruedAt != null ? `Read ${formatRelativeTime(accruedAt)}.` : null,
+    ineligible ? 'The REO marks this indexer ineligible.' : null,
+  ].filter(Boolean).join(' ');
   const cut =
     effectiveCutPercent != null
       ? `${effectiveCutPercent.toFixed(2)}% / ${formatPPM(statedCutPPM)}`
@@ -91,7 +106,7 @@ export function IndexerCompactHeader({
         </div>
       </div>
 
-      <div className="hidden sm:grid grid-cols-6 gap-3 mt-3">
+      <div className="hidden sm:grid grid-cols-4 lg:grid-cols-7 gap-3 mt-3">
         <HeaderStat label="Provisioned">{grtOrDash(provisionedGRT)}</HeaderStat>
         <HeaderStat label="Allocated">{grtOrDash(allocatedGRT)}</HeaderStat>
         <HeaderStat label="Delegated">{`${formatGRT(delegatedGRT)} GRT`}</HeaderStat>
@@ -101,6 +116,16 @@ export function IndexerCompactHeader({
         <HeaderStat label="Cut" title="Effective / stated reward cut">{cut}</HeaderStat>
         <HeaderStat label="30d APY">
           {rollingAPY30d == null ? '—' : `${rollingAPY30d.toFixed(2)}%`}
+        </HeaderStat>
+        <HeaderStat label="Accrued" title={accruedTitle}>
+          {accrued.kind === 'unavailable' ? (
+            <span className="text-[var(--text-faint)]">unavailable</span>
+          ) : (
+            <>
+              {`${formatGRT(weiToGRT(accrued.wei))}${accrued.unread > 0 ? '+' : ''} GRT`}
+              {ineligible ? <span className="ml-1 text-[10px] text-[var(--red-text)]">ineligible</span> : null}
+            </>
+          )}
         </HeaderStat>
       </div>
     </header>

@@ -35,6 +35,7 @@ import { MissingSection } from '@/components/indexer/MissingSection';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocation-ratio';
 import { poiClock } from '@/lib/poi-clock';
+import { ACCRUED_TOOLTIP, accruedWei } from '@/lib/pending-rewards';
 
 const PAGE_SIZE = 25;
 
@@ -53,6 +54,7 @@ const ALLOC_COLUMNS: readonly AllocColumn[] = [
   { id: 'ratio', label: 'Ratio', views: ACTIVE },
   { id: 'age', label: 'Age', views: BOTH },
   { id: 'poi', label: 'POI', views: ACTIVE },
+  { id: 'accrued', label: 'Accrued', views: ACTIVE },
   { id: 'rewards', label: 'Indexing Rewards', views: CLOSED, hideBelow: 'sm' },
   { id: 'fees', label: 'Query Fees', views: CLOSED, hideBelow: 'md' },
   { id: 'closed', label: 'Closed', views: CLOSED },
@@ -268,6 +270,9 @@ export function AllocationsPanel({
                       {cls.poi != null ? (
                         <SortHeader label="POI" sortKey="poi" sort={state.sort} onSort={onSort} align="right" className={cls.poi} title="Days since the last POI, or since creation if none, and days left before anyone can force-close." />
                       ) : null}
+                      {cls.accrued != null ? (
+                        <SortHeader label="Accrued" sortKey="accrued" sort={state.sort} onSort={onSort} align="right" className={cls.accrued} title={ACCRUED_TOOLTIP} />
+                      ) : null}
                       {cls.rewards != null ? (
                         <SortHeader label="Indexing Rewards" sortKey="rewards" sort={state.sort} onSort={onSort} align="right" className={cls.rewards} />
                       ) : null}
@@ -429,6 +434,7 @@ function AllocRow({
   const rewards = row.indexingRewards != null ? weiToGRT(row.indexingRewards) : 0;
   const fees = row.queryFeesCollected != null ? weiToGRT(row.queryFeesCollected) : 0;
   const qos = row.ipfsHash ? foghornSuccess(row.ipfsHash) : null;
+  const accrued = accruedWei(row.pendingRewards);
   const pad = compact ? 'px-3 py-1.5' : 'px-4 py-3';
 
   return (
@@ -569,6 +575,17 @@ function AllocRow({
               createdAtSec={createdAtSec(row.createdAtEpoch, currentEpoch, epochLength, nowSec)}
               nowSec={nowSec}
             />
+          )}
+        </td>
+      ) : null}
+      {cls.accrued != null ? (
+        <td className={cn(pad, 'text-right', cls.accrued)}>
+          {row.lifecycle === 'closed' ? (
+            <span className="text-sm text-[var(--text-faint)]">—</span>
+          ) : accrued == null ? (
+            <span className="text-sm text-[var(--text-faint)]" title="Pending rewards were not read for this allocation.">—</span>
+          ) : (
+            <span className="font-mono text-sm text-[var(--text)]" title={ACCRUED_TOOLTIP}>{formatGRT(weiToGRT(accrued))}</span>
           )}
         </td>
       ) : null}

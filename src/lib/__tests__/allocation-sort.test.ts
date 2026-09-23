@@ -74,6 +74,17 @@ describe('sortAllocations', () => {
     expect(ids(sortAllocations(rows, { key: 'deployment', dir: 'asc' }, noSuccess))).toEqual(['0xb2e0', '0xb8e4', '0xb911']);
   });
 
+  it('puts the most accrued first, and an unread or closed row last', () => {
+    const rows = [
+      row('unread', { pendingRewards: null }),
+      row('small', { pendingRewards: '9007199254740993000000' }),
+      row('closed', { pendingRewards: '1', lifecycle: 'closed' }),
+      row('large', { pendingRewards: '9007199254740994000000' }),
+    ];
+    expect(ids(sortAllocations(rows, { key: 'accrued', dir: 'desc' }, noSuccess)))
+      .toEqual(['large', 'small', 'closed', 'unread']);
+  });
+
   it('breaks ties by deployment so a page never reshuffles', () => {
     const rows = [row('c', { signalledTokens: '5' }), row('a', { signalledTokens: '5' }), row('b', { signalledTokens: '5' })];
     expect(ids(sortAllocations(rows, { key: 'signalled', dir: 'desc' }, noSuccess))).toEqual(['a', 'b', 'c']);

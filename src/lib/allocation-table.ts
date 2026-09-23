@@ -34,7 +34,7 @@ export type AllocTableState = {
 
 const SORT_KEYS: readonly AllocationSortKey[] = [
   'deployment', 'status', 'querySuccess', 'blocksBehind', 'allocated', 'signalled',
-  'age', 'rewards', 'fees', 'closed', 'ratio', 'poi',
+  'age', 'rewards', 'fees', 'closed', 'ratio', 'poi', 'accrued',
 ];
 
 export function parseAllocTableState(params: URLSearchParams): AllocTableState {

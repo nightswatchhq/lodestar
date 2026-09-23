@@ -82,6 +82,21 @@ describe('IndexerCompactHeader', () => {
     expect(screen.getByText('40.0%')).toBeInTheDocument();
   });
 
+  it('says accrued rewards are unavailable rather than zero when none were read', () => {
+    renderHeader();
+    expect(screen.getByText('unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('0.00 GRT')).not.toBeInTheDocument();
+  });
+
+  it('shows the accrued total, marked when some rows were not read', () => {
+    renderHeader({ accrued: { kind: 'ready', wei: 3802500000000000000000n, unread: 2 } });
+    expect(screen.getByText('3.80K+ GRT')).toBeInTheDocument();
+    expect(screen.getByText('3.80K+ GRT').closest('[title]')).toHaveAttribute(
+      'title',
+      expect.stringContaining('2 allocations could not be read'),
+    );
+  });
+
   it('shows the REO badge', () => {
     renderHeader();
     expect(screen.getByText('Eligible')).toBeInTheDocument();
