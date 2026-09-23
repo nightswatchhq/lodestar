@@ -6,6 +6,7 @@ import { useGRTPrice, useEpochInfo } from '@/hooks/useNetworkStats';
 import { formatUSD, shortenAddress, cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { OmniSearch } from './OmniSearch';
+import { navigation } from './Sidebar';
 
 const pageTitles: Record<string, string> = {
   '/': 'Protocol Overview',
@@ -26,7 +27,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/curators/')) return 'Curator Profile';
   if (pathname.startsWith('/subgraphs/')) return 'Subgraph Detail';
   if (pathname.startsWith('/poi/')) return 'POI Analysis';
-  return 'Lodestar';
+  return navigation.flatMap((s) => s.items).find((i) => i.href === pathname)?.label ?? 'Lodestar';
 }
 
 export function Topbar() {

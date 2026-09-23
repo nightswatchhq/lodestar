@@ -9,7 +9,7 @@
 import type { SubgraphSearchResult } from '@/lib/contracts/subgraph-search';
 import { shortenAddress } from '@/lib/utils';
 
-export type OmniKind = 'indexer' | 'subgraph' | 'account';
+export type OmniKind = 'page' | 'indexer' | 'subgraph' | 'account';
 
 export interface OmniHit {
   kind: OmniKind;
@@ -28,6 +28,37 @@ const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
 const PARTIAL_HEX_RE = /^0x[0-9a-fA-F]*$/;
 
 export const isAddress = (q: string) => ADDRESS_RE.test(q.trim());
+
+export interface PageLike {
+  label: string;
+  href: string;
+}
+
+/** Words people search for that a page's label does not use. */
+const PAGE_KEYWORDS: Record<string, string> = {
+  '/qos': 'qos quality of service',
+  '/poi': 'proof of indexing',
+  '/network': 'health stats',
+  '/foghorn': 'alerts',
+};
+
+/** Pages whose label, path or keywords match, label prefixes first. */
+export function pageHits(pages: readonly PageLike[], q: string, limit = 4): OmniHit[] {
+  const t = q.trim().toLowerCase();
+  if (t.length < 2) return [];
+  return pages
+    .map((p) => {
+      const label = p.label.toLowerCase();
+      const path = p.href.slice(1).replace(/-/g, ' ');
+      const words = `${path} ${PAGE_KEYWORDS[p.href] ?? ''}`;
+      const score = label.startsWith(t) ? 2 : label.includes(t) || words.includes(t) ? 1 : 0;
+      return { p, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ p }) => ({ kind: 'page', label: p.label, detail: p.href, href: p.href }));
+}
 
 /**
  * Whether `/api/subgraph-search` can say anything useful about this query.
