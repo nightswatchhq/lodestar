@@ -6,9 +6,12 @@ import { INDEXER_TAB_LABELS, type IndexerTab } from '@/lib/indexer-tabs';
 export function IndexerTabBar({
   active,
   onSelect,
+  labels,
 }: {
   active: IndexerTab;
   onSelect: (tab: IndexerTab) => void;
+  /** Labels that carry a figure, such as the delegator count. */
+  labels?: Partial<Record<IndexerTab, string>>;
 }) {
   return (
     <div className="flex items-center gap-1 border-b border-[var(--border)] overflow-x-auto">
@@ -24,7 +27,7 @@ export function IndexerTabBar({
               : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text)]',
           )}
         >
-          {tab.label}
+          {labels?.[tab.id] ?? tab.label}
         </button>
       ))}
     </div>

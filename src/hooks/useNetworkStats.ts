@@ -38,6 +38,7 @@ import {
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
   fetchIndexerDetail,
+  fetchIndexerDelegators,
   fetchSubgraphHistory,
   fetchSubgraphVersions,
   fetchIndexerDisputes,
@@ -277,6 +278,20 @@ export function useIndexerDetail(address: string) {
     queryKey: ['indexerDetails', address],
     queryFn: () => fetchIndexerDetail(address),
     staleTime: FIVE_MINUTES,
+    enabled: !!address,
+  });
+}
+
+/** One page of an indexer's delegators; `null` data means kittiwake does not serve the route. */
+export function useIndexerDelegators(
+  address: string,
+  params: { first: number; skip: number; orderBy: string; orderDirection: 'asc' | 'desc' },
+) {
+  return useQuery({
+    queryKey: ['indexerDelegators', address, params],
+    queryFn: () => fetchIndexerDelegators(address, params),
+    staleTime: ONE_MINUTE,
+    placeholderData: keepPreviousData,
     enabled: !!address,
   });
 }
