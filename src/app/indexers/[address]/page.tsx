@@ -19,6 +19,7 @@ import { AllocationsPanel } from '@/components/indexer/AllocationsPanel';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { fetchIndexerDelegators } from '@/lib/api';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
+import { ReoCoverage } from '@/components/indexer/ReoCoverage';
 import { FoghornScorecard } from '@/components/foghorn/FoghornScorecard';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
 import { useIndexerAllocationsQos } from '@/hooks/useFoghorn';
@@ -747,8 +748,9 @@ function IndexerDetailInner({ address }: { address: string }) {
                       )}
                     </div>
                     <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
-                      Source: REO oracle contract (GIP-0079). The oracle evaluates indexer service quality (HTTP status, response speed, and data freshness) over 28-day windows with 14-day renewal cycles. The badge above reflects the oracle&apos;s own eligibility verdict; a due renewal does not mean an eligible indexer has stopped earning.
+                      Source: REO oracle contract (GIP-0079). The oracle counts active days, each needing qualifying queries (HTTP 200, under 5 s, within 50,000 blocks of chain head) on enough subgraphs, five or more days in a rolling 28, and renews eligibility for 14 days. The badge above reflects the oracle&apos;s own eligibility verdict; a due renewal does not mean an eligible indexer has stopped earning.
                     </p>
+                    <ReoCoverage indexer={address} allocations={indexer.allocations} />
                   </div>
                 )}
               </CardContent>
