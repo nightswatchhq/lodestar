@@ -31,9 +31,11 @@ import {
   emptyDirectoryState,
   fetchWholeDirectory,
   hasFilters,
+  isUnallocated,
   loadSavedViews,
   parseDirectoryState,
   saveView,
+  toggleUnallocated,
   type Bound,
   type DirectorySortKey,
   type DirectoryState,
@@ -472,6 +474,13 @@ function SubgraphDirectory() {
             {p.label}
           </button>
         ))}
+        <Link
+          href="/subgraphs/migration"
+          title="BNB and Polygon deployments with signal and no indexer, for the move off Subgraph Studio"
+          className="text-xs text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"
+        >
+          Studio migration &rarr;
+        </Link>
         {savedViews.length > 0 && (
           <select
             aria-label="Saved views"
@@ -541,6 +550,14 @@ function SubgraphDirectory() {
             facets={data.facets.networks}
             onChange={(network) => update({ ...state, network })}
           />
+          <button
+            title="Some curation signal and no open allocation; combines with the network filter"
+            aria-pressed={isUnallocated(state)}
+            onClick={() => update(toggleUnallocated(state))}
+            className={cn(buttonBase, isUnallocated(state) ? buttonOn : buttonOff)}
+          >
+            Signalled, nobody allocated
+          </button>
           <FacetSelect
             label="Filter by complexity"
             allLabel="All Complexities"
