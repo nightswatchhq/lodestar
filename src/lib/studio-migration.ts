@@ -27,6 +27,9 @@ export const REO_SIGNAL_FLOOR_GRT = 500;
 /** Rows to read curator signals for. Past this the page says what it left unread. */
 export const SIGNAL_AGE_ROWS = 150;
 
+/** Curator reads in flight at once. kittiwake's gate shed 100 of 150 fired together on 2026-09-24. */
+export const SIGNAL_AGE_CONCURRENCY = 4;
+
 /** A `network` query value: comma-separated manifest names, or the default pair. Unknown names pass; the directory answers them empty. */
 export function parseNetworks(param: string | null): string[] {
   const names = (param ?? '')
@@ -78,6 +81,38 @@ export function latestSignalChange(signals: Pick<CuratorSignalEntry, 'lastSignal
   let latest = 0;
   for (const s of signals) if (s.lastSignalChange > latest) latest = s.lastSignalChange;
   return latest > 0 ? latest : null;
+}
+
+export interface SignalAges {
+  /** Latest signal change per deployment read, null where the curator rows were empty. */
+  at: Map<string, number | null>;
+  failed: number;
+}
+
+/**
+ * The latest signal change for each deployment, a few reads at a time. A read that fails is counted
+ * and its row left unread, because one deployment's age is not worth the page.
+ */
+export async function readSignalAges(
+  hashes: readonly string[],
+  read: (hash: string) => Promise<{ signals: Pick<CuratorSignalEntry, 'lastSignalChange'>[] }>,
+  concurrency = SIGNAL_AGE_CONCURRENCY,
+): Promise<SignalAges> {
+  const at = new Map<string, number | null>();
+  let failed = 0;
+  let next = 0;
+  const worker = async () => {
+    while (next < hashes.length) {
+      const hash = hashes[next++];
+      try {
+        at.set(hash, latestSignalChange((await read(hash)).signals));
+      } catch {
+        failed++;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(concurrency, hashes.length) }, worker));
+  return { at, failed };
 }
 
 /** Newest signal first; rows with no reading after those with one; then the most signal. */

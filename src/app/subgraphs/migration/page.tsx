@@ -3,7 +3,7 @@
 import { Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
@@ -17,11 +17,11 @@ import {
   REO_SIGNAL_FLOOR_GRT,
   SIGNAL_AGE_ROWS,
   STUDIO_SUPPORT_ENDS,
-  latestSignalChange,
   migrationRow,
   migrationStarted,
   migrationState,
   parseNetworks,
+  readSignalAges,
   signalAgeLabel,
   sortBySignalAge,
 } from '@/lib/studio-migration';
@@ -61,21 +61,16 @@ function StudioMigration() {
     () => [...(directory.data ?? [])].sort((a, b) => Number(BigInt(b.signalledTokens) - BigInt(a.signalledTokens))).slice(0, SIGNAL_AGE_ROWS),
     [directory.data],
   );
-  const ages = useQueries({
-    queries: toRead.map((d) => ({
-      queryKey: ['subgraphCuration', d.ipfsHash],
-      queryFn: () => fetchSubgraphCuration(d.ipfsHash),
-      staleTime: FIVE_MINUTES,
-      retry: 1,
-    })),
+  const reading = useMemo(() => toRead.map((d) => d.ipfsHash), [toRead]);
+  const ages = useQuery({
+    queryKey: ['studioMigrationAges', reading],
+    queryFn: () => readSignalAges(reading, fetchSubgraphCuration),
+    enabled: reading.length > 0,
+    staleTime: FIVE_MINUTES,
   });
-  const signalledAt = new Map<string, number | null>();
-  toRead.forEach((d, i) => {
-    const q = ages[i];
-    signalledAt.set(d.ipfsHash, q.status === 'success' ? latestSignalChange(q.data.signals) : null);
-  });
-  const agesPending = ages.some((q) => q.status === 'pending');
-  const agesFailed = ages.filter((q) => q.status === 'error').length;
+  const signalledAt = ages.data?.at ?? new Map<string, number | null>();
+  const agesPending = reading.length > 0 && ages.isPending;
+  const agesFailed = ages.data?.failed ?? 0;
 
   const rows = sortBySignalAge((directory.data ?? []).map((d) => migrationRow(d, signalledAt.get(d.ipfsHash) ?? null)));
   const unread = Math.max(0, (directory.data?.length ?? 0) - SIGNAL_AGE_ROWS);
@@ -165,7 +160,7 @@ function StudioMigration() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-[var(--text-muted)]">
-                      {r.signalledAt !== null ? signalAgeLabel(r.signalledAt) : signalledAt.has(r.ipfsHash) && agesPending ? '…' : '--'}
+                      {r.signalledAt !== null ? signalAgeLabel(r.signalledAt) : agesPending && reading.includes(r.ipfsHash) ? '…' : '--'}
                     </td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-[var(--text-muted)]">{r.curatorCount}</td>
                     <td className="px-4 py-3 text-right font-mono text-xs text-[var(--red-text)]">0</td>
@@ -183,8 +178,8 @@ function StudioMigration() {
       {directory.data && (
         <p className="text-[11px] text-[var(--text-faint)] leading-relaxed max-w-3xl">
           Signal and allocations are the directory&apos;s reading of the network subgraph. &ldquo;Signalled&rdquo; is the latest change to any
-          curator&apos;s position, read per deployment{unread > 0 ? ` for the ${SIGNAL_AGE_ROWS} largest by signal; ${unread.toLocaleString()} smaller rows show --` : ''}
-          {agesFailed > 0 ? `; ${agesFailed} of those reads failed` : ''}. Whether a deployment that gets an indexer then syncs is
+          curator&apos;s position, read per deployment{unread > 0 ? ` for the ${SIGNAL_AGE_ROWS} largest by signal` : ''}
+          {agesFailed > 0 ? `, ${agesFailed} of which failed to read` : ''}{unread > 0 ? `; ${unread.toLocaleString()} smaller rows show --` : ''}. Whether a deployment that gets an indexer then syncs is
           the indexer&apos;s page to answer, not this one.
         </p>
       )}

@@ -9,6 +9,7 @@ import {
   migrationStarted,
   migrationState,
   parseNetworks,
+  readSignalAges,
   signalAgeLabel,
   sortBySignalAge,
 } from '../studio-migration';
@@ -113,5 +114,33 @@ describe('a migration row', () => {
   it('knows whether 8 October has come', () => {
     expect(migrationStarted(Date.UTC(2026, 9, 7, 23))).toBe(false);
     expect(migrationStarted(Date.UTC(2026, 9, 8))).toBe(true);
+  });
+});
+
+describe('readSignalAges', () => {
+  it('reads every hash a few at a time and counts the reads that fail', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const read = async (hash: string) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((r) => setTimeout(r, 1));
+      inFlight--;
+      if (hash === 'shed') throw new Error('429');
+      return { signals: [{ lastSignalChange: hash.length }] };
+    };
+    const hashes = ['a', 'bb', 'shed', 'cccc', 'ddddd', 'eeeeee', 'fffffff'];
+    const { at, failed } = await readSignalAges(hashes, read, 2);
+    expect(peak).toBe(2);
+    expect(failed).toBe(1);
+    expect(at.has('shed')).toBe(false);
+    expect(at.get('fffffff')).toBe(7);
+    expect(at.size).toBe(6);
+  });
+
+  it('returns null for a deployment whose curator rows are empty', async () => {
+    const { at, failed } = await readSignalAges(['x'], async () => ({ signals: [] }));
+    expect(at.get('x')).toBeNull();
+    expect(failed).toBe(0);
   });
 });
