@@ -130,6 +130,29 @@ export function hasFilters(state: DirectoryState): boolean {
   );
 }
 
+/** Signal that at least one GRT of curation is on the deployment; a fraction is dust, not a request. */
+export const SIGNALLED_MIN_GRT = 1;
+
+/**
+ * The "signalled, nobody allocated" toggle: some signal and no open allocation. Held as two range
+ * bounds rather than a flag so it composes with the network filter and survives in a shared link.
+ */
+export function isUnallocated(state: DirectoryState): boolean {
+  return state.ranges.indexers.max === 0 && state.ranges.signal.min !== null && state.ranges.signal.min > 0;
+}
+
+export function toggleUnallocated(state: DirectoryState): DirectoryState {
+  if (isUnallocated(state)) {
+    return { ...state, ranges: { ...state.ranges, indexers: OPEN, signal: OPEN } };
+  }
+  return {
+    ...state,
+    sort: 'signal',
+    dir: 'desc',
+    ranges: { ...state.ranges, indexers: { min: null, max: 0 }, signal: { min: SIGNALLED_MIN_GRT, max: null } },
+  };
+}
+
 export type Preset = {
   id: 'under-allocated' | 'high-volume' | 'new';
   label: string;
