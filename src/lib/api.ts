@@ -15,23 +15,32 @@ import {
 import { parseResponse } from './contract';
 import { apiUrl } from './api-origin';
 import { fetchShedAware } from './shed';
+import { parseOpenApi, type ApiDoc } from './openapi';
 import type { ManifestAnalysis } from './manifest';
 import type { POIOverview, POIDeploymentDetail } from './poi';
 import type { DeploymentIndexingStatus } from './indexing-status-shape';
 import type { DeveloperActivityResponse } from '@/lib/contracts/developer-activity';
 import type { ActivityEvent } from '@/lib/contracts/horizon-activity';
-import type { DipsAllocation, DipsStep } from '@/lib/contracts/dips';
 import type { Agreement, AgreementStatus } from '@/lib/dips-agreements';
 import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import type { Concentration } from '@/lib/concentration';
 import type { ServiceCensus } from '@/lib/service-census';
 import type { RequirementsJson } from '@/lib/operator-requirements';
-import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
+import type { IndexerNode } from '@/lib/contracts/indexer-node';
+import {
+  MISSABLE_SECTIONS,
+  type DegradedPart,
+  type IndexerDetail,
+  type MissableSection,
+} from '@/lib/contracts/indexer-detail';
 import type {
   SubgraphSearchAnswer,
   SubgraphSearchResult,
 } from '@/lib/contracts/subgraph-search';
 import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
+import type { IndexerTrendsResponse } from '@/lib/contracts/indexer-trends';
+import type { IndexerDelegatorsPage } from '@/lib/contracts/indexer-delegators';
+import type { IndexerQosResponse, QosDeploymentsResponse, QosScoreResponse } from '@/lib/contracts/indexer-qos';
 import type { DisassemblyReport } from '@/lib/disassembly/types';
 import type { DisassemblyDiff } from '@/lib/disassembly/diff';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
@@ -55,15 +64,27 @@ import type {
   SubgraphVersion,
 } from '@/lib/contracts/indexer-signals';
 
-/** What `/api/dips` answers. `available: false` when the contracts are not configured. */
-export interface DipsStatusResponse {
+/** What `/api/dips` answers: where protocol issuance currently goes. */
+export interface DipsAllocation {
+  target: string;
+  label: string;
+  rate: number;
+  sharePct: number;
+  selfMinting: boolean;
+  lastDistributedAt: number | null;
+  configuredNotDistributed: boolean;
+  observed: boolean;
+}
+
+export interface DipsResponse {
   available: boolean;
-  totalRate?: number;
-  agreementRate?: number;
-  live?: boolean;
-  allocations?: DipsAllocation[];
-  timeline?: DipsStep[];
-  lastConfiguredAt?: number | null;
+  totalRate: number;
+  /** RewardsManager per-block GRT. Older kittiwake omits it; the RewardsManager row is the fallback. */
+  indexingRate?: number;
+  agreementRate: number;
+  live: boolean;
+  configuredNotDistributed: string[];
+  allocations: DipsAllocation[];
 }
 
 /** What `/api/dips/agreements` answers. */
@@ -238,6 +259,21 @@ export interface SubgraphDeployment {
   categories: string[];
 }
 
+/**
+ * One deployment's directory row by IPFS hash, or null when kittiwake has none. A 400 is
+ * kittiwake saying the string is not a deployment hash, which is also none.
+ */
+export async function fetchSubgraphDeployment(hash: string): Promise<SubgraphDeployment | null> {
+  const response = await fetchShedAware(apiUrl(`/api/subgraph-deployment/${encodeURIComponent(hash)}`));
+  if (response.status === 404 || response.status === 400) return null;
+  if (!response.ok) throw new Error(`Deployment fetch failed: ${response.status}`);
+  const rows = parseResponse<SubgraphDeployment[]>('/api/subgraph-deployment', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'displayName'] },
+    pick: 'data',
+  });
+  return rows.find((r) => r.ipfsHash === hash) ?? null;
+}
+
 export async function fetchSubgraphDeployments(params: {
   first?: number;
   skip?: number;
@@ -260,6 +296,49 @@ export async function fetchSubgraphDeployments(params: {
     // stops arriving, this should say so rather than let the table quietly go anonymous again.
     rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'displayName'] },
     pick: 'data',
+  });
+}
+
+/** One row of `/api/subgraph-directory`. Wei as decimal strings, as everywhere else. */
+export interface DirectoryRow {
+  id: string;
+  ipfsHash: string;
+  displayName: string | null;
+  categories: string[];
+  signalledTokens: string;
+  stakedTokens: string;
+  queryFeesAmount: string;
+  queryFees30d: string;
+  createdAt: number;
+  indexerCount: number;
+  curatorCount: number;
+  /** Null when the manifest has not been read yet, or names no network. */
+  network: string | null;
+  complexity: 'Light' | 'Moderate' | 'Heavy' | 'Extreme' | null;
+}
+
+export interface DirectoryFacet {
+  id: string;
+  count: number;
+}
+
+export interface DirectoryPage {
+  data: DirectoryRow[];
+  /** Every match, not just this page. */
+  total: number;
+  /** Rows with no manifest read yet, which no network or complexity filter can match. */
+  unanalysed: number;
+  facets: { networks: DirectoryFacet[]; complexities: DirectoryFacet[]; categories: DirectoryFacet[] };
+}
+
+/** The deployments directory, filtered and paged by kittiwake over the whole set. */
+export async function fetchSubgraphDirectory(query: string): Promise<DirectoryPage> {
+  const response = await fetchShedAware(apiUrl(`/api/subgraph-directory?${query}`));
+  if (!response.ok) throw new Error(`Directory fetch failed: ${response.status}`);
+  return parseResponse('/api/subgraph-directory', await response.json(), {
+    rows: { data: ['id', 'ipfsHash', 'signalledTokens', 'stakedTokens', 'queryFees30d', 'network', 'complexity'] },
+    present: ['total', 'unanalysed'],
+    arrays: ['facets.networks', 'facets.complexities', 'facets.categories'],
   });
 }
 
@@ -352,6 +431,7 @@ export async function fetchIndexingStatus(hash: string): Promise<DeploymentIndex
 export async function fetchIndexerStatus(address: string): Promise<{
   indexerAddress: string;
   indexerUrl: string | null;
+  node?: IndexerNode;
   totalAllocations: number;
   syncedCount: number;
   syncingCount: number;
@@ -378,10 +458,16 @@ export async function fetchIndexerStatus(address: string): Promise<{
 }> {
   const response = await fetchShedAware(apiUrl(`/api/indexer-status/${encodeURIComponent(address)}`));
   if (!response.ok) throw new Error(`Indexer status failed: ${response.status}`);
-  return parseResponse('/api/indexer-status', await response.json(), {
-    objects: ['data'],
+  // `data.node` arrived with kittiwake#152 and is asserted only when the answer carries it, so a
+  // kittiwake without it still parses; its absence costs the page the "checking" state, not the page.
+  const body = await response.json();
+  const hasNode = (body as { data?: { node?: unknown } }).data?.node != null;
+  return parseResponse('/api/indexer-status', body, {
+    objects: hasNode ? ['data', 'data.node'] : ['data'],
     arrays: ['data.deployments'],
-    present: ['data.indexerAddress'],
+    present: hasNode
+      ? ['data.indexerAddress', 'data.node.pending', 'data.node.stale']
+      : ['data.indexerAddress'],
     pick: 'data',
   });
 }
@@ -449,6 +535,57 @@ export async function fetchIndexerPayments(receiver: string): Promise<PaymentsOv
     objects: ['data'],
     arrays: ['data.escrowAccounts', 'data.recentTransactions'],
     present: ['data.totalCollected', 'data.activePayers'],
+    pick: 'data',
+  });
+}
+
+/** An indexer's daily rewards and query fees over the last `days` UTC days, today included. */
+export async function fetchIndexerTrends(address: string, days = 30): Promise<IndexerTrendsResponse> {
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address)}/trends?days=${days}`),
+  );
+  if (!response.ok) throw new Error(`Indexer trends failed: ${response.status}`);
+  return parseResponse('/api/indexer/trends', await response.json(), {
+    objects: ['data'],
+    rows: {
+      'data.rewards': ['timestamp', 'totalIndexerRewards', 'totalDelegationRewards'],
+      'data.queryFees': ['timestamp', 'totalCollected', 'totalCurators', 'totalCollectedNet'],
+    },
+    pick: 'data',
+  });
+}
+
+/** An indexer's daily QoS from Edge & Node's oracle postings over the last `days` UTC days, today included. */
+export async function fetchIndexerQos(address: string, days = 90): Promise<IndexerQosResponse> {
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos?days=${days}`),
+  );
+  if (!response.ok) throw new Error(`Indexer QoS failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos', await response.json(), {
+    objects: ['data', 'data.summary', 'data.freshness'],
+    rows: { 'data.qos': ['date', 'buckets', 'partial', 'badBuckets'] },
+    pick: 'data',
+  });
+}
+
+/** The QoS Quality score: the latest breakdown and a daily history over the scoring window. */
+export async function fetchIndexerQosScore(address: string): Promise<QosScoreResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos-score`));
+  if (!response.ok) throw new Error(`QoS score failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos-score', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.daily'],
+    pick: 'data',
+  });
+}
+
+/** Every deployment behind the QoS Quality score, with how much of it each one costs. */
+export async function fetchIndexerQosDeployments(address: string): Promise<QosDeploymentsResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos-deployments`));
+  if (!response.ok) throw new Error(`QoS deployments failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos-deployments', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.deployments': ['deployment_id', 'drag', 'measured'] },
     pick: 'data',
   });
 }
@@ -658,17 +795,18 @@ export async function fetchCuratorLeaderboard(params: { first?: number; skip?: n
 // saying so. `failed-reads-are-not-answers` exists to catch that and its pattern only matched the
 // `const r = await fetch(…)` form, so this shape walked past it.
 
-/** `available: false` is a real answer here: the DIPS contracts may simply not be configured. */
-export async function fetchDipsStatus(): Promise<DipsStatusResponse> {
+export async function fetchDips(): Promise<DipsResponse> {
   const response = await fetchShedAware(apiUrl('/api/dips'));
-  if (!response.ok) throw new Error(`DIPS status failed: ${response.status}`);
+  if (!response.ok) throw new Error(`DIPS failed: ${response.status}`);
   return parseResponse('/api/dips', await response.json(), {
     objects: ['data'],
-    present: ['data.available'],
+    present: ['data.available', 'data.totalRate'],
+    arrays: ['data.allocations'],
     pick: 'data',
   });
 }
 
+/** `available: false` is a real answer here: the DIPS contracts may simply not be configured. */
 export async function fetchDipsAgreements(): Promise<DipsAgreementsResponse> {
   const response = await fetchShedAware(apiUrl('/api/dips/agreements'));
   if (!response.ok) throw new Error(`DIPS agreements failed: ${response.status}`);
@@ -764,6 +902,14 @@ export async function fetchGrtFlow(): Promise<GrtFlowData> {
 // ended `json.data?.x ?? []`, so a 200 carrying a renamed field rendered as "nothing happened"
 // rather than as a contract change.
 
+/** Where each section kittiwake may leave out sits in the body. */
+const SECTION_PATHS: Record<MissableSection, string> = {
+  operators: 'data.indexer.account.operators',
+  delegators: 'data.indexer.delegators',
+  allocations: 'data.indexer.allocations',
+  closedAllocations: 'data.indexer.closedAllocations',
+};
+
 export async function fetchIndexerDetail(address: string): Promise<IndexerDetail | null> {
   const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address.toLowerCase())}`));
   if (!response.ok) throw new Error(`Indexer detail failed: ${response.status}`);
@@ -776,12 +922,57 @@ export async function fetchIndexerDetail(address: string): Promise<IndexerDetail
     parseResponse('/api/indexer', body, { present: ['data'] });
     return null;
   }
-  return parseResponse('/api/indexer', body, {
+  // Only a section `data.degraded` admits to leaving out goes unasserted. One that vanishes with
+  // nothing naming it is still the contract change this parser exists to catch.
+  const degraded = degradedSections(body);
+  const leftOut = new Set(degraded.map((d) => d.part));
+  const indexer = parseResponse<IndexerDetail>('/api/indexer', body, {
     objects: ['data', 'data.indexer', 'data.indexer.account'],
-    arrays: ['data.indexer.allocations', 'data.indexer.delegators'],
+    arrays: MISSABLE_SECTIONS.filter((s) => !leftOut.has(s)).map((s) => SECTION_PATHS[s]),
     present: ['data.indexer.stakedTokens', 'data.indexer.delegatedTokens'],
     pick: 'data.indexer',
   });
+  return degraded.length > 0 ? { ...indexer, degraded } : indexer;
+}
+
+/**
+ * One page of an indexer's delegators, or null from a kittiwake that does not serve the route yet
+ * (kittiwake#163), so the caller can fall back to the capped list and say that it has.
+ */
+export async function fetchIndexerDelegators(
+  address: string,
+  params: { first: number; skip: number; orderBy: string; orderDirection: 'asc' | 'desc' },
+): Promise<IndexerDelegatorsPage | null> {
+  const qs = new URLSearchParams({
+    first: String(params.first),
+    skip: String(params.skip),
+    orderBy: params.orderBy,
+    orderDirection: params.orderDirection,
+  });
+  const response = await fetchShedAware(
+    apiUrl(`/api/indexer/${encodeURIComponent(address.toLowerCase())}/delegators?${qs}`),
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Indexer delegators failed: ${response.status}`);
+  return parseResponse('/api/indexer/delegators', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.delegators': ['delegator', 'shareAmount', 'currentTokens', 'thawingTokens', 'delegatedAt', 'lastChangeAt'] },
+    present: ['data.total', 'data.pool'],
+    pick: 'data',
+  });
+}
+
+/**
+ * The sections `data.degraded` names, or none. Parsed rather than read: the assertions above are
+ * relaxed by what it finds, so a malformed `degraded` must fail rather than read as empty.
+ */
+function degradedSections(body: unknown): DegradedPart[] {
+  const named = (body as { data?: { degraded?: unknown } }).data?.degraded;
+  if (named === undefined) return [];
+  return parseResponse<{ degraded: DegradedPart[] }>('/api/indexer', body, {
+    rows: { 'data.degraded': ['part', 'reason'] },
+    pick: 'data',
+  }).degraded;
 }
 
 export async function fetchSubgraphHistory(
@@ -862,6 +1053,13 @@ export async function fetchENSName(address: string): Promise<{ ensName: string |
   const response = await fetchShedAware(apiUrl(`/api/ens?address=${encodeURIComponent(address)}`));
   if (!response.ok) throw new Error(`ENS lookup failed: ${response.status}`);
   return parseResponse('/api/ens', await response.json(), { present: ['ensName'] });
+}
+
+/** The address a `.eth` name resolves to, or null when it resolves to nothing. */
+export async function fetchENSAddress(name: string): Promise<{ address: string | null }> {
+  const response = await fetchShedAware(apiUrl(`/api/ens?name=${encodeURIComponent(name)}`));
+  if (!response.ok) throw new Error(`ENS lookup failed: ${response.status}`);
+  return parseResponse('/api/ens', await response.json(), { present: ['address'] });
 }
 
 // ── The last of the reads that built their own requests ──────────────────────
@@ -946,8 +1144,9 @@ export async function fetchIndexerPnl(
   params: { windowDays: number; grtPrice?: number; chain?: string },
 ): Promise<IndexerPnl> {
   const qs = new URLSearchParams({ window: String(params.windowDays) });
-  if (params.grtPrice != null) qs.set('price', String(params.grtPrice));
-  if (params.chain) qs.set('chain', params.chain);
+  // kittiwake reads `grtPrice` and `chains`; any other name is ignored and the dollar columns come back null.
+  if (params.grtPrice != null) qs.set('grtPrice', String(params.grtPrice));
+  if (params.chain) qs.set('chains', params.chain);
   const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/pnl?${qs}`));
   if (!response.ok) throw new Error(`Indexer P&L failed: ${response.status}`);
   // `net_usd` is the headline and it is a subtraction: a missing `infra_cost_usd` would render a
@@ -1124,6 +1323,13 @@ export async function fetchSqlCatalog(): Promise<SqlCatalog> {
 
 /** Thrown when a query is refused, carrying what the route said about it. */
 export class SqlRefused extends Error {}
+
+/** kittiwake's own description of its routes, for the API page. */
+export async function fetchApiDoc(): Promise<ApiDoc> {
+  const response = await fetchShedAware(apiUrl('/openapi.json'));
+  if (!response.ok) throw new Error(`The API description could not be read: ${response.status}`);
+  return parseOpenApi(await response.json());
+}
 
 export async function runSqlQuery(dataset: string, q: string): Promise<QueryResult> {
   const response = await fetchShedAware(apiUrl('/api/sql/query'), {

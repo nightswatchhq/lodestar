@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// A self-hosted build's Cockpit is often plain http on the operator's network, which `https:` does not admit.
+const cockpitOrigin = process.env.NEXT_PUBLIC_COCKPIT_URL?.trim()
+  ? new URL(process.env.NEXT_PUBLIC_COCKPIT_URL.trim()).origin
+  : null;
+
 const securityHeaders = [
   // Prevent clickjacking
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -26,7 +31,7 @@ const securityHeaders = [
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
       // Allow all HTTPS + WebSocket connections (wallet RPC, subgraph, WalletConnect)
-      "connect-src 'self' https: wss:",
+      `connect-src 'self' https: wss:${cockpitOrigin ? ` ${cockpitOrigin}` : ''}`,
       // No embedding us in iframes
       "frame-ancestors 'none'",
       "base-uri 'self'",

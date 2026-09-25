@@ -15,10 +15,7 @@ import {
   formatRelativeTime,
   cn,
 } from '@/lib/utils';
-import {
-  calculateDelegationCapacity,
-  calculateEstimatedAPR,
-} from '@/lib/rewards';
+import { calculateDelegationCapacity } from '@/lib/rewards';
 import type { Indexer } from '@/lib/queries';
 
 // ---------- types ----------
@@ -32,7 +29,7 @@ interface ProcessedIndexer {
   rewardCut: number;
   effectiveCut: number;
   queryFeeCut: number;
-  estimatedAPR: number;
+  estimatedAPR: number | null;
   totalRewards: number;
   allocations: number;
   createdAt: number;
@@ -64,27 +61,18 @@ const METRICS: MetricDef[] = [
 function processIndexer(
   indexer: Indexer,
   delegationRatio: number,
-  networkRewardsPerYear: number,
+  delegatorAPR: number | null,
+  effectiveCutPercent: number | null,
 ): ProcessedIndexer {
   const selfStake = weiToGRT(indexer.stakedTokens) - weiToGRT(indexer.lockedTokens ?? '0');
   const delegated = weiToGRT(indexer.delegatedTokens);
   const totalRewards = weiToGRT(indexer.rewardsEarned);
 
   const capacity = calculateDelegationCapacity(selfStake, delegated, delegationRatio);
-  const totalStake = selfStake + delegated;
-  const indexerRewardsPerYear = totalStake > 0
-    ? (totalStake / 3_000_000_000) * networkRewardsPerYear
-    : 0;
 
-  const estimatedAPR = calculateEstimatedAPR(
-    indexerRewardsPerYear,
-    indexer.indexingRewardCut,
-    delegated,
-    10_000, // reference delegation of 10K GRT
-  );
-
-  const rawCut = indexer.indexingRewardCut / 1_000_000;
-  const effectiveCut = rawCut * 100;
+  // The raw cut stood in here for the effective one, which is lower wherever the indexer's own
+  // stake is a real share of the pool: ellipfra's 43% is 38.7% to its delegators.
+  const effectiveCut = effectiveCutPercent ?? (indexer.indexingRewardCut / 1_000_000) * 100;
 
   return {
     id: indexer.id,
@@ -95,7 +83,7 @@ function processIndexer(
     rewardCut: indexer.indexingRewardCut,
     effectiveCut,
     queryFeeCut: indexer.queryFeeCut,
-    estimatedAPR,
+    estimatedAPR: delegatorAPR,
     totalRewards,
     allocations: indexer.allocationCount,
     createdAt: indexer.createdAt,
@@ -108,7 +96,7 @@ function formatMetric(value: unknown, format: MetricDef['format']): string {
     case 'grt':
       return `${formatGRT(value as number)} GRT`;
     case 'percent':
-      return `${(value as number).toFixed(2)}%`;
+      return value == null || !Number.isFinite(value as number) ? '—' : `${(value as number).toFixed(2)}%`;
     case 'ppm':
       return formatPPM(value as number);
     case 'number':
@@ -262,15 +250,17 @@ function CompareContent() {
   const indexers = indexersData?.indexers ?? [];
 
   // Build maps from enriched data (has ENS names + allocation-level APR)
-  const { nameMap, aprMap } = useMemo(() => {
+  const { nameMap, aprMap, cutMap } = useMemo(() => {
     const names = new Map<string, string>();
     const aprs = new Map<string, number>();
+    const cuts = new Map<string, number | null>();
     const enrichedList = enrichedData && 'indexers' in enrichedData ? enrichedData.indexers : enrichedData ?? [];
     for (const e of enrichedList) {
       names.set(e.id, e.name ?? e.id);
       aprs.set(e.id, e.delegatorAPR);
+      cuts.set(e.id, e.effectiveCut);
     }
-    return { nameMap: names, aprMap: aprs };
+    return { nameMap: names, aprMap: aprs, cutMap: cuts };
   }, [enrichedData]);
 
   const setSlot = useCallback((idx: number, id: string) => {
@@ -292,21 +282,17 @@ function CompareContent() {
     });
   }, []);
 
-  // Process selected indexers — overlay enriched APR when available
+  // APR is kittiwake's Instant figure. There is no share-of-3B fallback.
   const processed: (ProcessedIndexer | null)[] = useMemo(() => {
     return selections.map((sel) => {
       if (!sel) return null;
       const ix = indexers.find((i) => i.id === sel);
       if (!ix) return null;
-      const p = processIndexer(ix, delegationRatio, 300_000_000);
-      const enrichedAPR = aprMap.get(sel);
-      if (enrichedAPR !== undefined) {
-        p.estimatedAPR = enrichedAPR;
-        p.name = nameMap.get(sel) ?? p.name;
-      }
+      const p = processIndexer(ix, delegationRatio, aprMap.get(sel) ?? null, cutMap.get(sel) ?? null);
+      p.name = nameMap.get(sel) ?? p.name;
       return p;
     });
-  }, [selections, indexers, delegationRatio, aprMap, nameMap]);
+  }, [selections, indexers, delegationRatio, aprMap, cutMap, nameMap]);
 
   // Best values per metric
   const bestValues = useMemo(() => {
@@ -315,7 +301,10 @@ function CompareContent() {
 
     const result: Record<string, number> = {};
     for (const metric of METRICS) {
-      const vals = active.map((p) => p[metric.key] as number);
+      const vals = active
+        .map((p) => p[metric.key] as number | null)
+        .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      if (vals.length === 0) continue;
       result[metric.key] =
         metric.highlight === 'higher' ? Math.max(...vals) : Math.min(...vals);
     }
@@ -450,8 +439,8 @@ function CompareContent() {
           {/* Legend */}
           <div className="px-4 py-3 border-t border-[0.5px] border-[var(--border)] bg-[var(--bg-elevated)]">
             <p className="text-xs text-[var(--text-faint)]">
-              Best value in each row is highlighted in accent colour. APR uses allocation-level
-              calculations from the enriched pipeline when available.
+              Best value in each row is highlighted in accent colour. APR is the Instantaneous
+              figure from the directory.
             </p>
           </div>
         </CardContent>

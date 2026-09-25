@@ -5,10 +5,11 @@ import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useAccount, useConnect } from 'wagmi';
 import { injected } from 'wagmi/connectors';
-import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrichedIndexers, useENSName } from '@/hooks/useNetworkStats';
+import { useGRTPrice, useNetworkStats, useREOStatus, useIndexerDetail, useEnrichedIndexers, useENSName, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import { useGRTBalance } from '@/hooks/useGRTBalance';
 import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { reoStatusOrUnknown, reoSourceOrHeuristic } from '@/lib/contracts/indexer-signals';
+import { whyMissing } from '@/lib/contracts/indexer-detail';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -39,6 +40,7 @@ export default function DelegatePage({
   const { data: reoData } = useREOStatus(address);
   const { data: ensData } = useENSName(address);
   const { data: enrichedData } = useEnrichedIndexers();
+  const annualIssuance = useAnnualIndexingIssuance();
   const { isConnected } = useAccount();
   const { connect } = useConnect();
   const { balance } = useGRTBalance();
@@ -51,9 +53,6 @@ export default function DelegatePage({
   const network = networkData?.graphNetwork;
   const delegationRatio = network?.delegationRatio ?? 16;
   const totalNetworkSignal = network?.totalTokensSignalled ? weiToGRT(network.totalTokensSignalled) : 0;
-  const annualIssuance = network?.networkGRTIssuancePerBlock
-    ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
-    : 0;
 
   // See the note on the detail page: a paused retry is not fetching, so `isLoading` let this fall
   // through to "Indexer Not Found" and stay there. It matters more here, because this is the
@@ -289,6 +288,15 @@ export default function DelegatePage({
             </div>
           )}
 
+          {/* Absent allocations are a failed read, not an indexer with none: without them there is
+              no projection to show, and a blank row would not say why. See lodestar#239. */}
+          {!indexer.allocations && (
+            <p className="text-xs text-[var(--red-text)]">
+              This indexer&apos;s active allocations could not be read, so the projected APR is left
+              out rather than estimated. {whyMissing(indexer, 'allocations')}
+            </p>
+          )}
+
           {/* The delegation panel */}
           <DelegatePanel
             indexer={{
@@ -297,7 +305,9 @@ export default function DelegatePage({
               stakedTokens: indexer.stakedTokens,
               lockedTokens: indexer.lockedTokens,
               delegatedTokens: indexer.delegatedTokens,
+              delegatedThawingTokens: indexer.delegatedThawingTokens,
               indexingRewardCut: indexer.indexingRewardCut,
+              indexingRewardEffectiveCut: indexer.indexingRewardEffectiveCut ?? null,
               allocations: indexer.allocations,
             }}
             riskGrade={indexerScore?.grade ?? null}

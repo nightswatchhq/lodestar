@@ -8,7 +8,7 @@ import { arbitrum } from 'wagmi/chains';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCuratorPortfolio } from '@/hooks/useNetworkStats';
-import { fetchSubgraphDeployments } from '@/lib/api';
+import { fetchSubgraphDeployment, fetchSubgraphDeployments } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -470,7 +470,10 @@ function DiscoverTab({ highlightDeployment }: { highlightDeployment?: string | n
 
   const { data: specificData, isFetching: specificFetching } = useQuery({
     queryKey: ['deployment-lookup', search],
-    queryFn: () => fetchSubgraphDeployments({ hash: search }),
+    queryFn: async () => {
+      const d = await fetchSubgraphDeployment(search);
+      return d ? [d] : [];
+    },
     enabled: isExactHash && filteredBeforeFetch.length === 0 && !isLoading,
     staleTime: 60_000,
   });

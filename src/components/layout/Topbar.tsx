@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { useGRTPrice, useEpochInfo } from '@/hooks/useNetworkStats';
 import { formatUSD, shortenAddress, cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
+import { OmniSearch } from './OmniSearch';
+import { navigation } from './Sidebar';
 
 const pageTitles: Record<string, string> = {
   '/': 'Protocol Overview',
@@ -12,6 +14,7 @@ const pageTitles: Record<string, string> = {
   '/delegators': 'Delegator Portfolio',
   '/curators': 'Curator Portfolio',
   '/subgraphs': 'Subgraph Directory',
+  '/subgraphs/migration': 'Studio Migration',
   '/calculator': 'Delegation Calculator',
   '/compare': 'Compare Indexers',
   '/profile': 'Portfolio',
@@ -25,7 +28,7 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith('/curators/')) return 'Curator Profile';
   if (pathname.startsWith('/subgraphs/')) return 'Subgraph Detail';
   if (pathname.startsWith('/poi/')) return 'POI Analysis';
-  return 'Lodestar';
+  return navigation.flatMap((s) => s.items).find((i) => i.href === pathname)?.label ?? 'Lodestar';
 }
 
 export function Topbar() {
@@ -62,9 +65,13 @@ export function Topbar() {
     <header className="fixed top-0 left-0 md:left-[var(--sidebar-width)] right-0 pt-[var(--safe-top)] bg-[var(--bg)]/80 backdrop-blur-md border-b-[0.5px] border-[var(--border)] z-30">
       <div className="h-[var(--topbar-height)] px-4 md:px-6 flex items-center justify-between">
         {/* Left side — page title */}
-        <span className="text-[15px] font-semibold tracking-tight text-[var(--text)]" style={{ fontFamily: 'var(--font-display)' }}>
+        <span className="shrink-0 md:min-w-[11rem] text-[15px] font-semibold tracking-tight text-[var(--text)]" style={{ fontFamily: 'var(--font-display)' }}>
           {getPageTitle(pathname)}
         </span>
+
+        <div className="ml-auto mr-3 md:mx-6 flex md:flex-1 md:justify-center">
+          <OmniSearch />
+        </div>
 
         {/* Right side */}
         <div className="flex items-center gap-3 md:gap-4">

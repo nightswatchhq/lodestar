@@ -32,6 +32,13 @@ const KITTIWAKE_ROW = {
 };
 
 describe('normaliseEnrichedResponse', () => {
+  it('carries the QoS Quality score, keeping an unmeasured indexer null rather than zero', () => {
+    const { indexers } = normaliseEnrichedResponse({
+      data: [{ ...KITTIWAKE_ROW, qScore: 63.233 }, { ...KITTIWAKE_ROW, qScore: null }, KITTIWAKE_ROW],
+    });
+    expect(indexers.map((e) => e.qScore)).toEqual([63.233, null, null]);
+  });
+
   it('maps the kittiwake payload onto the fields the table reads', () => {
     const { indexers } = normaliseEnrichedResponse({ data: [KITTIWAKE_ROW] });
     expect(indexers).toHaveLength(1);
@@ -86,6 +93,21 @@ describe('normaliseEnrichedResponse', () => {
 
   it('rejects rows under "data" that are not the kittiwake shape', () => {
     expect(() => normaliseEnrichedResponse({ data: [{ nope: 1 }] })).toThrow(/not the kittiwake shape/);
+  });
+
+  it('carries the verified names through, and leaves a missing one null', () => {
+    const named = normaliseEnrichedResponse({
+      data: [{ ...KITTIWAKE_ROW, name: 'datanexus.datanexus.eth', ensName: 'datanexus.datanexus.eth' }],
+    }).indexers[0];
+    expect(named.name).toBe('datanexus.datanexus.eth');
+    expect(named.ensName).toBe('datanexus.datanexus.eth');
+
+    // A row from before kittiwake sent names, and one without a name.
+    for (const row of [KITTIWAKE_ROW, { ...KITTIWAKE_ROW, name: null, ensName: null }]) {
+      const e = normaliseEnrichedResponse({ data: [row] }).indexers[0];
+      expect(e.name).toBeNull();
+      expect(e.ensName).toBeNull();
+    }
   });
 
   it('does not invent an eligibility it was not given', () => {

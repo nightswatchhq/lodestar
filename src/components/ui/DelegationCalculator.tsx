@@ -3,11 +3,10 @@
 import { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Badge } from './Badge';
-import { ProgressBar } from './ProgressBar';
-import { weiToGRT, formatGRT, formatPPM, cn } from '@/lib/utils';
+import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import {
   calculateDelegationCapacity,
-  calculateDelegatorAPR,
+  projectDelegatorAPR,
 } from '@/lib/rewards';
 
 interface DelegationCalculatorProps {
@@ -20,6 +19,7 @@ interface DelegationCalculatorProps {
     delegatedThawingTokens?: string;
     indexingRewardCut: number;
     queryFeeCut: number;
+    indexingRewardEffectiveCut?: string | null;
     delegatorParameterCooldown: number;
     lastDelegationParameterUpdate: number;
     allocations?: Array<{
@@ -33,6 +33,8 @@ interface DelegationCalculatorProps {
   delegationRatio?: number;
   totalNetworkSignal?: number;
   annualIssuance?: number;
+  /** Instant APR from kittiwake. Used for the current figure so it matches the directory. */
+  delegatorAPR?: number | null;
 }
 
 
@@ -41,6 +43,7 @@ export function DelegationCalculator({
   delegationRatio = 16,
   totalNetworkSignal = 0,
   annualIssuance = 0,
+  delegatorAPR = null,
 }: DelegationCalculatorProps) {
   const [delegationAmount, setDelegationAmount] = useState<string>('10000');
   // Mount-stable "now" (seconds) — keeps render pure (no Date.now() during render).
@@ -49,44 +52,34 @@ export function DelegationCalculator({
   const selfStake = weiToGRT(indexer.stakedTokens) - weiToGRT(indexer.lockedTokens ?? '0');
   const currentDelegated = weiToGRT(indexer.delegatedTokens) - weiToGRT(indexer.delegatedThawingTokens ?? '0');
   const newDelegation = parseFloat(delegationAmount) || 0;
+  const effectiveCut = indexer.indexingRewardEffectiveCut != null
+    ? parseFloat(indexer.indexingRewardEffectiveCut)
+    : null;
 
-  // Calculate capacity
   const capacity = useMemo(
     () => calculateDelegationCapacity(selfStake, currentDelegated, delegationRatio),
     [selfStake, currentDelegated, delegationRatio]
   );
 
-  // Current APR (what the table shows — no hypothetical delegation added)
-  const currentAPR = useMemo(
-    () => {
-      if (!indexer.allocations?.length || totalNetworkSignal === 0 || annualIssuance === 0) return 0;
-      return calculateDelegatorAPR(
-        indexer.allocations,
-        indexer.indexingRewardCut,
-        currentDelegated || 1,
-        totalNetworkSignal,
-        annualIssuance
-      );
-    },
-    [indexer.allocations, indexer.indexingRewardCut, currentDelegated, totalNetworkSignal, annualIssuance]
-  );
+  const projection = (added: number) => {
+    if (!indexer.allocations?.length || totalNetworkSignal === 0 || annualIssuance === 0) return 0;
+    return projectDelegatorAPR({
+      allocations: indexer.allocations,
+      protocolCutPPM: indexer.indexingRewardCut,
+      activeBase: currentDelegated,
+      addedGRT: added,
+      totalNetworkSignal,
+      annualIssuance,
+      effectiveCut,
+      selfStakeGRT: selfStake,
+    });
+  };
 
-  // Projected APR after user's hypothetical delegation
-  const estimatedAPR = useMemo(
-    () => {
-      if (!indexer.allocations?.length || totalNetworkSignal === 0 || annualIssuance === 0) return 0;
-      return calculateDelegatorAPR(
-        indexer.allocations,
-        indexer.indexingRewardCut,
-        currentDelegated + newDelegation || currentDelegated || 1,
-        totalNetworkSignal,
-        annualIssuance
-      );
-    },
-    [indexer.allocations, indexer.indexingRewardCut, currentDelegated, newDelegation, totalNetworkSignal, annualIssuance]
-  );
+  const currentAPR = delegatorAPR != null && Number.isFinite(delegatorAPR)
+    ? delegatorAPR
+    : projection(0);
 
-  const rawCut = indexer.indexingRewardCut / 1_000_000;
+  const estimatedAPR = projection(newDelegation);
 
   // Check if parameters are locked (cooldown active)
   const cooldownEnd = indexer.lastDelegationParameterUpdate + indexer.delegatorParameterCooldown;
@@ -109,45 +102,6 @@ export function DelegationCalculator({
         </div>
       </CardHeader>
       <CardContent>
-        {/* Indexer summary */}
-        <div className="grid grid-cols-3 gap-4 mb-6 p-4 rounded-lg bg-[var(--bg-elevated)]">
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Self-Stake</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatGRT(selfStake)} GRT</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Current Delegated</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatGRT(currentDelegated)} GRT</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Reward Cut</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatPPM(indexer.indexingRewardCut)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-[var(--text-faint)]">Query Fee Cut</p>
-            <p className="text-sm font-mono text-[var(--text)]">{formatPPM(indexer.queryFeeCut)}</p>
-          </div>
-        </div>
-
-        {/* Capacity indicator */}
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-[var(--text-muted)]">Delegation Capacity</span>
-            <span className="text-sm font-mono text-[var(--text)]">
-              {formatGRT(capacity.availableCapacity)} GRT available
-            </span>
-          </div>
-          <ProgressBar
-            value={capacity.utilizationPercent}
-            max={100}
-            variant={capacity.utilizationPercent > 90 ? 'orange' : 'teal'}
-            size="md"
-          />
-          <p className="text-xs text-[var(--text-faint)] mt-1">
-            {capacity.utilizationPercent.toFixed(1)}% utilized ({delegationRatio}x ratio)
-          </p>
-        </div>
-
         {/* Input */}
         <div className="mb-6">
           <label className="block text-sm text-[var(--text-muted)] mb-2">

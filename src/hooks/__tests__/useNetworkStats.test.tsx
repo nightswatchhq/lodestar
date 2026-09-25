@@ -26,6 +26,10 @@ vi.mock('@/lib/api', () => ({
   fetchPayments: vi.fn(),
   fetchIndexerPayments: vi.fn(),
   fetchIndexerStakeHistory: vi.fn(),
+  fetchIndexerTrends: vi.fn(),
+  fetchIndexerQos: vi.fn(),
+  fetchIndexerQosScore: vi.fn(),
+  fetchIndexerQosDeployments: vi.fn(),
   fetchDelegationFlows: vi.fn(),
   fetchTokenMetrics: vi.fn(),
   fetchParameterHistory: vi.fn(),
@@ -46,6 +50,7 @@ vi.mock('@/lib/api', () => ({
   fetchAprProvenance: vi.fn(),
   fetchDeveloperActivity: vi.fn(),
   fetchChainLag: vi.fn(),
+  fetchDips: vi.fn(),
 }));
 
 import * as api from '@/lib/api';
@@ -77,13 +82,19 @@ import {
   usePayments,
   useIndexerPayments,
   useIndexerStakeHistory,
+  useIndexerTrends,
+  useIndexerQos,
+  useIndexerQosScore,
+  useIndexerQosDeployments,
   useDelegationFlows,
   useTokenMetrics,
   useSubgraphSchema,
   useCuratorLeaderboard,
   useREOStatus,
   useENSName,
+  useAnnualIndexingIssuance,
 } from '../useNetworkStats';
+import { L1_BLOCKS_PER_YEAR } from '@/lib/network-math';
 
 function wrapper() {
   const client = new QueryClient({
@@ -104,6 +115,29 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('useAnnualIndexingIssuance', () => {
+  it('annualises the RewardsManager rate from dips', async () => {
+    vi.mocked(api.fetchDips).mockResolvedValue({
+      available: true,
+      totalRate: 120.73,
+      indexingRate: 96.584,
+      agreementRate: 0,
+      live: false,
+      configuredNotDistributed: [],
+      allocations: [],
+    } as never);
+    const { result } = renderHook(() => useAnnualIndexingIssuance(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current).toBeGreaterThan(0));
+    expect(result.current).toBeCloseTo(96.584 * L1_BLOCKS_PER_YEAR);
+  });
+
+  it('is 0 until dips lands', () => {
+    vi.mocked(api.fetchDips).mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useAnnualIndexingIssuance(), { wrapper: wrapper() });
+    expect(result.current).toBe(0);
+  });
 });
 
 describe('useNetworkStats', () => {
@@ -430,6 +464,39 @@ describe('enabled-gated query hooks (no arg → idle, arg → fetch)', () => {
     const on = renderHook(() => useIndexerPayments('0xrecv'), { wrapper: wrapper() });
     await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
     expect(api.fetchIndexerPayments).toHaveBeenCalledWith('0xrecv');
+  });
+
+  it('useIndexerTrends is idle for null and passes the day window through', async () => {
+    const off = renderHook(() => useIndexerTrends(null, 90), { wrapper: wrapper() });
+    expect(off.result.current.fetchStatus).toBe('idle');
+
+    vi.mocked(api.fetchIndexerTrends).mockResolvedValue({ rewards: [], queryFees: [] } as never);
+    const on = renderHook(() => useIndexerTrends('0xtrd', 90), { wrapper: wrapper() });
+    await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
+    expect(api.fetchIndexerTrends).toHaveBeenCalledWith('0xtrd', 90);
+  });
+
+  it('useIndexerQos is idle for null and passes the day window through', async () => {
+    const off = renderHook(() => useIndexerQos(null, 90), { wrapper: wrapper() });
+    expect(off.result.current.fetchStatus).toBe('idle');
+
+    vi.mocked(api.fetchIndexerQos).mockResolvedValue({ qos: [], summary: {}, freshness: {} } as never);
+    const on = renderHook(() => useIndexerQos('0xqos', 90), { wrapper: wrapper() });
+    await waitFor(() => expect(on.result.current.isSuccess).toBe(true));
+    expect(api.fetchIndexerQos).toHaveBeenCalledWith('0xqos', 90);
+  });
+
+  it('useIndexerQosScore and useIndexerQosDeployments are idle for null and fetch for an address', async () => {
+    expect(renderHook(() => useIndexerQosScore(null), { wrapper: wrapper() }).result.current.fetchStatus).toBe('idle');
+    expect(renderHook(() => useIndexerQosDeployments(null), { wrapper: wrapper() }).result.current.fetchStatus).toBe('idle');
+
+    vi.mocked(api.fetchIndexerQosScore).mockResolvedValue({ window_days: 30, latest: null, daily: [] } as never);
+    vi.mocked(api.fetchIndexerQosDeployments).mockResolvedValue({ window_days: 30, total: null, deployments: [] } as never);
+    const s = renderHook(() => useIndexerQosScore('0xs'), { wrapper: wrapper() });
+    const d = renderHook(() => useIndexerQosDeployments('0xd'), { wrapper: wrapper() });
+    await waitFor(() => expect(s.result.current.isSuccess && d.result.current.isSuccess).toBe(true));
+    expect(api.fetchIndexerQosScore).toHaveBeenCalledWith('0xs');
+    expect(api.fetchIndexerQosDeployments).toHaveBeenCalledWith('0xd');
   });
 
   it('useIndexerStakeHistory is idle for null and fetches for an address', async () => {

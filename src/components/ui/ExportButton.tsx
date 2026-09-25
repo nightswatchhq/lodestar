@@ -2,12 +2,17 @@
 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { downloadCsv } from '@/lib/csv';
 
 interface ExportButtonProps {
-  onExport: () => string;
+  /** May be async, for an export that has to fetch more than the page holds. */
+  onExport: () => string | Promise<string>;
   filename: string;
   label?: string;
   disabled?: boolean;
+  title?: string;
+  /** Toolbar size, to sit beside the small filter controls of a table. */
+  compact?: boolean;
 }
 
 export function ExportButton({
@@ -15,28 +20,22 @@ export function ExportButton({
   filename,
   label = 'Export CSV',
   disabled = false,
+  title,
+  compact = false,
 }: ExportButtonProps) {
   const [exporting, setExporting] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const handleExport = async () => {
     if (disabled || exporting) return;
 
     setExporting(true);
+    setFailed(false);
     try {
-      const csvContent = onExport();
-
-      // Create blob and download
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${filename}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      downloadCsv(filename, await onExport());
     } catch (error) {
       console.error('Export failed:', error);
+      setFailed(true);
     } finally {
       setExporting(false);
     }
@@ -44,10 +43,13 @@ export function ExportButton({
 
   return (
     <button
+      type="button"
       onClick={handleExport}
+      title={failed ? 'The export could not be completed. Try again.' : title}
       disabled={disabled || exporting}
       className={cn(
-        'inline-flex items-center gap-2 px-3 py-2 text-sm font-medium',
+        'inline-flex items-center font-medium',
+        compact ? 'gap-1.5 px-2.5 py-1.5 text-xs' : 'gap-2 px-3 py-2 text-sm',
         'rounded-[var(--radius-button)] border border-[var(--border)]',
         'transition-colors',
         disabled || exporting
@@ -56,10 +58,10 @@ export function ExportButton({
       )}
     >
       {exporting ? (
-        <div className="w-4 h-4 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+        <div className={cn(compact ? 'w-3 h-3' : 'w-4 h-4', 'border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin')} />
       ) : (
         <svg
-          className="w-4 h-4 text-[var(--text-muted)]"
+          className={cn(compact ? 'w-3 h-3' : 'w-4 h-4', 'text-[var(--text-muted)]')}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -72,7 +74,7 @@ export function ExportButton({
           />
         </svg>
       )}
-      <span className="text-[var(--text)]">{label}</span>
+      <span className="text-[var(--text)]">{failed ? 'Export failed' : label}</span>
     </button>
   );
 }

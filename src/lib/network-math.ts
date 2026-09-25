@@ -52,3 +52,32 @@ export function annualIssuancePercent(
   if (totalSupplyGrt <= 0 || issuancePerBlockGrt < 0) return 0;
   return ((issuancePerBlockGrt * blocksPerYear) / totalSupplyGrt) * 100;
 }
+
+/**
+ * RewardsManager on Arbitrum One. Same address kittiwake labels "Indexing rewards (RewardsManager)".
+ * Used only when `/api/dips` has not yet grown an `indexingRate` field.
+ */
+export const REWARDS_MANAGER = '0x971b9d3d0ae3eca029cab5ea1fb0f72c85e6a525';
+
+/** The per-block GRT indexing rewards are paid from. Protocol-total issuance is larger since GIP-0089. */
+export function indexingIssuancePerBlock(dips: {
+  indexingRate?: number;
+  allocations?: Array<{ target: string; rate: number }>;
+} | null | undefined): number {
+  if (dips == null) return 0;
+  if (dips.indexingRate != null && Number.isFinite(dips.indexingRate) && dips.indexingRate > 0) {
+    return dips.indexingRate;
+  }
+  const row = dips.allocations?.find(
+    (a) => a.target.toLowerCase() === REWARDS_MANAGER,
+  );
+  return row != null && Number.isFinite(row.rate) && row.rate > 0 ? row.rate : 0;
+}
+
+export function annualIndexingIssuance(
+  perBlockGrt: number,
+  blocksPerYear: number = L1_BLOCKS_PER_YEAR,
+): number {
+  if (perBlockGrt <= 0) return 0;
+  return perBlockGrt * blocksPerYear;
+}

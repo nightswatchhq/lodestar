@@ -18,6 +18,10 @@ import type { EnrichedIndexer } from '@/lib/enriched';
 /** Kittiwake's row. Named fields only - anything absent is handled explicitly below. */
 interface KittiwakeRow {
   address: string;
+  // Verified names only: a Graph default name the account owns on ENS, else its primary ENS name.
+  // Absent before kittiwake sent them.
+  name?: string | null;
+  ensName?: string | null;
   url: string | null;
   selfStakeGrt: string;
   delegatedGrt: string;
@@ -41,6 +45,8 @@ interface KittiwakeRow {
   rollingApy30d?: string | null;
   rollingApy90d?: string | null;
   lastUpdated?: string;
+  // Sent since kittiwake#143. Null for an indexer the oracle measured nothing for.
+  qScore?: number | null;
 }
 
 const num = (v: unknown): number => {
@@ -72,10 +78,10 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
   const delegated = num(r.delegatedGrt);
   return {
     id: String(r.address).toLowerCase(),
-    // Absent upstream. `null` renders as the address, which is honest; a placeholder string would
-    // read as a name the indexer chose.
-    name: null as unknown as string,
-    ensName: null,
+    // `null` renders as the address, which is honest; a placeholder string would read as a name the
+    // indexer chose.
+    name: r.name ?? null,
+    ensName: r.ensName ?? null,
     url: r.url ?? null,
     geoHash: r.geoHash ?? null,
 
@@ -108,6 +114,7 @@ function fromKittiwake(r: KittiwakeRow): EnrichedIndexer {
     },
     score: r.score === null || r.score === undefined ? null : num(r.score),
     scoreGrade: (r.scoreGrade ?? null) as EnrichedIndexer['scoreGrade'],
+    qScore: typeof r.qScore === 'number' && Number.isFinite(r.qScore) ? r.qScore : null,
 
     // Absent upstream, and left absent on purpose: `computeScore` in /api/delegate/recommend
     // distinguishes "no breakdown" from "a breakdown of zeroes", and an empty object would make

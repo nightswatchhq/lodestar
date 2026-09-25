@@ -112,6 +112,7 @@ export const KEY_GIPS: GipRow[] = [
   { id: 'GIP-0066', title: 'Graph Horizon' },
   { id: 'GIP-0070', title: 'Horizon-era issuance/curation redesign' },
   { id: 'GIP-0087/0088', title: 'On-chain indexing agreements + Issuance Allocator' },
+  { id: 'GIP-0089', title: 'Innovation Allocation (20% of issuance)' },
 ];
 
 export const CAVEATS: string[] = [
@@ -119,5 +120,5 @@ export const CAVEATS: string[] = [
   'On the Arbitrum subgraph, gross Minted/Burned are dominated by bridge flows (every L2 deposit mints, every withdrawal burns), so they are NOT a clean issuance/burn measure. Cumulative indexing rewards and the per-block issuance rate are the honest issuance figures.',
   'Realized burn has historically run well below the ~1%/yr design target, because query-fee and curation activity were low relative to issuance, so net inflation tracks close to gross issuance.',
   'A complete supply trace must still read L1 totalSupply and the BridgeEscrow balance: the L1 protocol is deprecated, not destroyed.',
-  'If GIP-0070/0087/0088 ship an Issuance Allocator distributing issuance beyond indexing rewards, that contract becomes a new emission node. GIP-0070 expects >99% of issuance to remain in Indexing Rewards initially.',
+  'GIP-0089 (1 Sep 2026) sends 20% of issuance to the Innovation Allocation. Protocol-total issuance is still 120.73 GRT/block; indexing rewards are the RewardsManager\'s 96.584. Instant APR uses the latter.',
 ];

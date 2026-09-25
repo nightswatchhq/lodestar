@@ -11,7 +11,9 @@ import {
   fetchIndexerProvisions,
   fetchEnrichedIndexers,
   fetchSubgraphDeployments,
+  fetchSubgraphDeployment,
   fetchSubgraphDeployments30d,
+  fetchSubgraphDirectory,
   fetchManifestAnalysis,
   fetchPOIOverview,
   fetchPOIDeployment,
@@ -24,6 +26,10 @@ import {
   fetchPayments,
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
+  fetchIndexerTrends,
+  fetchIndexerQos,
+  fetchIndexerQosScore,
+  fetchIndexerQosDeployments,
   fetchDelegationFlows,
   fetchDeveloperActivity,
   fetchTokenMetrics,
@@ -33,13 +39,16 @@ import {
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
   fetchIndexerDetail,
+  fetchIndexerDelegators,
   fetchSubgraphHistory,
   fetchSubgraphVersions,
   fetchIndexerDisputes,
   fetchREOStatus,
   fetchDelegationEvents,
   fetchENSName,
+  fetchDips,
 } from '@/lib/api';
+import { annualIndexingIssuance, indexingIssuancePerBlock } from '@/lib/network-math';
 import type { IndexerDetail } from '@/lib/contracts/indexer-detail';
 import type { DelegationEvent } from '@/lib/contracts/indexer-signals';
 
@@ -60,6 +69,25 @@ const TEN_MINUTES = 1000 * 60 * 10;
 const ONE_MINUTE = 1000 * 60;
 const THIRTY_SECONDS = 1000 * 30;
 const ONE_HOUR = 1000 * 60 * 60;
+
+/**
+ * Issuance split. Cached hard: the allocator's rates move on governance, not per block.
+ */
+export function useDips() {
+  return useQuery({
+    queryKey: ['dips'],
+    queryFn: fetchDips,
+    staleTime: TEN_MINUTES,
+    refetchInterval: FIVE_MINUTES,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Annual GRT the RewardsManager mints. Zero until `/api/dips` lands, never the protocol total. */
+export function useAnnualIndexingIssuance(): number {
+  const { data } = useDips();
+  return annualIndexingIssuance(indexingIssuancePerBlock(data));
+}
 
 /**
  * Hook for network statistics
@@ -108,10 +136,11 @@ export function useIndexers(params: {
 /**
  * Hook for enriched indexers (pre-computed by cron, the big win)
  */
-export function useEnrichedIndexers() {
+export function useEnrichedIndexers(enabled = true) {
   return useQuery({
     queryKey: ['enrichedIndexers'],
     queryFn: fetchEnrichedIndexers,
+    enabled,
     staleTime: TEN_MINUTES,
     refetchInterval: TEN_MINUTES,
     placeholderData: keepPreviousData,
@@ -199,6 +228,15 @@ export function useIndexerProvisions(indexer: string) {
 /**
  * Hook for subgraph deployments
  */
+export function useSubgraphDeployment(hash: string) {
+  return useQuery({
+    queryKey: ['subgraphDeployment', hash],
+    queryFn: () => fetchSubgraphDeployment(hash),
+    staleTime: FIVE_MINUTES,
+    enabled: !!hash,
+  });
+}
+
 export function useSubgraphDeployments(params: {
   first?: number;
   skip?: number;
@@ -208,6 +246,17 @@ export function useSubgraphDeployments(params: {
   return useQuery({
     queryKey: ['subgraphDeployments', params],
     queryFn: () => fetchSubgraphDeployments(params),
+    staleTime: FIVE_MINUTES,
+    refetchInterval: FIVE_MINUTES,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The directory, one page of it, as `directoryApiQuery` describes. */
+export function useSubgraphDirectory(query: string) {
+  return useQuery({
+    queryKey: ['subgraphDirectory', query],
+    queryFn: () => fetchSubgraphDirectory(query),
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
     placeholderData: keepPreviousData,
@@ -239,6 +288,20 @@ export function useIndexerDetail(address: string) {
     queryKey: ['indexerDetails', address],
     queryFn: () => fetchIndexerDetail(address),
     staleTime: FIVE_MINUTES,
+    enabled: !!address,
+  });
+}
+
+/** One page of an indexer's delegators; `null` data means kittiwake does not serve the route. */
+export function useIndexerDelegators(
+  address: string,
+  params: { first: number; skip: number; orderBy: string; orderDirection: 'asc' | 'desc' },
+) {
+  return useQuery({
+    queryKey: ['indexerDelegators', address, params],
+    queryFn: () => fetchIndexerDelegators(address, params),
+    staleTime: ONE_MINUTE,
+    placeholderData: keepPreviousData,
     enabled: !!address,
   });
 }
@@ -488,8 +551,52 @@ export function useIndexerPayments(receiver: string) {
 
 
 /**
+ * Hook for an indexer's daily rewards and query fees
+ */
+export function useIndexerTrends(indexer: string | null, days = 30) {
+  return useQuery({
+    queryKey: ['indexerTrends', indexer, days],
+    queryFn: () => fetchIndexerTrends(indexer!, days),
+    staleTime: TEN_MINUTES,
+    refetchInterval: TEN_MINUTES,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+/**
  * Hook for indexer stake history (26-week time-travel snapshots)
  */
+export function useIndexerQos(indexer: string | null, days = 90) {
+  return useQuery({
+    queryKey: ['indexerQos', indexer, days],
+    queryFn: () => fetchIndexerQos(indexer!, days),
+    staleTime: 10 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+export function useIndexerQosScore(indexer: string | null) {
+  return useQuery({
+    queryKey: ['indexerQosScore', indexer],
+    queryFn: () => fetchIndexerQosScore(indexer!),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+export function useIndexerQosDeployments(indexer: string | null) {
+  return useQuery({
+    queryKey: ['indexerQosDeployments', indexer],
+    queryFn: () => fetchIndexerQosDeployments(indexer!),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
 export function useIndexerStakeHistory(address: string | null) {
   return useQuery({
     queryKey: ['indexerStakeHistory', address],

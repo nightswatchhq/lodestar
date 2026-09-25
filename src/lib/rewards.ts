@@ -8,6 +8,7 @@
  */
 
 import { weiToGRT } from './utils';
+import { toCsv } from './csv';
 
 /**
  * Calculate the current exchange rate for an indexer's delegation pool
@@ -258,6 +259,37 @@ export function calculateDelegatorAPR(
 }
 
 /**
+ * Delegator APR after adding `addedGRT` to the active (excl. thawing) base.
+ * Same model as kittiwake; the only term the browser is allowed to change is the amount.
+ */
+export function projectDelegatorAPR(opts: {
+  allocations: Array<{
+    allocatedTokens: string;
+    subgraphDeployment: { signalledTokens: string; stakedTokens: string };
+  }>;
+  protocolCutPPM: number;
+  activeBase: number;
+  addedGRT?: number;
+  totalNetworkSignal: number;
+  annualIssuance: number;
+  effectiveCut?: number | null;
+  selfStakeGRT: number;
+}): number {
+  const delegated = opts.activeBase + (opts.addedGRT ?? 0);
+  const total = opts.selfStakeGRT + delegated;
+  const ratio = total > 0 ? delegated / total : null;
+  return calculateDelegatorAPR(
+    opts.allocations,
+    opts.protocolCutPPM,
+    delegated,
+    opts.totalNetworkSignal,
+    opts.annualIssuance,
+    opts.effectiveCut,
+    ratio,
+  );
+}
+
+/**
  * Calculate rolling delegator APY from closed allocations.
  *
  * Uses indexingDelegatorRewards from the subgraph, which already has the
@@ -482,5 +514,5 @@ export function generateRewardsCSV(
     '',
   ]);
 
-  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  return toCsv(headers, rows);
 }

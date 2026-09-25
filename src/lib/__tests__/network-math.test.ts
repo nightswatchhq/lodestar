@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { epochStatus, annualIssuancePercent, cooldownRemainingDays, L1_BLOCKS_PER_YEAR } from '../network-math';
+import {
+  epochStatus,
+  annualIssuancePercent,
+  cooldownRemainingDays,
+  L1_BLOCKS_PER_YEAR,
+  REWARDS_MANAGER,
+  indexingIssuancePerBlock,
+  annualIndexingIssuance,
+} from '../network-math';
 
 describe('epochStatus', () => {
   it('labels the current epoch Active (and anything ahead, defensively)', () => {
@@ -38,6 +46,45 @@ describe('annualIssuancePercent', () => {
   it('uses a sane L1 blocks/year constant (~2.6M)', () => {
     expect(L1_BLOCKS_PER_YEAR).toBeGreaterThan(2_500_000);
     expect(L1_BLOCKS_PER_YEAR).toBeLessThan(2_700_000);
+  });
+});
+
+describe('indexingIssuancePerBlock', () => {
+  const innovation = '0x2ff06ba8086f37ba656a5b75405bf985f738b16e';
+
+  it('prefers indexingRate over the allocations rows', () => {
+    expect(indexingIssuancePerBlock({
+      indexingRate: 96.584,
+      allocations: [
+        { target: REWARDS_MANAGER, rate: 1 },
+        { target: innovation, rate: 24.146 },
+      ],
+    })).toBeCloseTo(96.584);
+  });
+
+  it('falls back to the RewardsManager row when indexingRate is absent', () => {
+    expect(indexingIssuancePerBlock({
+      allocations: [
+        { target: REWARDS_MANAGER.toUpperCase(), rate: 96.584 },
+        { target: innovation, rate: 24.146 },
+      ],
+    })).toBeCloseTo(96.584);
+  });
+
+  it('returns 0 when dips has not loaded or the RewardsManager is missing', () => {
+    expect(indexingIssuancePerBlock(undefined)).toBe(0);
+    expect(indexingIssuancePerBlock({ allocations: [{ target: innovation, rate: 24.146 }] })).toBe(0);
+    expect(annualIndexingIssuance(0)).toBe(0);
+  });
+});
+
+describe('annualIndexingIssuance', () => {
+  it('annualises the RewardsManager rate, not protocol-total issuance', () => {
+    const next = annualIndexingIssuance(96.584);
+    expect(next).toBeCloseTo(96.584 * L1_BLOCKS_PER_YEAR);
+    // The pre-fix figure was 120.73 × 2,628,000. The new one is 96.584 × 2,610,223.
+    const old = 120.73 * 2_628_000;
+    expect(old / next).toBeCloseTo((120.73 / 96.584) * (2_628_000 / L1_BLOCKS_PER_YEAR), 8);
   });
 });
 

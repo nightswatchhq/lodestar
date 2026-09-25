@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePOIDeployment } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
@@ -8,9 +8,12 @@ import { CopyButton } from '@/components/ui/CopyButton';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
-import { formatGRT, formatPercent, formatNumber, cn } from '@/lib/utils';
+import { Pagination } from '@/components/ui/Pagination';
+import { formatGRT, formatPercent, cn } from '@/lib/utils';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 import { isUnavailable, unavailableReason, useQueryState } from '@/hooks/useQueryState';
+
+const EPOCH_PAGE_SIZE = 10;
 
 export default function POIDeploymentPage({
   params,
@@ -20,6 +23,8 @@ export default function POIDeploymentPage({
   const { deployment } = use(params);
   const query = useQueryState(usePOIDeployment(deployment));
   const detail = query.kind === 'ready' ? query.data : undefined;
+  const [epochPage, setEpochPage] = useState(0);
+  const epochsTop = useRef<HTMLDivElement>(null);
 
   // A read that failed or never went out is not "no POIs for this deployment", which is what the
   // branch below says. It used to be reached by `error || !detail`, so both of those states landed
@@ -126,7 +131,8 @@ export default function POIDeploymentPage({
       </StatGrid>
 
       {/* Epoch-by-epoch breakdown */}
-      {detail.epochs.map((epochGroup) => (
+      <div ref={epochsTop} />
+      {detail.epochs.slice(epochPage * EPOCH_PAGE_SIZE, (epochPage + 1) * EPOCH_PAGE_SIZE).map((epochGroup) => (
         <Card key={epochGroup.epoch}>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -173,9 +179,10 @@ export default function POIDeploymentPage({
             {/* Indexer list */}
             {/* Mobile cards */}
             <div className="block md:hidden space-y-2">
-              {epochGroup.indexers.map((idx) => (
+              {/* An indexer can close two allocations on one deployment in the same epoch. */}
+              {epochGroup.indexers.map((idx, i) => (
                 <div
-                  key={idx.indexer}
+                  key={`${idx.indexer}-${i}`}
                   className={cn(
                     'p-3 rounded-lg border',
                     idx.isZeroPoi
@@ -214,9 +221,9 @@ export default function POIDeploymentPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--border)]">
-                  {epochGroup.indexers.map((idx) => (
+                  {epochGroup.indexers.map((idx, i) => (
                     <tr
-                      key={idx.indexer}
+                      key={`${idx.indexer}-${i}`}
                       className={cn(
                         'transition-colors',
                         idx.isZeroPoi
@@ -260,6 +267,18 @@ export default function POIDeploymentPage({
           </CardContent>
         </Card>
       ))}
+
+      {detail.epochs.length > EPOCH_PAGE_SIZE && (
+        <Pagination
+          page={epochPage}
+          pageSize={EPOCH_PAGE_SIZE}
+          totalItems={detail.epochs.length}
+          onPageChange={(page) => {
+            setEpochPage(page);
+            epochsTop.current?.scrollIntoView({ block: 'start' });
+          }}
+        />
+      )}
 
       {detail.epochs.length === 0 && (
         <Card>

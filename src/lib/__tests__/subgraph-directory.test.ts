@@ -1,0 +1,150 @@
+import { describe, expect, it } from 'vitest';
+import {
+  activePreset,
+  applyPreset,
+  deleteView,
+  directoryApiQuery,
+  directoryCsv,
+  directoryParams,
+  emptyDirectoryState,
+  fetchWholeDirectory,
+  hasFilters,
+  loadSavedViews,
+  parseDirectoryState,
+  saveView,
+} from '../subgraph-directory';
+import type { DirectoryRow } from '../api';
+
+const parse = (qs: string) => parseDirectoryState(new URLSearchParams(qs));
+
+function memoryStorage(initial: Record<string, string> = {}) {
+  const m = new Map(Object.entries(initial));
+  return {
+    getItem: (k: string) => m.get(k) ?? null,
+    setItem: (k: string, v: string) => void m.set(k, v),
+  };
+}
+
+describe('the directory state in the URL', () => {
+  it('round-trips every filter and leaves the defaults out', () => {
+    const qs =
+      'window=allTime&sort=ratio&dir=asc&signalMin=200&stakeMax=5000&ratioMin=5&feesMin=10&indexersMax=3' +
+      '&network=arbitrum-one&complexity=Heavy&category=DeFi&createdWithinDays=30&page=2';
+    const state = parse(qs);
+    expect(new URLSearchParams(directoryParams(state)).toString()).toBe(new URLSearchParams(qs).toString());
+    expect(directoryParams(emptyDirectoryState()).toString()).toBe('');
+  });
+
+  it('asks the API for the page as first and skip', () => {
+    const q = new URLSearchParams(directoryApiQuery(parse('ratioMin=5&page=3')));
+    expect(q.get('ratioMin')).toBe('5');
+    expect(q.get('first')).toBe('25');
+    expect(q.get('skip')).toBe('75');
+    expect(q.has('page')).toBe(false);
+  });
+
+  it('drops a bound it cannot read rather than sending it on', () => {
+    const state = parse('signalMin=lots&ratioMin=-1&network=all&createdWithinDays=0');
+    expect(hasFilters(state)).toBe(false);
+  });
+
+  it('reads an old Elite link as the high-volume preset', () => {
+    const state = parse('elite=1');
+    expect(state.window).toBe('allTime');
+    expect(state.ranges.fees.min).toBe(1000);
+    expect(activePreset(state)).toBe('high-volume');
+  });
+});
+
+describe('presets', () => {
+  it('under-allocated is signal over stake above 5 with 200 GRT of signal', () => {
+    const q = new URLSearchParams(directoryApiQuery(applyPreset('under-allocated')));
+    expect(q.get('ratioMin')).toBe('5');
+    expect(q.get('signalMin')).toBe('200');
+    expect(q.get('sort')).toBe('ratio');
+  });
+
+  it('stays active when the table is re-sorted, and not when a filter is added', () => {
+    const state = applyPreset('new');
+    expect(activePreset({ ...state, sort: 'signal' })).toBe('new');
+    expect(activePreset({ ...state, network: 'base' })).toBeNull();
+    expect(activePreset(emptyDirectoryState())).toBeNull();
+  });
+});
+
+describe('export', () => {
+  const row = (n: number): DirectoryRow => ({
+    id: `0x${n}`,
+    ipfsHash: `Qm${n}`,
+    displayName: n === 0 ? 'Graph, Network' : null,
+    categories: ['DeFi', 'NFT'],
+    signalledTokens: '2000000000000000000000',
+    stakedTokens: '1000000000000000000000',
+    queryFeesAmount: '0',
+    queryFees30d: '1500000000000000000',
+    createdAt: 1_700_000_000,
+    indexerCount: 3,
+    curatorCount: 1,
+    network: 'arbitrum-one',
+    complexity: 'Light',
+  });
+
+  it('walks every page of the filtered set in its sort, a hundred at a time', async () => {
+    const all = Array.from({ length: 230 }, (_, i) => row(i));
+    const asked: URLSearchParams[] = [];
+    const rows = await fetchWholeDirectory(parse('ratioMin=5&sort=signal&page=4'), async (q) => {
+      const p = new URLSearchParams(q);
+      asked.push(p);
+      const skip = Number(p.get('skip') ?? 0);
+      return { data: all.slice(skip, skip + Number(p.get('first'))), total: all.length, unanalysed: 0, facets: { networks: [], complexities: [], categories: [] } };
+    });
+    expect(rows).toHaveLength(230);
+    expect(asked.map((p) => p.get('skip'))).toEqual([null, '100', '200']);
+    expect(asked.every((p) => p.get('first') === '100' && p.get('ratioMin') === '5' && p.get('sort') === 'signal')).toBe(true);
+  });
+
+  it('writes full hashes and exact amounts, quoting names with commas', () => {
+    const [header, line] = directoryCsv([row(0)]).split('\n');
+    expect(header.split(',')[0]).toBe('ipfs_hash');
+    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z');
+  });
+});
+
+describe('saved views', () => {
+  it('keeps named filters and replaces a view of the same name', () => {
+    const storage = memoryStorage();
+    saveView(storage, 'mine', applyPreset('under-allocated'));
+    const views = saveView(storage, ' mine ', parse('network=base'));
+    expect(views).toEqual([{ name: 'mine', query: 'network=base' }]);
+    expect(deleteView(storage, 'mine')).toEqual([]);
+  });
+
+  it('keeps the columns chosen when the view was saved', () => {
+    const storage = memoryStorage();
+    saveView(storage, 'wide', parse('network=base'), { categories: true, curators: false });
+    saveView(storage, 'plain', parse('network=base'));
+    expect(loadSavedViews(storage)).toEqual([
+      { name: 'wide', query: 'network=base', columns: { categories: true, curators: false } },
+      { name: 'plain', query: 'network=base' },
+    ]);
+    const junk = memoryStorage({
+      'lodestar:subgraph-views': '[{"name":"a","query":"","columns":{"x":"yes"}}]',
+    });
+    expect(loadSavedViews(junk)).toEqual([{ name: 'a', query: '' }]);
+  });
+
+  it('survives storage that refuses or holds something else', () => {
+    const refusing = {
+      getItem: () => {
+        throw new Error('SecurityError');
+      },
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+    expect(loadSavedViews(refusing)).toEqual([]);
+    expect(saveView(refusing, 'x', emptyDirectoryState())).toEqual([{ name: 'x', query: '' }]);
+    expect(loadSavedViews(memoryStorage({ 'lodestar:subgraph-views': '{"not":"a list"}' }))).toEqual([]);
+    expect(loadSavedViews(undefined)).toEqual([]);
+  });
+});

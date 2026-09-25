@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useIndexingStatus,
+  useSubgraphDeployment,
   useManifestAnalysis,
   useSubgraphCuration,
   useSubgraphHistory,
@@ -21,6 +22,7 @@ import { VerdictAge } from '@/components/subgraph/VerdictAge';
 import { SubgraphHistoryChart } from '@/components/charts/SubgraphHistoryChart';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { CopyButton } from '@/components/ui/CopyButton';
+import { WatchStar } from '@/components/ui/WatchStar';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -1081,6 +1083,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
   const activeTab: Tab = TABS.some((t) => t.id === rawTab) ? (rawTab as Tab) : 'overview';
 
   const { data: statusData } = useIndexingStatus(hash);
+  const { data: deployment } = useSubgraphDeployment(hash);
   const { data: manifestData } = useManifestAnalysis(hash);
   const { data: chainLagData } = useChainLag();
 
@@ -1094,7 +1097,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
     : null;
   const chainNotLive = chainVerdict?.liveness === 'halted' || chainVerdict?.liveness === 'stalled';
 
-  const displayName = statusData?.displayName ?? null;
+  const displayName = deployment?.displayName ?? statusData?.displayName ?? null;
   // The manifest's network id, as written. The Pinax registry that used to pretty-print it is gone (nuthatch#1160).
   const networkLabel = manifestData?.network ?? null;
 
@@ -1121,7 +1124,10 @@ function DeploymentPageInner({ hash }: { hash: string }) {
         <div className="min-w-0">
           {displayName ? (
             <>
-              <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)] mb-1">{displayName}</h1>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)]">{displayName}</h1>
+                <WatchStar kind="subgraph" id={hash} size="md" />
+              </div>
               <div className="flex items-center gap-2 mb-1">
                 {networkLabel && (
                   <Badge variant="accent">
@@ -1132,9 +1138,12 @@ function DeploymentPageInner({ hash }: { hash: string }) {
               </div>
             </>
           ) : (
-            <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)] mb-1">
-              {networkLabel ? `Deployment · ${networkLabel}` : 'Deployment'}
-            </h1>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)]">
+                {networkLabel ? `Deployment · ${networkLabel}` : 'Deployment'}
+              </h1>
+              <WatchStar kind="subgraph" id={hash} size="md" />
+            </div>
           )}
           <div className="flex items-center gap-2">
             <p className="text-xs sm:text-sm text-[var(--text-faint)] font-mono truncate">{hash}</p>

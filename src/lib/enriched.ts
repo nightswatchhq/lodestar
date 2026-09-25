@@ -5,8 +5,7 @@
 export interface EnrichedIndexer {
   // Base indexer fields
   id: string;
-  /** Null for every mainnet indexer today: none set `defaultDisplayName`, and kittiwake sends no
-   * name field. Typed honestly so a consumer has to handle it rather than find out in a browser. */
+  /** A verified name from kittiwake, or null for an indexer without one (about half of them). */
   name: string | null;
   stakedTokens: string;
   lockedTokens: string;
@@ -65,6 +64,8 @@ export interface EnrichedIndexer {
   // Composite risk score (computed from all dimensions above)
   score: number;               // 0–100 composite
   scoreGrade: 'A' | 'B' | 'C' | 'D' | 'F';
+  /** QoS Quality score, 0 to 100, from Edge & Node's oracle postings. Null where the oracle measured nothing. */
+  qScore: number | null;
   scoreBreakdown: {
     reo: number;
     selfStake: number;

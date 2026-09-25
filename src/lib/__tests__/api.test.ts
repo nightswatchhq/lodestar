@@ -9,6 +9,7 @@ import {
   fetchDelegatorPortfolio,
   fetchCuratorPortfolio,
   fetchSubgraphDeployments,
+  fetchSubgraphDeployment,
   fetchManifestAnalysis,
   fetchTokenMetrics,
   fetchDelegationFlows,
@@ -23,6 +24,11 @@ import {
   fetchPayments,
   fetchIndexerPayments,
   fetchIndexerStakeHistory,
+  fetchIndexerTrends,
+  fetchIndexerQos,
+  fetchIndexerQosScore,
+  fetchIndexerQosDeployments,
+  fetchIndexerPnl,
   fetchParameterHistory,
   fetchSubgraphCuration,
   fetchSubgraphSchema,
@@ -30,6 +36,7 @@ import {
   fetchServiceCensus,
   fetchQosCapture,
   fetchGrtFlow,
+  fetchDips,
   fetchIndexerDetail,
   fetchSubgraphHistory,
   fetchSubgraphVersions,
@@ -124,6 +131,26 @@ describe('api: URL building', () => {
     expect(url).toContain('orderDirection=asc');
   });
 
+  /** It sent `price` and `chain`; kittiwake reads `grtPrice` and `chains`, so Net never computed. */
+  it('asks the P&L route for the price and chains by the names kittiwake reads', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          pnl: { revenue_usd: null, infra_cost_usd: 0, net_usd: null },
+          costModel: {},
+          defaultChainCosts: {},
+        },
+      }),
+    );
+    await fetchIndexerPnl('0xabc', { windowDays: 30, grtPrice: 0.0186, chain: 'arbitrum,mainnet' });
+    const url = new URL(mockFetch.mock.calls[0][0] as string, 'http://x');
+    expect(url.searchParams.get('window')).toBe('30');
+    expect(url.searchParams.get('grtPrice')).toBe('0.0186');
+    expect(url.searchParams.get('chains')).toBe('arbitrum,mainnet');
+    expect(url.searchParams.has('price')).toBe(false);
+    expect(url.searchParams.has('chain')).toBe(false);
+  });
+
   it('URL-encodes addresses to prevent injection', async () => {
     mockFetch.mockResolvedValue(jsonResponse(OK.provisions));
     await fetchIndexerProvisions('0xAbc&evil=1');
@@ -162,6 +189,19 @@ describe('api: URL building', () => {
     expect(mockFetch.mock.calls[0][0]).toBe(
       '/api/subgraph-deployments?hash=Qm%2Fneeds%2Bescaping',
     );
+  });
+
+  it('reads one deployment by hash from its own route, and only that one', async () => {
+    const row = (ipfsHash: string) => ({ id: '0x1', ipfsHash, signalledTokens: '1', stakedTokens: '1', displayName: 'x' });
+    mockFetch.mockResolvedValue(jsonResponse({ data: [row('QmOther'), row('QmWanted')] }));
+    expect((await fetchSubgraphDeployment('QmWanted'))?.ipfsHash).toBe('QmWanted');
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/subgraph-deployment/QmWanted');
+    mockFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    expect(await fetchSubgraphDeployment('QmGone')).toBeNull();
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'bad_request', message: 'not a deployment hash' }, 400));
+    expect(await fetchSubgraphDeployment('QmNotAHash')).toBeNull();
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'internal' }, 500));
+    await expect(fetchSubgraphDeployment('QmWanted')).rejects.toThrow('500');
   });
 
   it('builds delegation-flows URL with compare flag', async () => {
@@ -348,6 +388,63 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
   it('fetchIndexerPayments throws with status on failure', async () => {
     mockFetch.mockResolvedValue(jsonResponse({}, 404));
     await expect(fetchIndexerPayments('0xabc')).rejects.toThrow('Indexer payments failed: 404');
+  });
+
+  it('fetchIndexerTrends asks for the day window on the path endpoint and unwraps .data', async () => {
+    const trends = {
+      rewards: [{ timestamp: '1787356800000000', indexer: '0xi', totalRewards: '3', totalIndexerRewards: '1', totalDelegationRewards: '2', rewardCount: '1' }],
+      queryFees: [{ timestamp: '1787356800000000', indexer: '0xi', totalCollected: '100', totalCurators: '10', totalProtocolTax: '1', totalCollectedNet: '89', feeCount: '1' }],
+    };
+    mockFetch.mockResolvedValue(jsonResponse({ data: trends }));
+    expect(await fetchIndexerTrends('0xI&x', 90)).toEqual(trends);
+    expect(mockFetch.mock.calls[0][0]).toBe(`/api/indexer/${encodeURIComponent('0xI&x')}/trends?days=90`);
+  });
+
+  it('fetchIndexerTrends refuses a fee row with no net figure rather than charting zero', async () => {
+    const queryFees = [{ timestamp: '1', indexer: '0xi', totalCollected: '100', totalCurators: '10' }];
+    mockFetch.mockResolvedValue(jsonResponse({ data: { rewards: [], queryFees } }));
+    await expect(fetchIndexerTrends('0xi')).rejects.toThrow(/totalCollectedNet/);
+  });
+
+  it('fetchIndexerTrends throws with status on failure', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchIndexerTrends('0xabc')).rejects.toThrow('Indexer trends failed: 503');
+  });
+
+  it('fetchIndexerQos asks for the day window on the path endpoint and unwraps .data', async () => {
+    const qos = {
+      qos: [{ date: '2026-09-07', buckets: 170, partial: true, badBuckets: 2, successRate: null }],
+      summary: { days: 1 },
+      freshness: { publisherLastPostAt: null },
+    };
+    mockFetch.mockResolvedValue(jsonResponse({ data: qos }));
+    expect(await fetchIndexerQos('0xI&x', 90)).toEqual(qos);
+    expect(mockFetch.mock.calls[0][0]).toBe(`/api/indexer/${encodeURIComponent('0xI&x')}/qos?days=90`);
+  });
+
+  it('fetchIndexerQos refuses a day with no bucket count rather than drawing it as complete', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { qos: [{ date: 'd', partial: false, badBuckets: 0 }], summary: {}, freshness: {} } }));
+    await expect(fetchIndexerQos('0xi')).rejects.toThrow(/buckets/);
+  });
+
+  it('fetchIndexerQos throws with status on failure', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({}, 503));
+    await expect(fetchIndexerQos('0xabc')).rejects.toThrow('Indexer QoS failed: 503');
+  });
+
+  it('fetchIndexerQosScore and fetchIndexerQosDeployments unwrap .data from their path endpoints', async () => {
+    const score = { window_days: 30, latest: null, daily: [] };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: score }));
+    expect(await fetchIndexerQosScore('0xabc')).toEqual(score);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc/qos-score');
+
+    const deps = { window_days: 30, total: null, deployments: [{ deployment_id: 'Qm1', drag: 0.1, measured: true }] };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: deps }));
+    expect(await fetchIndexerQosDeployments('0xabc')).toEqual(deps);
+    expect(mockFetch.mock.calls[1][0]).toBe('/api/indexer/0xabc/qos-deployments');
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 502));
+    await expect(fetchIndexerQosScore('0xabc')).rejects.toThrow('QoS score failed: 502');
   });
 
   it('fetchIndexerStakeHistory unwraps .data from the path endpoint', async () => {
@@ -571,6 +668,32 @@ describe('panels that no longer fetch for themselves', () => {
     );
     await expect(fetchGrtFlow()).resolves.toMatchObject({ supplyBreakdown: null });
   });
+
+  it('unwraps the issuance split and does not require indexingRate', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: {
+          available: true,
+          totalRate: 120.73,
+          agreementRate: 0,
+          live: false,
+          configuredNotDistributed: [],
+          allocations: [{ target: '0x971b9d3d0ae3eca029cab5ea1fb0f72c85e6a525', rate: 96.584 }],
+        },
+      }),
+    );
+    await expect(fetchDips()).resolves.toMatchObject({
+      available: true,
+      totalRate: 120.73,
+      allocations: [{ rate: 96.584 }],
+    });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/dips');
+  });
+
+  it('refuses a dips payload with no allocations array', async () => {
+    mockFetch.mockResolvedValue(jsonResponse({ data: { available: true, totalRate: 1 } }));
+    await expect(fetchDips()).rejects.toThrow('data.allocations');
+  });
 });
 
 /**
@@ -581,23 +704,111 @@ describe('panels that no longer fetch for themselves', () => {
  * from a page-load into a day, because an empty list is a sentence the UI is happy to render.
  */
 describe('the reads that moved out of the hooks', () => {
+  /** A profile with every part reading. It carries all four missable sections on purpose. */
+  type Profile = { data: { indexer: Record<string, unknown> } & Record<string, unknown> };
+  const profile = (): Profile => ({
+    data: {
+      indexer: {
+        id: '0xabc',
+        account: { id: '0xabc', defaultDisplayName: null, operators: [] },
+        stakedTokens: '1',
+        delegatedTokens: '2',
+        allocations: [],
+        closedAllocations: [],
+        delegators: [],
+      },
+    },
+  });
+
   it('unwraps the indexer profile from its envelope', async () => {
+    mockFetch.mockResolvedValue(jsonResponse(profile()));
+    await expect(fetchIndexerDetail('0xABC')).resolves.toMatchObject({ id: '0xabc' });
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc');
+  });
+
+  /**
+   * kittiwake#153. On 2026-09-14 the delegators statement ran the allocation nest out of memory and
+   * took the whole page with it for half an hour; the section is now left out and named instead.
+   */
+  it('accepts a profile whose delegators were left out, when degraded names them', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    body.data.degraded = [{ part: 'delegators', reason: 'nest_upstream' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+
+    const indexer = await fetchIndexerDetail('0xabc');
+    expect(indexer?.delegators).toBeUndefined();
+    expect(indexer?.degraded).toEqual([{ part: 'delegators', reason: 'nest_upstream' }]);
+    // The sections that did answer are still there, and still asserted.
+    expect(indexer?.allocations).toEqual([]);
+  });
+
+  it('refuses a section that went missing with nothing naming it', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.indexer.delegators');
+  });
+
+  it('refuses a profile missing a required part, however much of it is degraded', async () => {
+    const body = profile();
+    delete body.data.indexer.stakedTokens;
+    delete body.data.indexer.allocations;
+    body.data.degraded = [{ part: 'allocations', reason: 'nest_busy' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.indexer.stakedTokens');
+  });
+
+  it('refuses an answer that says it is degraded without saying what it lost', async () => {
+    const body = profile();
+    delete body.data.indexer.delegators;
+    body.data.degraded = [{ reason: 'nest_busy' }];
+    mockFetch.mockResolvedValue(jsonResponse(body));
+    await expect(fetchIndexerDetail('0xabc')).rejects.toThrow('data.degraded');
+  });
+
+  /**
+   * kittiwake#152 added `data.node`. It is asserted when present and not required when absent, so a
+   * kittiwake without it still parses: its absence costs the page the "checking" state, not the page.
+   */
+  it('parses the node block when the status answer carries one', async () => {
     mockFetch.mockResolvedValue(
       jsonResponse({
         data: {
-          indexer: {
-            id: '0xabc',
-            account: { id: '0xabc', defaultDisplayName: null },
-            stakedTokens: '1',
-            delegatedTokens: '2',
-            allocations: [],
-            delegators: [],
+          indexerAddress: '0xabc',
+          indexerUrl: null,
+          deployments: [],
+          node: {
+            reachable: null,
+            checkedAt: null,
+            ageSeconds: null,
+            stale: false,
+            lastReachedAt: null,
+            error: null,
+            pending: true,
           },
         },
       }),
     );
-    await expect(fetchIndexerDetail('0xABC')).resolves.toMatchObject({ id: '0xabc' });
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc');
+    const status = await fetchIndexerStatus('0xabc');
+    expect(status.node?.pending).toBe(true);
+    expect(status.node?.reachable).toBeNull();
+  });
+
+  it('still parses a status answer from a kittiwake that has no node block', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({ data: { indexerAddress: '0xabc', indexerUrl: null, deployments: [] } }),
+    );
+    await expect(fetchIndexerStatus('0xabc')).resolves.toMatchObject({ indexerAddress: '0xabc' });
+  });
+
+  it('refuses a node block that is not the shape it claims', async () => {
+    mockFetch.mockResolvedValue(
+      jsonResponse({
+        data: { indexerAddress: '0xabc', indexerUrl: null, deployments: [], node: { reachable: true } },
+      }),
+    );
+    await expect(fetchIndexerStatus('0xabc')).rejects.toThrow('data.node.pending');
   });
 
   it('treats a null indexer as an answer, because an unstaked address is one', async () => {

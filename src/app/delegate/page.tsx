@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { useNetworkStats } from '@/hooks/useNetworkStats';
+import { useNetworkStats, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import { DelegatePanel } from '@/components/ui/DelegatePanel';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -266,6 +266,7 @@ export default function DelegatePage() {
 
   const { data: rec, isLoading, isFetching, error } = useRecommendation(prefs);
   const { data: networkData } = useNetworkStats();
+  const annualIssuance = useAnnualIndexingIssuance();
 
   // Use manual override if set, otherwise use recommendation
   const active = override ?? rec;
@@ -273,9 +274,6 @@ export default function DelegatePage() {
   const network = networkData?.graphNetwork;
   const delegationRatio = network?.delegationRatio ?? 16;
   const totalNetworkSignal = network?.totalTokensSignalled ? weiToGRT(network.totalTokensSignalled) : 0;
-  const annualIssuance = network?.networkGRTIssuancePerBlock
-    ? weiToGRT(network.networkGRTIssuancePerBlock) * 2628000
-    : 0;
 
   const setPref = useCallback((key: PrefKey, value: number) => {
     setPrefs((p) => ({ ...p, [key]: value }));
@@ -399,6 +397,7 @@ export default function DelegatePage() {
               stakedTokens: active.indexer.stakedTokens,
               lockedTokens: active.indexer.lockedTokens,
               delegatedTokens: active.indexer.delegatedTokens,
+              delegatedThawingGRT: active.indexer.delegatedThawingGRT,
               indexingRewardCut: active.indexer.indexingRewardCut,
             }}
             riskGrade={active.indexer.scoreGrade}
