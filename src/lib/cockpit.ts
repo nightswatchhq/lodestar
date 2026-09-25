@@ -183,3 +183,132 @@ export function closeGate(detail: POIDeploymentDetail | null, indexer: string): 
 export function closes(type: CockpitActionType): boolean {
   return type === 'unallocate' || type === 'reallocate';
 }
+
+export type DecisionBasis = 'rules' | 'never' | 'always' | 'offchain';
+export const DECISION_BASES: DecisionBasis[] = ['rules', 'always', 'offchain', 'never'];
+
+/** A rule as the agent returns it: amounts in wei as decimal strings, or null where unset. */
+export interface IndexingRule {
+  identifier: string;
+  identifierType: 'deployment' | 'subgraph' | 'group';
+  decisionBasis: DecisionBasis | null;
+  allocationAmount: string | null;
+  parallelAllocations: number | null;
+  minSignal: string | null;
+  minStake: string | null;
+  minAverageQueryFees: string | null;
+  maxAllocationPercentage: number | null;
+  protocolNetwork: string;
+}
+
+/** What `POST /rules` takes. GRT amounts as decimal strings; the Cockpit converts them to wei. */
+export interface RuleInput {
+  identifier: string;
+  decisionBasis?: DecisionBasis;
+  allocationAmount?: string;
+  parallelAllocations?: number;
+  minSignal?: string;
+  minStake?: string;
+  minAverageQueryFees?: string;
+  maxAllocationPercentage?: number;
+}
+
+export async function fetchRules(): Promise<IndexingRule[]> {
+  const body = await cockpit('/rules');
+  return parseResponse('/rules', body, { arrays: ['rules'], pick: 'rules' });
+}
+
+export async function setRule(rule: RuleInput): Promise<IndexingRule> {
+  const body = await cockpit('/rules', { method: 'POST', body: rule });
+  return parseResponse('/rules', body, { present: ['rule'], pick: 'rule' });
+}
+
+export async function deleteRule(identifier: string): Promise<void> {
+  await cockpit('/rules/delete', { method: 'POST', body: { identifier } });
+}
+
+/** Wei as whole GRT for display, exact to the unit. Null stays null. */
+export function weiToGrtText(wei: string | null): string | null {
+  if (wei == null || !/^\d+$/.test(wei)) return null;
+  const padded = wei.padStart(19, '0');
+  const int = padded.slice(0, -18).replace(/^0+(?=\d)/, '');
+  const frac = padded.slice(-18).replace(/0+$/, '');
+  return frac ? `${int}.${frac}` : int;
+}
+
+export type RuleForm = {
+  identifier: string;
+  decisionBasis: DecisionBasis | '';
+  allocationAmount: string;
+  parallelAllocations: string;
+  minSignal: string;
+  minStake: string;
+  minAverageQueryFees: string;
+  maxAllocationPercent: string;
+};
+
+export function emptyRuleForm(identifier = ''): RuleForm {
+  return {
+    identifier,
+    decisionBasis: '',
+    allocationAmount: '',
+    parallelAllocations: '',
+    minSignal: '',
+    minStake: '',
+    minAverageQueryFees: '',
+    maxAllocationPercent: '',
+  };
+}
+
+export function ruleForm(rule: IndexingRule): RuleForm {
+  return {
+    identifier: rule.identifier,
+    decisionBasis: rule.decisionBasis ?? '',
+    allocationAmount: weiToGrtText(rule.allocationAmount) ?? '',
+    parallelAllocations: rule.parallelAllocations?.toString() ?? '',
+    minSignal: weiToGrtText(rule.minSignal) ?? '',
+    minStake: weiToGrtText(rule.minStake) ?? '',
+    minAverageQueryFees: weiToGrtText(rule.minAverageQueryFees) ?? '',
+    maxAllocationPercent: rule.maxAllocationPercentage == null ? '' : String(+(rule.maxAllocationPercentage * 100).toFixed(4)),
+  };
+}
+
+/**
+ * The form as the Cockpit takes it, or the first thing wrong with it. A blank field is left out,
+ * so it keeps whatever the agent has, as `graph indexer rules set` does with an unnamed key.
+ */
+export function ruleInput(form: RuleForm): RuleInput {
+  const identifier = form.identifier.trim();
+  if (identifier !== 'global' && !/^Qm[1-9A-HJ-NP-Za-km-z]{44}$/.test(identifier)) {
+    throw new Error('A rule is for "global" or a Qm deployment hash');
+  }
+  const rule: RuleInput = { identifier };
+  if (form.decisionBasis) rule.decisionBasis = form.decisionBasis;
+  const grt = (label: string, v: string) => {
+    const t = v.trim().replace(/,/g, '');
+    if (!t) return undefined;
+    if (!/^\d+(\.\d{1,18})?$/.test(t)) throw new Error(`${label} must be an amount in GRT`);
+    return t;
+  };
+  const amounts = {
+    allocationAmount: grt('Allocation amount', form.allocationAmount),
+    minSignal: grt('Minimum signal', form.minSignal),
+    minStake: grt('Minimum stake', form.minStake),
+    minAverageQueryFees: grt('Minimum average query fees', form.minAverageQueryFees),
+  };
+  for (const [k, v] of Object.entries(amounts)) if (v !== undefined) rule[k as keyof typeof amounts] = v;
+  const parallel = form.parallelAllocations.trim();
+  if (parallel) {
+    const n = Number(parallel);
+    if (!Number.isInteger(n) || n < 1 || n > 20) throw new Error('Parallel allocations is a whole number from 1 to 20');
+    rule.parallelAllocations = n;
+  }
+  const pct = form.maxAllocationPercent.trim();
+  if (pct) {
+    const n = Number(pct);
+    if (!(n > 0 && n <= 100)) throw new Error('Maximum allocation share is a percentage above 0 and at most 100');
+    rule.maxAllocationPercentage = n / 100;
+  }
+  return rule;
+}
+

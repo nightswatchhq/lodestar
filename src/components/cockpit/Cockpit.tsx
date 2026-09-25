@@ -14,7 +14,15 @@ import {
   closeGate,
   closes,
   cockpitAction,
+  DECISION_BASES,
+  deleteRule,
+  emptyRuleForm,
   fetchActions,
+  fetchRules,
+  ruleForm,
+  ruleInput,
+  setRule,
+  weiToGrtText,
   fetchCockpitSession,
   queueActions,
   requestChallenge,
@@ -24,11 +32,15 @@ import {
   type AgentAction,
   type CockpitActionType,
   type CockpitSession,
+  type DecisionBasis,
+  type IndexingRule,
+  type RuleForm,
 } from '@/lib/cockpit';
 import { cn, shortenAddress } from '@/lib/utils';
 
 const SESSION_KEY = ['cockpit', 'session'] as const;
 const ACTIONS_KEY = ['cockpit', 'actions'] as const;
+const RULES_KEY = ['cockpit', 'rules'] as const;
 const button =
   'px-2.5 py-1.5 text-xs rounded-[var(--radius-button)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50';
 const input =
@@ -74,6 +86,7 @@ function SignedIn() {
       <SessionBar session={session.data} />
       <QueueForm session={session.data} />
       <ActionQueue />
+      <IndexingRules />
     </>
   );
 }
@@ -349,3 +362,140 @@ function ActionQueue() {
     </Card>
   );
 }
+
+const RULE_FIELDS: { key: keyof RuleForm; label: string; placeholder: string }[] = [
+  { key: 'allocationAmount', label: 'Allocation amount (GRT)', placeholder: 'unchanged' },
+  { key: 'parallelAllocations', label: 'Parallel allocations', placeholder: 'unchanged' },
+  { key: 'minSignal', label: 'Minimum signal (GRT)', placeholder: 'unchanged' },
+  { key: 'minStake', label: 'Minimum stake (GRT)', placeholder: 'unchanged' },
+  { key: 'minAverageQueryFees', label: 'Minimum average query fees (GRT)', placeholder: 'unchanged' },
+  { key: 'maxAllocationPercent', label: 'Maximum allocation share (%)', placeholder: 'unchanged' },
+];
+
+function grt(wei: string | null): string {
+  const t = weiToGrtText(wei);
+  return t == null ? '—' : Number(t).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function IndexingRules() {
+  const qc = useQueryClient();
+  const rules = useQuery({ queryKey: RULES_KEY, queryFn: fetchRules });
+  const [form, setForm] = useState<RuleForm>(emptyRuleForm('global'));
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: () => setRule(ruleInput(form)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: RULES_KEY }),
+  });
+  const remove = useMutation({
+    mutationFn: deleteRule,
+    onSuccess: () => {
+      setConfirmDelete(null);
+      return qc.invalidateQueries({ queryKey: RULES_KEY });
+    },
+  });
+  const rows: IndexingRule[] = rules.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Indexing rules</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
+          What the agent allocates to on its own, as <span className="font-mono">graph indexer rules</span> sets it. A
+          deployment rule overrides <span className="font-mono">global</span> for the fields it names. Blank fields keep
+          what the agent has.
+        </p>
+        {rules.isPending ? (
+          <div className="h-16 animate-pulse rounded bg-[var(--bg-elevated)]" />
+        ) : rules.isError ? (
+          <p className="text-sm text-[var(--red-text)]">The rules could not be read. {message(rules.error)}</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">The agent has no rules.</p>
+        ) : (
+          <div className="overflow-x-auto -mx-4">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className={th}>Identifier</th>
+                  <th className={th}>Decision</th>
+                  <th className={cn(th, 'text-right')}>Allocation</th>
+                  <th className={cn(th, 'text-right')}>Parallel</th>
+                  <th className={cn(th, 'text-right')}>Min signal</th>
+                  <th className={cn(th, 'text-right')}>Min stake</th>
+                  <th className={th} />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {rows.map((r) => (
+                  <tr key={`${r.identifierType}:${r.identifier}`} className="hover:bg-[var(--bg-elevated)]">
+                    <td className={cn(td, 'font-mono')} title={r.identifier}>
+                      {r.identifier.length > 20 ? `${r.identifier.slice(0, 8)}…${r.identifier.slice(-6)}` : r.identifier}
+                    </td>
+                    <td className={td}>{r.decisionBasis ?? '—'}</td>
+                    <td className={cn(td, 'text-right font-mono')}>{grt(r.allocationAmount)}</td>
+                    <td className={cn(td, 'text-right font-mono')}>{r.parallelAllocations ?? '—'}</td>
+                    <td className={cn(td, 'text-right font-mono')}>{grt(r.minSignal)}</td>
+                    <td className={cn(td, 'text-right font-mono')}>{grt(r.minStake)}</td>
+                    <td className={cn(td, 'text-right whitespace-nowrap')}>
+                      {r.identifierType === 'subgraph' ? (
+                        <span className="text-[var(--text-faint)]">edit with indexer-cli</span>
+                      ) : (
+                        <>
+                          <button type="button" className={button} onClick={() => setForm(ruleForm(r))}>Edit</button>{' '}
+                          {confirmDelete === r.identifier ? (
+                            <button type="button" className={cn(button, 'text-[var(--red-text)]')} disabled={remove.isPending} onClick={() => remove.mutate(r.identifier)}>
+                              Really delete
+                            </button>
+                          ) : (
+                            <button type="button" className={button} onClick={() => setConfirmDelete(r.identifier)}>Delete</button>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {remove.isError ? <p className="text-xs text-[var(--red-text)]">{message(remove.error)}</p> : null}
+
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)] lg:col-span-2">
+              Rule for
+              <input className={input} value={form.identifier} placeholder="global or Qm…" onChange={(e) => setForm({ ...form, identifier: e.target.value })} />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)]">
+              Decision basis
+              <select className={cn(input, 'font-sans')} value={form.decisionBasis} onChange={(e) => setForm({ ...form, decisionBasis: e.target.value as DecisionBasis | '' })}>
+                <option value="">unchanged</option>
+                {DECISION_BASES.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </label>
+            {RULE_FIELDS.map((f) => (
+              <label key={f.key} className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)]">
+                {f.label}
+                <input className={input} inputMode="decimal" placeholder={f.placeholder} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} />
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="submit" className={button} disabled={save.isPending}>{save.isPending ? 'Saving…' : 'Save rule'}</button>
+            <button type="button" className={button} onClick={() => setForm(emptyRuleForm('global'))}>Clear</button>
+            {save.isError ? <span className="text-xs text-[var(--red-text)]">{message(save.error)}</span> : null}
+            {save.isSuccess ? <span className="text-xs text-[var(--text-muted)]">Saved.</span> : null}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
