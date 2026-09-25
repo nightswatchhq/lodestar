@@ -6,7 +6,20 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAccount, useSignMessage } from 'wagmi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge, type BadgeVariant } from '@/components/ui/Badge';
-import { fetchPOIDeployment } from '@/lib/api';
+import { fetchIndexerPnl, fetchPOIDeployment } from '@/lib/api';
+import {
+  useAnnualIndexingIssuance,
+  useIndexerDetail,
+  useNetworkStats,
+  usePOIDeployment,
+  useREOStatus,
+  useSubgraphDeployment,
+} from '@/hooks/useNetworkStats';
+import { actionContext } from '@/lib/cockpit-context';
+import { ALLOCATION_ESTIMATE_TOOLTIP } from '@/lib/allocation-estimate';
+import { ACCRUED_TOOLTIP, accruedTotal } from '@/lib/pending-rewards';
+import type { ActiveAllocation } from '@/lib/contracts/indexer-detail';
+import { reoStatusOrUnknown } from '@/lib/contracts/indexer-signals';
 import {
   COCKPIT_URL,
   approveActions,
@@ -36,7 +49,7 @@ import {
   type IndexingRule,
   type RuleForm,
 } from '@/lib/cockpit';
-import { cn, shortenAddress } from '@/lib/utils';
+import { cn, formatGRT, shortenAddress, weiToGRT } from '@/lib/utils';
 
 const SESSION_KEY = ['cockpit', 'session'] as const;
 const ACTIONS_KEY = ['cockpit', 'actions'] as const;
@@ -85,7 +98,8 @@ function SignedIn() {
     <>
       <SessionBar session={session.data} />
       <QueueForm session={session.data} />
-      <ActionQueue />
+      <ContextBar indexer={session.data.indexer} />
+      <ActionQueue indexer={session.data.indexer} />
       <IndexingRules />
     </>
   );
@@ -264,7 +278,12 @@ const STATUS_VARIANT: Record<ActionStatus, BadgeVariant> = {
 
 const FILTERS: (ActionStatus | 'all')[] = ['queued', 'approved', 'pending', 'failed', 'success', 'canceled', 'all'];
 
-function ActionQueue() {
+function ActionQueue({ indexer }: { indexer: string }) {
+  const detail = useIndexerDetail(indexer);
+  const network = useNetworkStats();
+  const annualIssuance = useAnnualIndexingIssuance();
+  const totalSignalGrt = network.data?.graphNetwork?.totalTokensSignalled
+    ? weiToGRT(network.data.graphNetwork.totalTokensSignalled) : 0;
   const [filter, setFilter] = useState<ActionStatus | 'all'>('queued');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const qc = useQueryClient();
@@ -326,6 +345,7 @@ function ActionQueue() {
                   <th className={cn(th, 'text-right')}>GRT</th>
                   <th className={th}>Status</th>
                   <th className={th}>Source</th>
+                  <th className={th}>Context</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -352,6 +372,15 @@ function ActionQueue() {
                       ) : null}
                     </td>
                     <td className={cn(td, 'text-[var(--text-muted)]')}>{a.source}</td>
+                    <td className={td}>
+                      {LIVE.has(a.status) ? <ActionContextCell
+                        action={a}
+                        indexer={indexer}
+                        allocations={detail.data?.allocations}
+                        annualIssuance={annualIssuance}
+                        totalSignalGrt={totalSignalGrt}
+                      /> : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -360,6 +389,114 @@ function ActionQueue() {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** The indexer at a glance above its queue: REO standing, what its open allocations hold, 30-day revenue. */
+function ContextBar({ indexer }: { indexer: string }) {
+  const reo = useREOStatus(indexer);
+  const detail = useIndexerDetail(indexer);
+  const pnl = useQuery({
+    queryKey: ['indexerPnl', indexer.toLowerCase(), 30, '', 0],
+    queryFn: () => fetchIndexerPnl(indexer.toLowerCase(), { windowDays: 30 }),
+    staleTime: 5 * 60 * 1000,
+  });
+  const status = reo.data ? reoStatusOrUnknown(reo.data.status.status) : null;
+  const days = reo.data?.status.daysRemaining;
+  const accrued = accruedTotal(detail.data?.allocations);
+  const cell = 'flex flex-col gap-0.5';
+  const label = 'text-[10px] uppercase tracking-wide text-[var(--text-faint)]';
+  return (
+    <Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+        <div className={cell}>
+          <span className={label}>REO</span>
+          {reo.isError ? (
+            <span className="text-[var(--red-text)]">could not be read</span>
+          ) : status == null ? (
+            <span className="text-[var(--text-muted)]">…</span>
+          ) : (
+            <span className={status === 'eligible' ? 'text-[var(--text)]' : 'text-[var(--red-text)]'}>
+              {status}
+              {status === 'eligible' && days != null ? (days > 0 ? `, ${days.toFixed(1)}d left` : ', renewal overdue') : ''}
+              {reo.data?.status.oracleStale ? ' (oracle stale)' : ''}
+            </span>
+          )}
+        </div>
+        <div className={cell}>
+          <span className={label}>Open allocations</span>
+          <span className="font-mono text-[var(--text)]">{detail.data?.allocations ? detail.data.allocations.length : '…'}</span>
+        </div>
+        <div className={cell} title={ACCRUED_TOOLTIP}>
+          <span className={label}>Accrued, uncollected</span>
+          <span className="font-mono text-[var(--text)]">
+            {accrued.kind === 'ready' ? `${formatGRT(Number(accrued.wei / 10n ** 14n) / 1e4)} GRT` : '—'}
+          </span>
+        </div>
+        <div className={cell}>
+          <span className={label}>Revenue, 30 days</span>
+          <span className="font-mono text-[var(--text)]">
+            {pnl.data ? `${formatGRT(pnl.data.pnl.revenue_grt)} GRT` : pnl.isError ? '—' : '…'}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Context is for decisions still to be made; a finished action's history would cost a read per row.
+const LIVE = new Set<ActionStatus>(['queued', 'approved', 'pending']);
+
+function ActionContextCell({
+  action,
+  indexer,
+  allocations,
+  annualIssuance,
+  totalSignalGrt,
+}: {
+  action: AgentAction;
+  indexer: string;
+  allocations: ActiveAllocation[] | undefined;
+  annualIssuance: number;
+  totalSignalGrt: number;
+}) {
+  const hash = action.deploymentID ?? '';
+  const isClose = action.type === 'unallocate' || action.type === 'reallocate';
+  const deployment = useSubgraphDeployment(hash);
+  const poi = usePOIDeployment(isClose && hash ? hash : null);
+  if (!hash) return <span className="text-[var(--text-faint)]">—</span>;
+  const c = actionContext({
+    action,
+    deployment: deployment.data ?? null,
+    allocations,
+    annualIssuance,
+    totalSignalGrt,
+    poiDetail: isClose ? (poi.isSuccess ? poi.data ?? null : poi.isError ? null : undefined) : undefined,
+    indexer,
+  });
+  return (
+    <div className="space-y-0.5 min-w-[12rem] text-[11px]">
+      <p className="text-[var(--text)] truncate max-w-[16rem]">
+        {c.name ?? (deployment.isPending ? '…' : 'unnamed')}
+        {c.denied ? <Badge variant="error" className="ml-1">Rewards denied</Badge> : null}
+      </p>
+      {c.signalGrt != null ? <p className="text-[var(--text-muted)]">signal {formatGRT(c.signalGrt)} GRT</p> : null}
+      {c.estimatedApr != null ? (
+        <p className="text-[var(--text-muted)]" title={ALLOCATION_ESTIMATE_TOOLTIP}>
+          est. {c.estimatedApr.toFixed(2)}% a year at {formatGRT(Number(action.amount))} GRT
+        </p>
+      ) : null}
+      {c.accruedGrt != null ? (
+        <p className="text-[var(--text-muted)]" title={ACCRUED_TOOLTIP}>closing collects ~{formatGRT(c.accruedGrt)} GRT</p>
+      ) : null}
+      {c.poi?.kind === 'diverged' ? (
+        <p className="text-[var(--red-text)]">last POI (epoch {c.poi.epoch}) disagreed with {c.poi.consensusPct.toFixed(0)}% consensus</p>
+      ) : c.poi?.kind === 'clear' ? (
+        <p className="text-[var(--text-muted)]">last POI (epoch {c.poi.epoch}) agreed with consensus</p>
+      ) : c.poi?.kind === 'no-data' ? (
+        <p className="text-[var(--text-faint)]">no closed POI on record</p>
+      ) : null}
+    </div>
   );
 }
 
