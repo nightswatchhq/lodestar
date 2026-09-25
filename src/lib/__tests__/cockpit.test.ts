@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { closeGate, closes, cockpitAction, emptyRuleForm, ruleForm, ruleInput, weiToGrtText } from '../cockpit';
+import { closeGate, closes, cockpitAction, emptyRuleForm, flatPrice, priceInput, ruleForm, ruleInput, weiToGrtText } from '../cockpit';
 import type { POIDeploymentDetail, POIEpochGroup, POIIndexerEntry } from '../poi';
 
 const ME = '0xAbC0000000000000000000000000000000000001';
@@ -161,3 +161,19 @@ describe('indexing rules', () => {
     });
   });
 });
+
+describe('query prices', () => {
+  it('reads a model as the gateway does', () => {
+    expect(flatPrice('default => 0.00004;')).toBe(0.00004);
+    expect(flatPrice('  default  =>  0.004100  ; ')).toBe(0.0041);
+    expect(flatPrice('query { pairs } => 0.1;')).toBeNull();
+    expect(flatPrice(null)).toBeNull();
+  });
+
+  it('takes only a plain decimal under one GRT', () => {
+    expect(priceInput(' 0.00004 ')).toBe('0.00004');
+    expect(priceInput('0')).toBe('0');
+    for (const bad of ['1', '4e-5', '.1', '0.1; query { x } => 5', '']) expect(() => priceInput(bad)).toThrow();
+  });
+});
+

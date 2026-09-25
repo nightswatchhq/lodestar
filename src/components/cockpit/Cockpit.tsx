@@ -9,6 +9,7 @@ import { Badge, type BadgeVariant } from '@/components/ui/Badge';
 import { fetchIndexerPnl, fetchPOIDeployment } from '@/lib/api';
 import {
   useAnnualIndexingIssuance,
+  useGRTPrice,
   useIndexerDetail,
   useNetworkStats,
   usePOIDeployment,
@@ -28,12 +29,17 @@ import {
   closes,
   cockpitAction,
   DECISION_BASES,
+  deleteCostModel,
   deleteRule,
   emptyRuleForm,
   fetchActions,
+  fetchCostModels,
   fetchRules,
+  flatPrice,
+  priceInput,
   ruleForm,
   ruleInput,
+  setPrice,
   setRule,
   weiToGrtText,
   fetchCockpitSession,
@@ -54,6 +60,7 @@ import { cn, formatGRT, shortenAddress, weiToGRT } from '@/lib/utils';
 const SESSION_KEY = ['cockpit', 'session'] as const;
 const ACTIONS_KEY = ['cockpit', 'actions'] as const;
 const RULES_KEY = ['cockpit', 'rules'] as const;
+const COST_KEY = ['cockpit', 'costModels'] as const;
 const button =
   'px-2.5 py-1.5 text-xs rounded-[var(--radius-button)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] disabled:opacity-50';
 const input =
@@ -101,6 +108,7 @@ function SignedIn() {
       <ContextBar indexer={session.data.indexer} />
       <ActionQueue indexer={session.data.indexer} />
       <IndexingRules />
+      <QueryPrices />
     </>
   );
 }
@@ -630,6 +638,130 @@ function IndexingRules() {
             {save.isError ? <span className="text-xs text-[var(--red-text)]">{message(save.error)}</span> : null}
             {save.isSuccess ? <span className="text-xs text-[var(--text-muted)]">Saved.</span> : null}
           </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function perMillionUsd(priceGrt: number, grtUsd: number | undefined): string {
+  if (!grtUsd) return '';
+  return `$${(priceGrt * grtUsd * 1e6).toLocaleString('en-US', { maximumFractionDigits: 2 })} per million queries`;
+}
+
+function QueryPrices() {
+  const qc = useQueryClient();
+  const models = useQuery({ queryKey: COST_KEY, queryFn: fetchCostModels });
+  const grtUsd = useGRTPrice().data?.price;
+  const [deployment, setDeployment] = useState('global');
+  const [price, setPriceText] = useState('');
+  const [confirmZero, setConfirmZero] = useState(false);
+  const save = useMutation({
+    mutationFn: () => setPrice(deployment.trim(), priceInput(price)),
+    onSuccess: () => {
+      setConfirmZero(false);
+      return qc.invalidateQueries({ queryKey: COST_KEY });
+    },
+  });
+  const remove = useMutation({
+    mutationFn: deleteCostModel,
+    onSuccess: () => qc.invalidateQueries({ queryKey: COST_KEY }),
+  });
+  const typed = Number(price.trim());
+  const zero = price.trim() !== '' && typed === 0;
+  const rows = models.data ?? [];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Query prices</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-xs text-[var(--text-muted)] max-w-3xl">
+          The gateway reads a cost model only in the form <span className="font-mono">default =&gt; x;</span>, as GRT per
+          query, and treats anything else as free. Your indexer-service refuses receipts below this price, so a price
+          above what the gateway will pay serves no queries at all.
+        </p>
+        {models.isPending ? (
+          <div className="h-16 animate-pulse rounded bg-[var(--bg-elevated)]" />
+        ) : models.isError ? (
+          <p className="text-sm text-[var(--red-text)]">The cost models could not be read. {message(models.error)}</p>
+        ) : rows.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">No cost models. The gateway prices every query at zero.</p>
+        ) : (
+          <div className="overflow-x-auto -mx-4">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th className={th}>Deployment</th>
+                  <th className={cn(th, 'text-right')}>GRT per query</th>
+                  <th className={th} />
+                  <th className={th} />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {rows.map((m) => {
+                  const p = flatPrice(m.model);
+                  return (
+                    <tr key={m.deployment} className="hover:bg-[var(--bg-elevated)]">
+                      <td className={cn(td, 'font-mono')} title={m.deployment}>
+                        {m.deployment.length > 20 ? `${m.deployment.slice(0, 8)}…${m.deployment.slice(-6)}` : m.deployment}
+                      </td>
+                      <td className={cn(td, 'text-right font-mono')}>{p == null ? '—' : p}</td>
+                      <td className={cn(td, 'text-[var(--text-muted)]')}>
+                        {p == null ? (
+                          <span className="text-[var(--amber)]" title={m.model ?? ''}>not a flat price, so the gateway reads it as zero</span>
+                        ) : (
+                          perMillionUsd(p, grtUsd)
+                        )}
+                      </td>
+                      <td className={cn(td, 'text-right whitespace-nowrap')}>
+                        <button type="button" className={button} onClick={() => { setDeployment(m.deployment); setPriceText(p == null ? '' : String(p)); }}>Edit</button>{' '}
+                        <button type="button" className={button} disabled={remove.isPending} onClick={() => remove.mutate(m.deployment)}>Delete</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {remove.isError ? <p className="text-xs text-[var(--red-text)]">{message(remove.error)}</p> : null}
+
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (zero && !confirmZero) {
+              setConfirmZero(true);
+              return;
+            }
+            save.mutate();
+          }}
+        >
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)] w-full sm:w-96">
+            Price for
+            <input className={input} value={deployment} placeholder="global or Qm…" onChange={(e) => setDeployment(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-[11px] text-[var(--text-muted)] w-40">
+            GRT per query
+            <input
+              className={input}
+              inputMode="decimal"
+              placeholder="0.00004"
+              value={price}
+              onChange={(e) => { setPriceText(e.target.value); setConfirmZero(false); }}
+            />
+          </label>
+          <button type="submit" className={button} disabled={save.isPending}>
+            {save.isPending ? 'Saving…' : confirmZero ? 'Serve for nothing' : 'Save price'}
+          </button>
+          {Number.isFinite(typed) && typed > 0 ? (
+            <span className="text-xs text-[var(--text-muted)]">{perMillionUsd(typed, grtUsd)}</span>
+          ) : null}
+          {confirmZero ? <span className="text-xs text-[var(--amber)]">A zero price serves every query for free. Press again to confirm.</span> : null}
+          {save.isError ? <span className="text-xs text-[var(--red-text)]">{message(save.error)}</span> : null}
+          {save.isSuccess ? <span className="text-xs text-[var(--text-muted)]">Saved.</span> : null}
         </form>
       </CardContent>
     </Card>
