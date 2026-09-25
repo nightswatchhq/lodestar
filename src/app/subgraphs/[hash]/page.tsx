@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useIndexingStatus,
+  useSubgraphDeployment,
   useManifestAnalysis,
   useSubgraphCuration,
   useSubgraphHistory,
@@ -1082,6 +1083,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
   const activeTab: Tab = TABS.some((t) => t.id === rawTab) ? (rawTab as Tab) : 'overview';
 
   const { data: statusData } = useIndexingStatus(hash);
+  const { data: deployment } = useSubgraphDeployment(hash);
   const { data: manifestData } = useManifestAnalysis(hash);
   const { data: chainLagData } = useChainLag();
 
@@ -1095,7 +1097,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
     : null;
   const chainNotLive = chainVerdict?.liveness === 'halted' || chainVerdict?.liveness === 'stalled';
 
-  const displayName = statusData?.displayName ?? null;
+  const displayName = deployment?.displayName ?? statusData?.displayName ?? null;
   // The manifest's network id, as written. The Pinax registry that used to pretty-print it is gone (nuthatch#1160).
   const networkLabel = manifestData?.network ?? null;
 

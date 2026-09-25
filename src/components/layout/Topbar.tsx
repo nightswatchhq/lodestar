@@ -14,6 +14,7 @@ const pageTitles: Record<string, string> = {
   '/delegators': 'Delegator Portfolio',
   '/curators': 'Curator Portfolio',
   '/subgraphs': 'Subgraph Directory',
+  '/subgraphs/migration': 'Studio Migration',
   '/calculator': 'Delegation Calculator',
   '/compare': 'Compare Indexers',
   '/profile': 'Portfolio',

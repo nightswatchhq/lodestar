@@ -11,6 +11,7 @@ import {
   fetchIndexerProvisions,
   fetchEnrichedIndexers,
   fetchSubgraphDeployments,
+  fetchSubgraphDeployment,
   fetchSubgraphDeployments30d,
   fetchSubgraphDirectory,
   fetchManifestAnalysis,
@@ -227,6 +228,15 @@ export function useIndexerProvisions(indexer: string) {
 /**
  * Hook for subgraph deployments
  */
+export function useSubgraphDeployment(hash: string) {
+  return useQuery({
+    queryKey: ['subgraphDeployment', hash],
+    queryFn: () => fetchSubgraphDeployment(hash),
+    staleTime: FIVE_MINUTES,
+    enabled: !!hash,
+  });
+}
+
 export function useSubgraphDeployments(params: {
   first?: number;
   skip?: number;
