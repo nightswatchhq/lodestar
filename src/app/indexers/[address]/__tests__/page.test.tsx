@@ -57,6 +57,7 @@ vi.mock('@/hooks/useNetworkStats', () => ({
       },
     }),
   useIndexerProvisions: () => answered({ provisions: [] }),
+  useProvisionDetail: () => answered({ indexer: '', chain: null, services: [], activity: [] }),
   useREOStatus: () => answered(undefined),
   useRecentDelegations: () => answered([]),
   useENSName: () => answered({ ensName: null }),
