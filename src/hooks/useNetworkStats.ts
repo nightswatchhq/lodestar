@@ -12,6 +12,7 @@ import {
   fetchProvisionDetail,
   fetchEnrichedIndexers,
   fetchSubgraphDeployments,
+  fetchSubgraphDeployment,
   fetchSubgraphDeployments30d,
   fetchSubgraphDirectory,
   fetchManifestAnalysis,
@@ -238,6 +239,15 @@ export function useProvisionDetail(indexer: string, enabled = true) {
 /**
  * Hook for subgraph deployments
  */
+export function useSubgraphDeployment(hash: string) {
+  return useQuery({
+    queryKey: ['subgraphDeployment', hash],
+    queryFn: () => fetchSubgraphDeployment(hash),
+    staleTime: FIVE_MINUTES,
+    enabled: !!hash,
+  });
+}
+
 export function useSubgraphDeployments(params: {
   first?: number;
   skip?: number;

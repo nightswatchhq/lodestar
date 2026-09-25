@@ -42,17 +42,21 @@ export function ReoCoverage({ indexer, allocations }: { indexer: string; allocat
     <div className="border-t border-[var(--border)] pt-3 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-sm text-[var(--text-muted)]">
-          Qualifying subgraphs, {query.status === 'success' ? `${query.data.window_days} days` : 'window'}
+          Qualifying subgraphs served, {query.status === 'success' ? `${query.data.window_days} days` : 'window'}
         </span>
         <span className={cn('text-sm font-mono font-medium', short ? 'text-[var(--red-text)]' : 'text-[var(--text)]')}>
-          {c === null ? (query.status === 'error' ? '--' : '…') : `${c.qualifying} of ${REO_SUBGRAPHS_FROM}`}
+          {c === null ? (query.status === 'error' ? '--' : '…') : c.qualifying}
         </span>
       </div>
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-[var(--text-faint)]">Needs, on each active day, {changed ? 'since' : 'from'} {when}</span>
+        <span className={cn('font-mono', short ? 'text-[var(--red-text)]' : 'text-[var(--text-muted)]')}>{REO_SUBGRAPHS_FROM}</span>
+      </div>
       <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
-        {changed ? 'Since' : 'From'} {when}, an active day needs a qualifying query on each of {REO_SUBGRAPHS_FROM} subgraphs
-        with at least {REO_SIGNAL_FLOOR_GRT} GRT of signal, up from 1. Allocating is not enough: the gateway has to route the
-        query and it has to come back 200, under 5 s, within 50,000 blocks. The count is deployments served across the whole
-        window with that signal today, so no single day is higher.
+        A qualifying subgraph carries at least {REO_SIGNAL_FLOOR_GRT} GRT of signal; the rule was 1 a day before {when}. Allocating
+        is not enough: the gateway has to route the query and it has to come back 200, under 5 s, within 50,000 blocks. The
+        figure above is deployments served at any point in the window that carry that signal today, so it is a ceiling on any
+        one day, not a day&apos;s count. Under {REO_SUBGRAPHS_FROM} here means under {REO_SUBGRAPHS_FROM} on every day.
         {c !== null && c.unknown > 0 && ` ${c.unknown} served ${c.unknown === 1 ? 'deployment is' : 'deployments are'} not allocated now, so their signal is unread and they count for nothing here.`}
         {!changed && ' Eligibility renewed before the change keeps its 14 days.'}
       </p>
