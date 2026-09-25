@@ -312,3 +312,43 @@ export function ruleInput(form: RuleForm): RuleInput {
   return rule;
 }
 
+export interface CostModel {
+  deployment: string;
+  model: string | null;
+}
+
+export async function fetchCostModels(): Promise<CostModel[]> {
+  const body = await cockpit('/cost-models');
+  return parseResponse('/cost-models', body, { arrays: ['costModels'], pick: 'costModels' });
+}
+
+/** Sets `default => price;`, the only cost model the gateway reads. The Cockpit writes the line. */
+export async function setPrice(deployment: string, price: string): Promise<CostModel> {
+  const body = await cockpit('/cost-models', { method: 'POST', body: { deployment, price } });
+  return parseResponse('/cost-models', body, { present: ['costModel'], pick: 'costModel' });
+}
+
+export async function deleteCostModel(deployment: string): Promise<void> {
+  await cockpit('/cost-models/delete', { method: 'POST', body: { deployment } });
+}
+
+/**
+ * The GRT-per-query price in a model, parsed as the gateway parses it (`default => x;`), or null
+ * for a model the gateway does not read: anything else it treats as a price of zero.
+ */
+export function flatPrice(model: string | null): number | null {
+  const m = model?.match(/default\s*=>\s*([^;]+);/);
+  if (!m) return null;
+  const n = Number(m[1].trim());
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+/** A price as the Cockpit takes it, or the reason it will not. */
+export function priceInput(raw: string): string {
+  const t = raw.trim();
+  if (!/^0(\.\d{1,18})?$/.test(t) || (t !== '0' && !t.includes('.'))) {
+    throw new Error('A price is GRT per query, a plain decimal below 1, such as 0.00004');
+  }
+  return t;
+}
+
