@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from './Card';
 import { Badge } from './Badge';
 import { ProgressBar } from './ProgressBar';
-import { weiToGRT, formatGRT, shortenAddress, cn } from '@/lib/utils';
+import { weiToGRT, formatGRT, shortenAddress } from '@/lib/utils';
 import type { Provision } from '@/lib/queries';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
 
@@ -25,7 +25,7 @@ const SERVICE_COLORS = [
   '#8b5cf6',
 ];
 
-function resolveServiceName(id: string): string {
+export function resolveServiceName(id: string): string {
   return SERVICE_NAMES[id.toLowerCase()] || shortenAddress(id);
 }
 

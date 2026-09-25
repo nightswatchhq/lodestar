@@ -9,6 +9,7 @@ import {
   fetchGRTPrice,
   fetchTVL,
   fetchIndexerProvisions,
+  fetchProvisionDetail,
   fetchEnrichedIndexers,
   fetchSubgraphDeployments,
   fetchSubgraphDeployment,
@@ -222,6 +223,16 @@ export function useIndexerProvisions(indexer: string) {
     staleTime: FIVE_MINUTES,
     refetchInterval: FIVE_MINUTES,
     enabled: !!indexer,
+  });
+}
+
+export function useProvisionDetail(indexer: string, enabled = true) {
+  return useQuery({
+    queryKey: ['provisionDetail', indexer],
+    queryFn: () => fetchProvisionDetail(indexer),
+    staleTime: FIVE_MINUTES,
+    refetchInterval: FIVE_MINUTES,
+    enabled: !!indexer && enabled,
   });
 }
 

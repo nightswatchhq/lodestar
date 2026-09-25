@@ -6,7 +6,7 @@
 
 **0 route files left in this repo.** The goal is none: Lodestar is a frontend and kittiwake is the backend. That is **100%** of the way from 93 on 10 September 2026.
 
-Of the port itself, **66 of 66** are across, **100%**. Of the rest, **0 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
+Of the port itself, **67 of 67** are across, **100%**. Of the rest, **0 are written and answering on kittiwake already** and wait only on a cutover, and **0** have still to be ported.
 
 That second denominator is routes meant to move that have not yet, and it excludes 0 agreed for deletion, 0 staying on Next by decision, and 0 scheduled endpoints. The first counts all of them, because a route that stays by decision is still a route this repo serves. Each is listed below rather than quietly improving either figure.
 
@@ -14,7 +14,7 @@ That second denominator is routes meant to move that have not yet, and it exclud
 
 | Block | Done | Left |
 |---|---|---|
-| data plane | 66/66 | 0 |
+| data plane | 67/67 | 0 |
 
 ## On kittiwake
 
@@ -57,6 +57,7 @@ That second denominator is routes meant to move that have not yet, and it exclud
 - `/api/portfolio`
 - `/api/price`
 - `/api/provisions`
+- `/api/provisions/detail`
 - `/api/qos/capture`
 - `/api/reo`
 - `/api/rewards-history`
