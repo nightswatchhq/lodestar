@@ -33,6 +33,7 @@ import { CopyButton } from '@/components/ui/CopyButton';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { queueCommand, queueBlock } from '@/lib/indexer-cli';
+import { COCKPIT_URL } from '@/lib/cockpit';
 import { MissingSection } from '@/components/indexer/MissingSection';
 import { formatGRT, weiToGRT, shortenAddress, formatRelativeTime, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio, ratioVsNetwork } from '@/lib/allocation-ratio';
@@ -484,6 +485,14 @@ function AllocRow({
               title="Copy unallocate command"
               className="self-start mt-0.5"
             />
+          ) : null}
+          {COCKPIT_URL && row.lifecycle === 'active' && row.ipfsHash ? (
+            <Link
+              href={`/cockpit?${new URLSearchParams({ type: 'unallocate', deployment: row.ipfsHash, allocation: row.allocationId })}`}
+              className="text-[10px] text-[var(--accent-text)] hover:underline"
+            >
+              Queue in Cockpit
+            </Link>
           ) : null}
           {row.lifecycle === 'closed' && showActiveCols ? (
             <span className="text-[10px] text-[var(--text-faint)]">closed</span>
