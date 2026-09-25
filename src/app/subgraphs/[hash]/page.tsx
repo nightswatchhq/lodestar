@@ -14,7 +14,10 @@ import {
   useENSName,
   useSubgraphSchema,
   useChainLag,
+  useNetworkStats,
+  useAnnualIndexingIssuance,
 } from '@/hooks/useNetworkStats';
+import { ALLOCATION_ESTIMATE_TOOLTIP, estimatedAllocationApr } from '@/lib/allocation-estimate';
 import { useDeploymentQos } from '@/hooks/useFoghorn';
 import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { FoghornAlertBanner } from '@/components/foghorn/FoghornAlertBanner';
@@ -1087,6 +1090,8 @@ function DeploymentPageInner({ hash }: { hash: string }) {
 
   const { data: statusData } = useIndexingStatus(hash);
   const { data: deployment } = useSubgraphDeployment(hash);
+  const { data: networkStats } = useNetworkStats();
+  const annualIssuance = useAnnualIndexingIssuance();
   const manifestQuery = useManifestAnalysis(hash);
   const { data: manifestData } = manifestQuery;
   const versionsQuery = useSubgraphVersions(hash);
@@ -1094,6 +1099,11 @@ function DeploymentPageInner({ hash }: { hash: string }) {
   const viewedVersion = versions.find((version) => version.ipfsHash === hash);
   const currentVersion = versions.find((version) => version.isCurrent);
   const superseded = viewedVersion && currentVersion && viewedVersion.version !== currentVersion.version;
+  const totalSignal = networkStats?.graphNetwork?.totalTokensSignalled
+    ? weiToGRT(networkStats.graphNetwork.totalTokensSignalled) : 0;
+  const estimatedApr = deployment ? estimatedAllocationApr(
+    annualIssuance, weiToGRT(deployment.signalledTokens), totalSignal, weiToGRT(deployment.stakedTokens),
+  ) : null;
   const { data: chainLagData } = useChainLag();
 
   // Which chain this deployment indexes. The manifest is authoritative; fall
@@ -1179,6 +1189,17 @@ function DeploymentPageInner({ hash }: { hash: string }) {
           Back to Subgraphs
         </Link>
       </div>
+      {deployment?.deniedSince != null && deployment.deniedSince > 0 && (
+        <p className="text-sm text-[var(--red-text)]"><Badge variant="error">Rewards denied</Badge>{' '}
+          RewardsManager denylist since block {formatNumber(deployment.deniedSince)}.
+        </p>
+      )}
+      {deployment && (
+        <p className="text-sm text-[var(--text-muted)]" title={ALLOCATION_ESTIMATE_TOOLTIP}>
+          New 100k GRT allocation, estimated APR before cuts:{' '}
+          {deployment.deniedSince != null && deployment.deniedSince > 0 ? 'Rewards denied' : estimatedApr == null ? 'Unavailable' : `${estimatedApr.toFixed(2)}%`}
+        </p>
+      )}
       {superseded && (
         <div className="rounded-[var(--radius-card)] border border-[var(--amber)] bg-[var(--amber-dim)] p-4 text-sm text-[var(--text)]">
           Superseded by{' '}

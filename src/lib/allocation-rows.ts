@@ -17,6 +17,7 @@ export type StatusDeployment = {
 
 export type AllocationRow = StatusDeployment & {
   allocationId: string;
+  deniedSince?: number | null;
   pendingRewards?: string | null;
 };
 
@@ -52,6 +53,7 @@ export function allocationsWithStatus(
       syncProgress: status?.syncProgress,
       fatalError: status?.fatalError,
       pendingRewards: a.pendingRewards,
+      deniedSince: a.subgraphDeployment.deniedSince,
     };
   });
 }

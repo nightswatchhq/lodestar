@@ -104,6 +104,7 @@ export interface OgDeployment {
   stakedTokens?: string;
   queryFeesAmount?: string;
   createdAt?: number;
+  deniedSince?: number | null;
   /** Arrays whose lengths are the counts, which is what the pages read. */
   indexerAllocations?: unknown[];
   curatorSignals?: unknown[];

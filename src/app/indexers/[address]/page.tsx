@@ -17,6 +17,7 @@ import {
 } from '@/lib/utils';
 import { AllocationsPanel } from '@/components/indexer/AllocationsPanel';
 import { AlertsPanel } from '@/components/indexer/AlertsPanel';
+import { SimulatorPanel } from '@/components/indexer/SimulatorPanel';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { fetchIndexerDelegators } from '@/lib/api';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
@@ -861,6 +862,15 @@ function IndexerDetailInner({ address }: { address: string }) {
       )}
 
       {activeTab === 'allocations' && <AlertsPanel key={indexer.id} indexer={indexer.id} />}
+
+      {activeTab === 'plan' && (
+        <SimulatorPanel
+          allocations={allocations}
+          availableGRT={stakeKnown ? (ssStake?.available ?? 0) : null}
+          annualIssuance={annualIssuance}
+          totalNetworkSignal={totalNetworkSignal}
+        />
+      )}
 
       {activeTab === 'history' && (
         <DisputesSection address={address} />

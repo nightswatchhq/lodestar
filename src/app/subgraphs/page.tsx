@@ -11,9 +11,10 @@ import { TableControls } from '@/components/ui/TableControls';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
 import { isColumnVisible, type ColumnSpec } from '@/lib/table-prefs';
 import { ExportButton } from '@/components/ui/ExportButton';
-import { useSubgraphDirectory, useNetworkStats } from '@/hooks/useNetworkStats';
+import { useSubgraphDirectory, useNetworkStats, useAnnualIndexingIssuance } from '@/hooks/useNetworkStats';
 import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio } from '@/lib/allocation-ratio';
+import { ALLOCATION_ESTIMATE_TOOLTIP, estimatedAllocationApr } from '@/lib/allocation-estimate';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { WatchStar } from '@/components/ui/WatchStar';
 import { fetchSubgraphDirectory, fetchSubgraphSearch, type DirectoryFacet, type DirectoryRow } from '@/lib/api';
@@ -70,6 +71,14 @@ function NetworkCell({ network }: { network: string | null }) {
 function RatioText({ ratio }: { ratio: number | null }) {
   if (ratio === null) return <span title="Nothing allocated against this signal">∞</span>;
   return <>{ratio.toFixed(3)}</>;
+}
+
+function EstimateCell({ signal, stake, totalSignal, annualIssuance, deniedSince }: {
+  signal: number; stake: number; totalSignal: number; annualIssuance: number; deniedSince?: number | null;
+}) {
+  if (deniedSince != null && deniedSince > 0) return <span className="text-[var(--red-text)]">Denied</span>;
+  const apr = estimatedAllocationApr(annualIssuance, signal, totalSignal, stake);
+  return <span title={ALLOCATION_ESTIMATE_TOOLTIP}>{apr == null ? '—' : `${apr.toFixed(2)}%`}</span>;
 }
 
 /**
@@ -246,6 +255,7 @@ const SUBGRAPH_COLUMNS: readonly ColumnSpec[] = [
   { id: 'created', label: 'Created' },
   { id: 'indexers', label: 'Indexers' },
   { id: 'ratio', label: 'Signal/Stake' },
+  { id: 'estimatedApr', label: 'Est. APR' },
   { id: 'curators', label: 'Curators' },
 ];
 const SPEC = Object.fromEntries(SUBGRAPH_COLUMNS.map((c) => [c.id, c]));
@@ -270,6 +280,9 @@ function SubgraphDirectory() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { data: networkData } = useNetworkStats();
+  const annualIssuance = useAnnualIndexingIssuance();
+  const totalNetworkSignal = networkData?.graphNetwork?.totalTokensSignalled
+    ? weiToGRT(networkData.graphNetwork.totalTokensSignalled) : 0;
   const networkRatio = (() => {
     const n = networkData?.graphNetwork;
     if (!n?.totalTokensSignalled || !n?.totalTokensAllocated) return 0;
@@ -748,6 +761,7 @@ function SubgraphDirectory() {
                         />
                       )}
                       {row.isHighVolume && highVolumeBadge}
+                      {row.deniedSince != null && row.deniedSince > 0 && <Badge variant="error">Rewards denied</Badge>}
                     </div>
                     {row.displayName ? (
                       <CopyableId
@@ -802,6 +816,10 @@ function SubgraphDirectory() {
                     <p className="text-xs font-mono text-[var(--text)]">{row.curatorCount}</p>
                   </div>
                 </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]" title={ALLOCATION_ESTIMATE_TOOLTIP}>
+                  New 100k GRT allocation, estimated APR:{' '}
+                  <EstimateCell signal={row.signal} stake={row.stake} totalSignal={totalNetworkSignal} annualIssuance={annualIssuance} deniedSince={row.deniedSince} />
+                </p>
               </Card>
             </Link>
           );
@@ -870,6 +888,7 @@ function SubgraphDirectory() {
                     Signal/Stake{renderSortArrow('ratio')}
                   </th>
                 )}
+                {show('estimatedApr') && <th className={cn(thBase, 'text-right')} title={ALLOCATION_ESTIMATE_TOOLTIP}>Est. APR (100k)</th>}
                 {show('curators') && (
                   <th className={cn(thSortable, 'text-right')} onClick={() => handleSort('curators')}>
                     Curators{renderSortArrow('curators')}
@@ -917,6 +936,7 @@ function SubgraphDirectory() {
                           />
                         </div>
                         {row.isHighVolume ? highVolumeBadge : null}
+                        {row.deniedSince != null && row.deniedSince > 0 ? <Badge variant="error">Denied</Badge> : null}
                       </div>
                     </td>
                     {show('complexity') && (
@@ -979,6 +999,11 @@ function SubgraphDirectory() {
                         )}
                       >
                         <RatioText ratio={row.ratio} />
+                      </td>
+                    )}
+                    {show('estimatedApr') && (
+                      <td className={cn(pad, 'text-right font-mono text-sm', tdBorder)}>
+                        <EstimateCell signal={row.signal} stake={row.stake} totalSignal={totalNetworkSignal} annualIssuance={annualIssuance} deniedSince={row.deniedSince} />
                       </td>
                     )}
                     {show('curators') && (
