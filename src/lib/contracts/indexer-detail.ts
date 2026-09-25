@@ -19,6 +19,7 @@ export interface AllocationDeployment {
    * route filled with an empty array and never populated: see kittiwake#128.
    */
   displayName: string | null;
+  deniedSince?: number | null;
 }
 
 export interface ActiveAllocation {

@@ -275,6 +275,23 @@ export function useSubgraphDirectory(query: string) {
 }
 
 /**
+ * The simulator's candidates: the 200 most-signalled deployments, where nearly all rewards are.
+ * Two pages one after the other, because the directory serves at most 100 rows a request.
+ */
+export function useSimulatorCandidates(enabled = true) {
+  return useQuery({
+    queryKey: ['simulatorCandidates'],
+    queryFn: async () => {
+      const first = await fetchSubgraphDirectory('sort=signal&first=100');
+      const second = await fetchSubgraphDirectory('sort=signal&first=100&skip=100');
+      return [...first.data, ...second.data];
+    },
+    enabled,
+    staleTime: FIVE_MINUTES,
+  });
+}
+
+/**
  * Hook for subgraph deployments with 30-day query fees
  */
 export function useSubgraphDeployments30d(enabled = true) {

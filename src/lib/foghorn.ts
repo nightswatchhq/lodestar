@@ -5,6 +5,7 @@
 import { apiUrl } from './api-origin';
 import { fetchShedAware } from './shed';
 import type { BadgeVariant } from '@/components/ui/Badge';
+import type { AlertKind, SavedSubscription, SubscriptionInfo } from './alert-subscriptions';
 
 // ── Response types (match the Foghorn axum API) ──────────────────────────────
 
@@ -617,4 +618,54 @@ export function kindLabel(kind: string): string {
     'sybil-swarm-member': 'Sybil swarm member',
   };
   return map[kind] ?? kind;
+}
+
+// ── Alert subscriptions (#256) ──────────────────────────────────────────────
+
+const ALERTS = 'alerts/subscriptions';
+
+async function foghornAnswer<T>(res: Response): Promise<T> {
+  const body = await res.json().catch(() => ({}));
+  // kittiwake's own refusals put a code in `error` and the prose in `message`; Foghorn's use `error`.
+  const said = [body?.message, body?.error].find((v): v is string => typeof v === 'string');
+  if (!res.ok) throw new Error(said ?? `Foghorn answered ${res.status}`);
+  return body as T;
+}
+
+export async function createSubscription(req: {
+  indexer: string;
+  webhookUrl: string;
+  kinds: AlertKind[];
+  signalMovePct: number;
+}): Promise<SavedSubscription> {
+  const res = await fetchShedAware(apiUrl(`/api/foghorn/${ALERTS}`), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      indexer: req.indexer,
+      webhook_url: req.webhookUrl,
+      kinds: req.kinds,
+      signal_move_pct: req.signalMovePct,
+    }),
+  });
+  const body = await foghornAnswer<{ id: string; manage_token: string }>(res);
+  return { id: body.id, token: body.manage_token };
+}
+
+export async function fetchSubscription(s: SavedSubscription): Promise<SubscriptionInfo | null> {
+  const res = await fetchShedAware(
+    apiUrl(`/api/foghorn/${ALERTS}/${encodeURIComponent(s.id)}?token=${encodeURIComponent(s.token)}`),
+  );
+  if (res.status === 404) return null;
+  return foghornAnswer<SubscriptionInfo>(res);
+}
+
+export async function deleteSubscription(s: SavedSubscription): Promise<void> {
+  const res = await fetchShedAware(apiUrl(`/api/foghorn/${ALERTS}/${encodeURIComponent(s.id)}/delete`), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ token: s.token }),
+  });
+  if (res.status === 404) return;
+  await foghornAnswer(res);
 }

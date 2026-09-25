@@ -42,7 +42,7 @@ describe('parseIndexerTab', () => {
 
   it('lists every tab the page renders', () => {
     expect([...INDEXER_TABS]).toEqual([
-      'overview', 'allocations', 'rewards', 'provisions', 'performance', 'delegators', 'history',
+      'overview', 'allocations', 'plan', 'rewards', 'provisions', 'performance', 'delegators', 'history',
     ]);
   });
 });

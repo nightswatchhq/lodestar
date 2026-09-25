@@ -265,6 +265,8 @@ export interface SubgraphDeployment {
   stakedTokens: string;
   queryFeesAmount: string;
   createdAt: number;
+  /** RewardsManager denial start block, or null after an allow update. */
+  deniedSince?: number | null;
   indexerAllocations: { id: string }[];
   curatorSignals: { id: string }[];
   /** Flat, as kittiwake sends it. It is not nested under `versions[0].subgraph.metadata`. */
@@ -323,6 +325,7 @@ export interface DirectoryRow {
   queryFeesAmount: string;
   queryFees30d: string;
   createdAt: number;
+  deniedSince?: number | null;
   indexerCount: number;
   curatorCount: number;
   /** Null when the manifest has not been read yet, or names no network. */

@@ -506,6 +506,11 @@ function AllocRow({
           {row.network ? (
             <span className="text-[10px] text-[var(--text-faint)]">{row.network}</span>
           ) : null}
+          {row.lifecycle === 'active' && row.deniedSince != null && row.deniedSince > 0 && (
+            <span className="text-[10px] text-[var(--red-text)]" title={`RewardsManager denylist since block ${row.deniedSince}`}>
+              Rewards denied
+            </span>
+          )}
         </div>
       </td>
       {cls.status != null ? (
