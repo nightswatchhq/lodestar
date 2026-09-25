@@ -16,6 +16,7 @@ import {
   cn,
 } from '@/lib/utils';
 import { AllocationsPanel } from '@/components/indexer/AllocationsPanel';
+import { SimulatorPanel } from '@/components/indexer/SimulatorPanel';
 import { ExportButton } from '@/components/ui/ExportButton';
 import { fetchIndexerDelegators } from '@/lib/api';
 import { DisputesSection } from '@/components/indexer/DisputesSection';
@@ -856,6 +857,15 @@ function IndexerDetailInner({ address }: { address: string }) {
               ? totalNetworkSignal / weiToGRT(network.totalTokensAllocated)
               : 0
           }
+        />
+      )}
+
+      {activeTab === 'plan' && (
+        <SimulatorPanel
+          allocations={allocations}
+          availableGRT={stakeKnown ? (ssStake?.available ?? 0) : null}
+          annualIssuance={annualIssuance}
+          totalNetworkSignal={totalNetworkSignal}
         />
       )}
 
