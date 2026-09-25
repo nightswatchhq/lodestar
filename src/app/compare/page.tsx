@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useMemo, useCallback, Suspense } from 'react';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useIndexers, useEnrichedIndexers, useNetworkStats } from '@/hooks/useNetworkStats';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import {
@@ -17,6 +18,23 @@ import {
 } from '@/lib/utils';
 import { calculateDelegationCapacity } from '@/lib/rewards';
 import type { Indexer } from '@/lib/queries';
+import { fetchIndexerDetail, fetchIndexerTrends, fetchManifestAnalysis } from '@/lib/api';
+import { allocationComparison } from '@/lib/allocation-comparison';
+
+const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
+
+async function deploymentNetworks(hashes: string[]): Promise<Map<string, string | null>> {
+  const result = new Map<string, string | null>();
+  for (let offset = 0; offset < hashes.length; offset += 5) {
+    const batch = hashes.slice(offset, offset + 5);
+    const manifests = await Promise.allSettled(batch.map(fetchManifestAnalysis));
+    manifests.forEach((manifest, idx) => {
+      result.set(batch[idx], manifest.status === 'fulfilled' && manifest.value.network !== 'unknown'
+        ? manifest.value.network : null);
+    });
+  }
+  return result;
+}
 
 // ---------- types ----------
 
@@ -150,6 +168,9 @@ function IndexerSearch({
     return resolveIndexerName(ix?.account, selected);
   }, [indexers, nameMap, selected]);
 
+  const directAddress = ADDRESS_RE.test(query.trim()) ? query.trim().toLowerCase() : null;
+  const directMatch = directAddress && !filtered.some((ix) => ix.id.toLowerCase() === directAddress);
+
   return (
     <div className="relative">
       <button
@@ -183,6 +204,12 @@ function IndexerSearch({
             />
           </div>
           <div className="max-h-60 overflow-y-auto">
+            {directMatch && (
+              <button type="button" onClick={() => { onSelect(directAddress); setOpen(false); setQuery(''); }}
+                className="w-full px-3 py-2 text-left text-sm text-[var(--accent-text)] hover:bg-[var(--bg-elevated)]">
+                Compare {shortenAddress(directAddress)}
+              </button>
+            )}
             {filtered.map((ix) => {
               const name = nameMap?.get(ix.id) || resolveIndexerName(ix.account, ix.id);
               return (
@@ -204,7 +231,7 @@ function IndexerSearch({
                 </button>
               );
             })}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && !directMatch && (
               <p className="px-3 py-4 text-sm text-[var(--text-faint)] text-center">
                 {unavailable ?? 'No indexers found'}
               </p>
@@ -227,19 +254,21 @@ export default function ComparePage() {
 }
 
 function CompareContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const initialA = searchParams.get('a');
   const initialB = searchParams.get('b');
   const initialC = searchParams.get('c');
 
-  const [selections, setSelections] = useState<(string | null)[]>(() => {
-    const init: (string | null)[] = [initialA, initialB];
-    if (initialC) init.push(initialC);
-    return init;
-  });
+  const [showThird, setShowThird] = useState(false);
+  const selections = useMemo<(string | null)[]>(() => {
+    const selected = [initialA, initialB];
+    if (initialC || showThird) selected.push(initialC);
+    return selected;
+  }, [initialA, initialB, initialC, showThird]);
 
   const indexersState = useQueryState(
-    useIndexers({ first: 100, orderBy: 'stakedTokens', orderDirection: 'desc' }),
+    useIndexers({ first: 1000, orderBy: 'stakedTokens', orderDirection: 'desc' }),
   );
   const indexersData = indexersState.kind === 'ready' ? indexersState.data : undefined;
   const indexersLoading = indexersState.kind === 'loading';
@@ -247,7 +276,7 @@ function CompareContent() {
   const { data: networkData } = useNetworkStats();
 
   const delegationRatio = networkData?.graphNetwork?.delegationRatio ?? 16;
-  const indexers = indexersData?.indexers ?? [];
+  const indexers = useMemo(() => indexersData?.indexers ?? [], [indexersData]);
 
   // Build maps from enriched data (has ENS names + allocation-level APR)
   const { nameMap, aprMap, cutMap } = useMemo(() => {
@@ -263,36 +292,68 @@ function CompareContent() {
     return { nameMap: names, aprMap: aprs, cutMap: cuts };
   }, [enrichedData]);
 
-  const setSlot = useCallback((idx: number, id: string) => {
-    setSelections((prev) => {
-      const next = [...prev];
-      next[idx] = id;
-      return next;
-    });
-  }, []);
+  const updateUrl = useCallback((idx: number, id: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    const key = ['a', 'b', 'c'][idx];
+    if (id) params.set(key, id);
+    else params.delete(key);
+    router.replace(`/compare?${params}`, { scroll: false });
+  }, [router, searchParams]);
+
+  const setSlot = useCallback((idx: number, id: string) => updateUrl(idx, id), [updateUrl]);
 
   const addSlot = useCallback(() => {
-    setSelections((prev) => (prev.length < 3 ? [...prev, null] : prev));
+    setShowThird(true);
   }, []);
 
   const removeSlot = useCallback((idx: number) => {
-    setSelections((prev) => {
-      if (prev.length <= 2) return prev;
-      return prev.filter((_, i) => i !== idx);
-    });
-  }, []);
+    if (idx === 2) { setShowThird(false); updateUrl(2, null); }
+  }, [updateUrl]);
+
+  const detailQueries = useQueries({ queries: selections.map((id) => ({
+    queryKey: ['indexerDetails', id],
+    queryFn: () => fetchIndexerDetail(id!),
+    enabled: !!id,
+    staleTime: 5 * 60_000,
+  })) });
+  const trendQueries = useQueries({ queries: selections.map((id) => ({
+    queryKey: ['indexerTrends', id, 30],
+    queryFn: () => fetchIndexerTrends(id!, 30),
+    enabled: !!id,
+    staleTime: 5 * 60_000,
+  })) });
+  const allocationMetrics = detailQueries.map((query, idx) => query.data
+    ? allocationComparison(query.data, trendQueries[idx].data ?? null, networkData?.graphNetwork?.currentEpoch ?? null)
+    : null);
+  const commonDeployments = new Map<string, number>();
+  for (const metrics of allocationMetrics) {
+    if (!metrics) continue;
+    for (const hash of metrics.deployments.keys()) {
+      commonDeployments.set(hash, (commonDeployments.get(hash) ?? 0) + 1);
+    }
+  }
+  const sharedHashes = [...commonDeployments].filter(([, count]) => count > 1).map(([hash]) => hash);
+  const networkHashes = [...commonDeployments.keys()].sort();
+  const networkQuery = useQuery({
+    queryKey: ['compareDeploymentNetworks', networkHashes],
+    queryFn: () => deploymentNetworks(networkHashes),
+    enabled: networkHashes.length > 0,
+    staleTime: 60 * 60_000,
+  });
+  const networkState = useQueryState(networkQuery);
 
   // APR is kittiwake's Instant figure. There is no share-of-3B fallback.
   const processed: (ProcessedIndexer | null)[] = useMemo(() => {
     return selections.map((sel) => {
       if (!sel) return null;
-      const ix = indexers.find((i) => i.id === sel);
+      const ix = indexers.find((i) => i.id.toLowerCase() === sel.toLowerCase())
+        ?? detailQueries.find((q) => q.data?.id.toLowerCase() === sel.toLowerCase())?.data as Indexer | undefined;
       if (!ix) return null;
       const p = processIndexer(ix, delegationRatio, aprMap.get(sel) ?? null, cutMap.get(sel) ?? null);
       p.name = nameMap.get(sel) ?? p.name;
       return p;
     });
-  }, [selections, indexers, delegationRatio, aprMap, cutMap, nameMap]);
+  }, [selections, indexers, detailQueries, delegationRatio, aprMap, cutMap, nameMap]);
 
   // Best values per metric
   const bestValues = useMemo(() => {
@@ -443,6 +504,60 @@ function CompareContent() {
               figure from the directory.
             </p>
           </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Allocation comparison</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {detailQueries.some((q, idx) => selections[idx] && q.isError) && (
+            <p className="text-sm text-[var(--red-text)]">One or more indexer allocation profiles could not be loaded.</p>
+          )}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr><th className="text-left py-2">Measure</th>{selections.map((id, idx) => <th key={idx} className="text-right px-3">{id ? shortenAddress(id) : 'Not selected'}</th>)}</tr></thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {([
+                  ['Allocated stake', (m: NonNullable<typeof allocationMetrics[number]>) => `${formatGRT(m.allocatedGrt)} GRT`],
+                  ['Top five deployment share', (m: NonNullable<typeof allocationMetrics[number]>) => m.topFiveShare == null ? '—' : `${(m.topFiveShare * 100).toFixed(1)}%`],
+                  ['Stake weighted signal/stake', (m: NonNullable<typeof allocationMetrics[number]>) => m.weightedSignalStakeRatio?.toFixed(3) ?? '—'],
+                  ['Average active allocation age', (m: NonNullable<typeof allocationMetrics[number]>) => m.meanAllocationEpochs == null ? '—' : `${m.meanAllocationEpochs.toFixed(1)} epochs`],
+                  ['Average closed allocation lifetime', (m: NonNullable<typeof allocationMetrics[number]>) => m.meanCloseEpochs == null ? '—' : `${m.meanCloseEpochs.toFixed(1)} epochs`],
+                  ['POI close interval', (m: NonNullable<typeof allocationMetrics[number]>) => m.poiCloseCadenceEpochs == null ? '—' : `${m.poiCloseCadenceEpochs.toFixed(1)} epochs`],
+                  ['30 day indexer rewards per allocated GRT', (m: NonNullable<typeof allocationMetrics[number]>) => m.rewardPerAllocatedGrt30d == null ? '—' : `${m.rewardPerAllocatedGrt30d.toFixed(4)} GRT`],
+                ] as const).map(([label, format]) => (
+                  <tr key={label}><td className="py-2 text-[var(--text-muted)]">{label}</td>{allocationMetrics.map((m, idx) => <td key={idx} className="px-3 py-2 text-right font-mono">{m ? format(m) : selections[idx] && detailQueries[idx].fetchStatus === 'fetching' ? 'Loading…' : '—'}</td>)}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <h3 className="text-sm font-medium">Deployments in common</h3>
+            {sharedHashes.length > 0 ? (
+              <div className="overflow-x-auto"><table className="w-full text-sm"><tbody>
+                {sharedHashes.map((hash) => <tr key={hash} className="border-t border-[var(--border)]"><td className="py-2 font-mono">{hash}</td>{allocationMetrics.map((m, idx) => <td key={idx} className="px-3 text-right font-mono">{m?.deployments.has(hash) ? `${formatGRT(m.deployments.get(hash)!)} GRT` : '—'}</td>)}</tr>)}
+              </tbody></table></div>
+            ) : <p className="text-xs text-[var(--text-muted)]">{allocationMetrics.filter(Boolean).length < 2 ? 'Select at least two indexers with readable allocations.' : 'These indexers have no active deployments in common.'}</p>}
+          </div>
+          <div>
+            <h3 className="text-sm font-medium">Network mix by allocated stake</h3>
+            <div className="grid gap-3 md:grid-cols-3 mt-2">
+              {allocationMetrics.map((m, idx) => {
+                const mix = new Map<string, number>();
+                if (m && networkState.kind === 'ready') for (const [hash, stake] of m.deployments) {
+                  const network = networkState.data.get(hash) ?? 'Unknown';
+                  mix.set(network, (mix.get(network) ?? 0) + stake);
+                }
+                return <div key={idx} className="text-xs text-[var(--text-muted)]">
+                  <p className="font-mono mb-1">{selections[idx] ? shortenAddress(selections[idx]) : 'Not selected'}</p>
+                  {m && networkState.kind === 'loading' && <p>Reading manifests…</p>}
+                  {m && (networkState.kind === 'failed' || networkState.kind === 'unreachable') && <p>Network mix could not be read.</p>}
+                  {m && networkState.kind === 'ready' && [...mix].sort((a, b) => b[1] - a[1]).map(([network, stake]) =>
+                    <p key={network}>{network}: {m.allocatedGrt > 0 ? (stake / m.allocatedGrt * 100).toFixed(1) : '0'}%</p>)}
+                </div>;
+              })}
+            </div>
+          </div>
+          <p className="text-xs text-[var(--text-faint)]">Rewards use the last 30 daily totals divided by currently allocated stake. POI close interval is the mean gap between recorded allocation closes carrying a POI, across the latest 500 closes. It does not measure graph-node POI generation.</p>
         </CardContent>
       </Card>
     </div>
