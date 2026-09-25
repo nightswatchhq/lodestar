@@ -9,7 +9,7 @@ import { fetchENSAddress, fetchSubgraphSearch } from '@/lib/api';
 import { loadSavedViews } from '@/lib/subgraph-directory';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import { navigation } from './Sidebar';
-import { accountHits, actionHits, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
+import { accountHits, actionHits, deploymentHashHit, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable, type OmniHit, type OmniKind } from '@/lib/omni-search';
 import { cn } from '@/lib/utils';
 
 const PAGES = navigation.flatMap((s) => s.items.map(({ label, href }) => ({ label, href })));
@@ -101,6 +101,7 @@ export function OmniSearch() {
       ...actionHits(pathname, q, savedViews()),
       ...pageHits(PAGES, q),
       ...indexerHits(indexers, q),
+      ...[deploymentHashHit(q)].filter((hit): hit is OmniHit => hit !== null),
       ...subgraphs,
       ...accountHits(q),
       ...ens,
@@ -271,4 +272,3 @@ export function OmniSearch() {
     </>
   );
 }
-

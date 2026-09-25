@@ -1013,6 +1013,24 @@ export async function fetchSubgraphVersions(
   });
 }
 
+export interface GraftChild {
+  ipfsHash: string;
+  graftBlock: number;
+  displayName: string | null;
+  label: string | null;
+}
+
+export async function fetchGraftChildren(hash: string): Promise<{ children: GraftChild[]; source: 'cached_manifests' }> {
+  const response = await fetchShedAware(apiUrl(`/api/subgraph-deployment/${encodeURIComponent(hash)}/graft-children`));
+  if (!response.ok) throw new Error(`Graft children failed: ${response.status}`);
+  return parseResponse('/api/subgraph-deployment/graft-children', await response.json(), {
+    objects: ['data'],
+    arrays: ['data.children'],
+    present: ['data.source'],
+    pick: 'data',
+  });
+}
+
 export async function fetchIndexerDisputes(address: string): Promise<IndexerDispute[]> {
   const response = await fetchShedAware(apiUrl(`/api/indexer-disputes/${encodeURIComponent(address.toLowerCase())}`));
   if (!response.ok) throw new Error(`Indexer disputes failed: ${response.status}`);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { accountHits, actionHits, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable } from '../omni-search';
+import { accountHits, actionHits, deploymentHashHit, indexerHits, isEnsName, pageHits, subgraphHits, subgraphSearchable } from '../omni-search';
 import type { SubgraphSearchResult } from '../contracts/subgraph-search';
 
 const ADDR = '0x4e5c87772c29381bcabc58c3f182b6633b5a274a';
@@ -34,6 +34,13 @@ describe('subgraphSearchable', () => {
   it('asks for names of two characters or more', () => {
     expect(subgraphSearchable('u')).toBe(false);
     expect(subgraphSearchable('uniswap')).toBe(true);
+  });
+});
+
+describe('deploymentHashHit', () => {
+  it('opens a full hash without waiting for a published search result', () => {
+    expect(deploymentHashHit(HASH)?.href).toBe(`/subgraphs/${HASH}`);
+    expect(deploymentHashHit('QmaqdZ8K')).toBeNull();
   });
 });
 
