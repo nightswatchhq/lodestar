@@ -35,6 +35,8 @@ export interface TemplateSignal {
 }
 
 export interface ManifestAnalysis {
+  description?: string | null;
+  repository?: string | null;
   score: number;
   category: ComplexityCategory;
   breakdown: ScoreBreakdown[];
@@ -370,6 +372,8 @@ export function parseManifest(yamlString: string): ManifestAnalysis {
   }
 
   return {
+    description: typeof doc.description === 'string' && doc.description ? doc.description : null,
+    repository: typeof doc.repository === 'string' && doc.repository ? doc.repository : null,
     score,
     category: categoryFromScore(score),
     breakdown,

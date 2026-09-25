@@ -15,26 +15,34 @@ const VERSIONS: SubgraphVersion[] = [
 
 describe('VersionsTable', () => {
   it('renders a row per version with its semver label', () => {
-    render(<VersionsTable versions={VERSIONS} />);
+    render(<VersionsTable versions={VERSIONS} viewedHash={VERSIONS[0].ipfsHash} />);
     expect(screen.getByText('0.0.3')).toBeInTheDocument();
     expect(screen.getByText('0.0.2')).toBeInTheDocument();
   });
 
   it('flags the current version with a "Current" badge', () => {
-    render(<VersionsTable versions={VERSIONS} />);
+    render(<VersionsTable versions={VERSIONS} viewedHash={VERSIONS[0].ipfsHash} />);
     expect(screen.getByText('Current')).toBeInTheDocument();
   });
 
   it('links non-current versions to their deployment but not the current one', () => {
-    render(<VersionsTable versions={VERSIONS} />);
+    render(<VersionsTable versions={VERSIONS} viewedHash={VERSIONS[0].ipfsHash} />);
     const links = screen.getAllByRole('link');
     // Only the old (non-current) version is a link
     expect(links).toHaveLength(1);
     expect(links[0]).toHaveAttribute('href', '/subgraphs/QmOldHashBBBBBBBBBBBBBB');
   });
 
+  it('links the current version when an older deployment is being viewed', () => {
+    render(<VersionsTable versions={VERSIONS} viewedHash={VERSIONS[1].ipfsHash} />);
+    const links = screen.getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute('href', '/subgraphs/QmCurrentHashAAAAAAAAAA');
+    expect(screen.getByText('Viewing')).toBeInTheDocument();
+  });
+
   it('falls back to v{version} when no semver label is present', () => {
-    render(<VersionsTable versions={[{ ...VERSIONS[0], label: null }]} />);
+    render(<VersionsTable versions={[{ ...VERSIONS[0], label: null }]} viewedHash={VERSIONS[0].ipfsHash} />);
     expect(screen.getByText('v1')).toBeInTheDocument();
   });
 });

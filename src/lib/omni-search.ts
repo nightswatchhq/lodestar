@@ -33,6 +33,7 @@ const PARTIAL_HEX_RE = /^0x[0-9a-fA-F]*$/;
 // What kittiwake's forward lookup accepts: plain ASCII labels, since it does no UTS-46 normalisation.
 const ENS_RE = /^([a-z0-9-]+\.)+eth$/;
 const PAGE_ID_RE = /^\/(indexers|delegators|curators|payments|subgraphs|poi|disassembly)\/(0x[0-9a-fA-F]{40}|Qm[1-9A-HJ-NP-Za-km-z]{44})/;
+const DEPLOYMENT_HASH_RE = /^Qm[1-9A-HJ-NP-Za-km-z]{44}$/;
 
 export const isAddress = (q: string) => ADDRESS_RE.test(q.trim());
 export const isEnsName = (q: string) => ENS_RE.test(q.trim().toLowerCase());
@@ -80,6 +81,14 @@ export function subgraphSearchable(q: string): boolean {
   if (PARTIAL_HEX_RE.test(t)) return ADDRESS_RE.test(t);
   if (t.startsWith('Qm')) return t.length >= 8;
   return true;
+}
+
+/** A full hash opens its deployment page even when it has never been published or allocated. */
+export function deploymentHashHit(q: string): OmniHit | null {
+  const hash = q.trim();
+  return DEPLOYMENT_HASH_RE.test(hash)
+    ? { kind: 'subgraph', label: 'Open deployment hash', detail: hash, href: `/subgraphs/${hash}` }
+    : null;
 }
 
 function indexerLabel(i: IndexerLike): string {

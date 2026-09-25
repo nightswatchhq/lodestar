@@ -94,6 +94,7 @@ export const MIGRATED: readonly string[] = [
   '/api/sql/query',
   '/api/subgraph-curation/',
   '/api/subgraph-deployments',
+  '/api/subgraph-deployment/*/graft-children',
   '/api/subgraph-fees-30d',
   '/api/studio/auth',
   '/api/studio/deploy-key',

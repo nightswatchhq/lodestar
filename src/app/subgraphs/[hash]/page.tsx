@@ -28,6 +28,7 @@ import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { cn, formatNumber, formatGRT, weiToGRT, shortenAddress } from '@/lib/utils';
 import { VersionsTable } from '@/components/subgraph/VersionsTable';
+import { GraftLineage } from '@/components/subgraph/GraftLineage';
 import { ActivitySection } from '@/components/subgraph/ActivitySection';
 import { SYNC_TOLERANCE_BLOCKS } from '@/lib/indexing-status-shape';
 import { formatStallDuration } from '@/lib/chain-liveness';
@@ -871,7 +872,9 @@ function VersionsSection({ hash }: { hash: string }) {
       <Card>
         <CardHeader><CardTitle>Version History</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-sm text-[var(--text-muted)] py-4">No version history available for this subgraph.</p>
+          <p className="text-sm text-[var(--text-muted)] py-4">
+            {error ? 'Version history could not be loaded.' : 'This deployment has no published version history.'}
+          </p>
         </CardContent>
       </Card>
     );
@@ -886,7 +889,7 @@ function VersionsSection({ hash }: { hash: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        <VersionsTable versions={versions} />
+        <VersionsTable versions={versions} viewedHash={hash} />
       </CardContent>
     </Card>
   );
@@ -1084,7 +1087,13 @@ function DeploymentPageInner({ hash }: { hash: string }) {
 
   const { data: statusData } = useIndexingStatus(hash);
   const { data: deployment } = useSubgraphDeployment(hash);
-  const { data: manifestData } = useManifestAnalysis(hash);
+  const manifestQuery = useManifestAnalysis(hash);
+  const { data: manifestData } = manifestQuery;
+  const versionsQuery = useSubgraphVersions(hash);
+  const versions = versionsQuery.data?.versions ?? [];
+  const viewedVersion = versions.find((version) => version.ipfsHash === hash);
+  const currentVersion = versions.find((version) => version.isCurrent);
+  const superseded = viewedVersion && currentVersion && viewedVersion.version !== currentVersion.version;
   const { data: chainLagData } = useChainLag();
 
   // Which chain this deployment indexes. The manifest is authoritative; fall
@@ -1098,13 +1107,16 @@ function DeploymentPageInner({ hash }: { hash: string }) {
   const chainNotLive = chainVerdict?.liveness === 'halted' || chainVerdict?.liveness === 'stalled';
 
   const displayName = deployment?.displayName ?? statusData?.displayName ?? null;
+  const versionLabel = viewedVersion?.label ?? (viewedVersion ? `v${viewedVersion.version}` : null);
   // The manifest's network id, as written. The Pinax registry that used to pretty-print it is gone (nuthatch#1160).
   const networkLabel = manifestData?.network ?? null;
 
   useEffect(() => {
-    const parts = [displayName, networkLabel].filter(Boolean);
+    const parts = [displayName, versionLabel, networkLabel].filter(Boolean);
+    // The title changes as independent API reads resolve after the page has mounted.
+    // eslint-disable-next-line react-hooks/immutability
     if (parts.length > 0) document.title = `${parts.join(' · ')} | Lodestar`;
-  }, [displayName, networkLabel]);
+  }, [displayName, versionLabel, networkLabel]);
 
   const setTab = (tab: Tab) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -1125,7 +1137,9 @@ function DeploymentPageInner({ hash }: { hash: string }) {
           {displayName ? (
             <>
               <div className="flex items-center gap-2 mb-1">
-                <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)]">{displayName}</h1>
+                <h1 className="text-xl sm:text-2xl font-semibold text-[var(--text)]">
+                  {displayName}{versionLabel && ` · ${versionLabel}`}
+                </h1>
                 <WatchStar kind="subgraph" id={hash} size="md" />
               </div>
               <div className="flex items-center gap-2 mb-1">
@@ -1165,6 +1179,29 @@ function DeploymentPageInner({ hash }: { hash: string }) {
           Back to Subgraphs
         </Link>
       </div>
+      {superseded && (
+        <div className="rounded-[var(--radius-card)] border border-[var(--amber)] bg-[var(--amber-dim)] p-4 text-sm text-[var(--text)]">
+          Superseded by{' '}
+          <Link href={`/subgraphs/${currentVersion.ipfsHash}`} className="font-medium text-[var(--accent-text)] hover:underline">
+            {currentVersion.label ?? `v${currentVersion.version}`} ({currentVersion.ipfsHash.slice(0, 10)}…)
+          </Link>{' '}
+          on {new Date(currentVersion.createdAt * 1000).toLocaleDateString()}.
+          <p className="mt-1 text-[var(--text-muted)]">
+            Still allocated here: {formatGRT(weiToGRT(viewedVersion.stakedTokens))} GRT.
+          </p>
+        </div>
+      )}
+      {versionsQuery.isSuccess && versions.length === 0 && manifestQuery.isSuccess && (
+        <p className="rounded-[var(--radius-card)] border border-[var(--border)] p-4 text-sm text-[var(--text-muted)]">
+          This deployment is not published on the network. Its manifest is available below.
+          {manifestData?.description && <span className="block mt-1">{manifestData.description}</span>}
+          {manifestData?.repository && /^https?:\/\//.test(manifestData.repository) && (
+            <a href={manifestData.repository} className="block mt-1 text-[var(--accent-text)] hover:underline" target="_blank" rel="noopener noreferrer">
+              Source repository
+            </a>
+          )}
+        </p>
+      )}
 
       {/* Chain liveness banner.
           Everything below this point measures health relative to chain head, so
@@ -1219,7 +1256,12 @@ function DeploymentPageInner({ hash }: { hash: string }) {
 
       {/* Tab content */}
       <div className="space-y-6">
-        {activeTab === 'overview' && <IndexingHealthSection hash={hash} />}
+        {activeTab === 'overview' && (
+          <>
+            <IndexingHealthSection hash={hash} />
+            {manifestQuery.isSuccess && <GraftLineage hash={hash} graft={manifestQuery.data.graft} />}
+          </>
+        )}
         {activeTab === 'schema' && <SchemaTab hash={hash} />}
         {activeTab === 'curators' && <CurationSection hash={hash} />}
         {activeTab === 'history' && <HistorySection hash={hash} />}

@@ -8,9 +8,9 @@ import type { SubgraphVersion } from '@/hooks/useNetworkStats';
 /**
  * Presentational table of a subgraph's deployment version history.
  * Each row is a published version (semver label + its deployment ID); the
- * version currently being viewed is flagged and not re-linked.
+ * version currently being viewed is not re-linked, even when superseded.
  */
-export function VersionsTable({ versions }: { versions: SubgraphVersion[] }) {
+export function VersionsTable({ versions, viewedHash }: { versions: SubgraphVersion[]; viewedHash: string }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
@@ -29,10 +29,11 @@ export function VersionsTable({ versions }: { versions: SubgraphVersion[] }) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-[var(--text)]">{v.label || `v${v.version}`}</span>
                   {v.isCurrent && <Badge variant="success">Current</Badge>}
+                  {v.ipfsHash === viewedHash && !v.isCurrent && <Badge variant="default">Viewing</Badge>}
                 </div>
               </td>
               <td className="px-4 py-3">
-                {v.isCurrent ? (
+                {v.ipfsHash === viewedHash ? (
                   <span className="text-[11px] font-mono text-[var(--text-faint)]">
                     {v.ipfsHash.slice(0, 10)}…{v.ipfsHash.slice(-6)}
                   </span>
