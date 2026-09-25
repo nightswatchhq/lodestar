@@ -103,6 +103,7 @@ vi.mock('next/dynamic', () => ({ default: () => () => null }));
 vi.mock('@/components/indexer/DisputesSection', () => ({ DisputesSection: () => null }));
 vi.mock('@/components/foghorn/FoghornScorecard', () => ({ FoghornScorecard: () => null }));
 vi.mock('@/components/foghorn/FoghornAlertBanner', () => ({ FoghornAlertBanner: () => null }));
+vi.mock('@/components/indexer/AlertsPanel', () => ({ AlertsPanel: () => null }));
 vi.mock('@/components/feed/DelegationFeed', () => ({ DelegationFeed: () => null }));
 vi.mock('@/components/ParameterHistory', () => ({ ParameterHistory: () => null }));
 
