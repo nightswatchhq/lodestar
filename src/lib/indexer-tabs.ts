@@ -1,6 +1,7 @@
 export const INDEXER_TABS = [
   'overview',
   'allocations',
+  'plan',
   'rewards',
   'provisions',
   'performance',
@@ -13,6 +14,7 @@ export type IndexerTab = (typeof INDEXER_TABS)[number];
 export const INDEXER_TAB_LABELS: { id: IndexerTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'allocations', label: 'Allocations' },
+  { id: 'plan', label: 'Plan' },
   { id: 'rewards', label: 'Rewards' },
   { id: 'provisions', label: 'Provisions' },
   { id: 'performance', label: 'Performance' },
