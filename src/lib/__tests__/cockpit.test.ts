@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { closeGate, closes, cockpitAction } from '../cockpit';
+import { closeGate, closes, cockpitAction, emptyRuleForm, ruleForm, ruleInput, weiToGrtText } from '../cockpit';
 import type { POIDeploymentDetail, POIEpochGroup, POIIndexerEntry } from '../poi';
 
 const ME = '0xAbC0000000000000000000000000000000000001';
@@ -123,5 +123,41 @@ describe('the client', () => {
     ));
     const { queueActions } = await import('../cockpit');
     await expect(queueActions([{ type: 'allocate', deploymentID: 'QmA', amount: '1' }])).rejects.toThrow(/agent refused: nope/);
+  });
+});
+
+describe('indexing rules', () => {
+  const HASH = 'QmSWxvd8SaQK6qZKJ7xtfxCCGoRzGnoi2WNzmJYYJW9BXY';
+
+  it('shows wei as exact GRT', () => {
+    expect(weiToGrtText('5000000000000000000000')).toBe('5000');
+    expect(weiToGrtText('1500000000000000000')).toBe('1.5');
+    expect(weiToGrtText('1')).toBe('0.000000000000000001');
+    expect(weiToGrtText('0')).toBe('0');
+    expect(weiToGrtText(null)).toBeNull();
+  });
+
+  it('sends only what the form fills, as the Cockpit takes it', () => {
+    const form = { ...emptyRuleForm(HASH), decisionBasis: 'always' as const, allocationAmount: '5,000', maxAllocationPercent: '2.5' };
+    expect(ruleInput(form)).toEqual({ identifier: HASH, decisionBasis: 'always', allocationAmount: '5000', maxAllocationPercentage: 0.025 });
+    expect(ruleInput(emptyRuleForm('global'))).toEqual({ identifier: 'global' });
+  });
+
+  it('refuses before sending', () => {
+    expect(() => ruleInput(emptyRuleForm('all'))).toThrow(/global/);
+    expect(() => ruleInput({ ...emptyRuleForm('global'), minSignal: '1e3' })).toThrow(/Minimum signal/);
+    expect(() => ruleInput({ ...emptyRuleForm('global'), parallelAllocations: '0' })).toThrow(/Parallel/);
+    expect(() => ruleInput({ ...emptyRuleForm('global'), maxAllocationPercent: '150' })).toThrow(/share/);
+  });
+
+  it('round-trips a rule the agent returned', () => {
+    const form = ruleForm({
+      identifier: HASH, identifierType: 'deployment', decisionBasis: 'rules', allocationAmount: '5000000000000000000000',
+      parallelAllocations: 2, minSignal: null, minStake: '100000000000000000000000', minAverageQueryFees: null,
+      maxAllocationPercentage: 0.025, protocolNetwork: 'eip155:42161',
+    });
+    expect(ruleInput(form)).toEqual({
+      identifier: HASH, decisionBasis: 'rules', allocationAmount: '5000', parallelAllocations: 2, minStake: '100000', maxAllocationPercentage: 0.025,
+    });
   });
 });
