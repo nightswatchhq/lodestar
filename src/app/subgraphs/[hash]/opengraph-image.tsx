@@ -123,13 +123,10 @@ export default async function OGImage({
   let curators = 0;
   let network: string | null = null;
   let createdAt = 0;
-  const denied = false;
+  let denied = false;
   let substreams = false;
   let found = false;
 
-  // Asked of kittiwake rather than read out of the nests and Postgres. `deniedAt` is the
-  // rewards-eligibility oracle's verdict and is on neither, so the "Rewards denied" chip is never
-  // shown here, exactly as on the path this replaces.
   const [dep, facts] = await Promise.all([ogDeployment(hash), ogManifest(hash)]);
   if (dep) {
     found = true;
@@ -142,6 +139,7 @@ export default async function OGImage({
     activeIndexers = (dep.indexerAllocations ?? []).length;
     curators = (dep.curatorSignals ?? []).length;
     createdAt = Number(dep.createdAt ?? 0);
+    denied = dep.deniedSince != null && dep.deniedSince > 0;
   }
   network = facts.network;
   substreams = facts.poweredBySubstreams;
