@@ -39,6 +39,47 @@ export function parseNetworks(param: string | null): string[] {
   return names.length ? [...new Set(names)] : [...MIGRATION_NETWORKS];
 }
 
+export interface MigrationFilters {
+  networks: string[];
+  /** Only rows at or over the REO signal floor. */
+  floorOnly: boolean;
+  /** Name or hash, case-insensitive substring. */
+  q: string;
+}
+
+export function parseMigrationFilters(params: URLSearchParams): MigrationFilters {
+  return {
+    networks: parseNetworks(params.get('network')),
+    floorOnly: params.get('floor') === '1',
+    q: (params.get('q') ?? '').trim(),
+  };
+}
+
+/** The page's query string, defaults left out so the plain page keeps its plain URL. */
+export function migrationParams(f: MigrationFilters): URLSearchParams {
+  const p = new URLSearchParams();
+  const isDefault = f.networks.length === MIGRATION_NETWORKS.length && f.networks.every((n) => MIGRATION_NETWORKS.includes(n));
+  if (!isDefault && f.networks.length) p.set('network', f.networks.join(','));
+  if (f.floorOnly) p.set('floor', '1');
+  if (f.q) p.set('q', f.q);
+  return p;
+}
+
+/** Add or remove one network, never leaving none: removing the last one puts the default pair back. */
+export function toggleNetwork(networks: string[], network: string): string[] {
+  const next = networks.includes(network) ? networks.filter((n) => n !== network) : [...networks, network];
+  return next.length ? next : [...MIGRATION_NETWORKS];
+}
+
+export function filterMigrationRows(rows: MigrationRow[], f: Pick<MigrationFilters, 'floorOnly' | 'q'>): MigrationRow[] {
+  const q = f.q.toLowerCase();
+  return rows.filter(
+    (r) =>
+      (!f.floorOnly || !r.belowReoFloor) &&
+      (!q || r.ipfsHash.toLowerCase().includes(q) || (r.displayName ?? '').toLowerCase().includes(q)),
+  );
+}
+
 /** The directory state the view is: one network, signalled, unallocated, most signal first. */
 export function migrationState(network: string): DirectoryState {
   return { ...toggleUnallocated(emptyDirectoryState()), network };

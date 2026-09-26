@@ -8,8 +8,12 @@ import {
   migrationRow,
   migrationStarted,
   migrationState,
+  filterMigrationRows,
+  migrationParams,
+  parseMigrationFilters,
   parseNetworks,
   readSignalAges,
+  toggleNetwork,
   signalAgeLabel,
   sortBySignalAge,
 } from '../studio-migration';
@@ -142,5 +146,31 @@ describe('readSignalAges', () => {
     const { at, failed } = await readSignalAges(['x'], async () => ({ signals: [] }));
     expect(at.get('x')).toBeNull();
     expect(failed).toBe(0);
+  });
+});
+
+describe('migration filters', () => {
+  it('round-trips through the URL and leaves the defaults out', () => {
+    expect(migrationParams(parseMigrationFilters(new URLSearchParams(''))).toString()).toBe('');
+    expect(migrationParams(parseMigrationFilters(new URLSearchParams('network=matic,bsc'))).toString()).toBe('');
+    const f = parseMigrationFilters(new URLSearchParams('network=base&floor=1&q=uniswap'));
+    expect(f).toEqual({ networks: ['base'], floorOnly: true, q: 'uniswap' });
+    expect(migrationParams(f).toString()).toBe('network=base&floor=1&q=uniswap');
+  });
+
+  it('never leaves no network selected', () => {
+    expect(toggleNetwork(['bsc', 'matic'], 'base')).toEqual(['bsc', 'matic', 'base']);
+    expect(toggleNetwork(['bsc', 'matic'], 'bsc')).toEqual(['matic']);
+    expect(toggleNetwork(['base'], 'base')).toEqual([...MIGRATION_NETWORKS]);
+  });
+
+  it('filters by the floor and by name or hash', () => {
+    const rows = [
+      migrationRow({ ...dep('QmAAA', 600), displayName: 'Uniswap V3 BSC' }, null),
+      migrationRow({ ...dep('QmBBB', 100), displayName: 'Thena' }, null),
+    ];
+    expect(filterMigrationRows(rows, { floorOnly: true, q: '' }).map((r) => r.ipfsHash)).toEqual(['QmAAA']);
+    expect(filterMigrationRows(rows, { floorOnly: false, q: 'thena' }).map((r) => r.ipfsHash)).toEqual(['QmBBB']);
+    expect(filterMigrationRows(rows, { floorOnly: false, q: 'qmaaa' }).map((r) => r.ipfsHash)).toEqual(['QmAAA']);
   });
 });
