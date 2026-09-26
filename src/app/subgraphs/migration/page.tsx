@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -10,18 +10,22 @@ import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { WatchStar } from '@/components/ui/WatchStar';
 import { fetchSubgraphCuration, fetchSubgraphDirectory, type DirectoryRow } from '@/lib/api';
-import { directoryParams, fetchWholeDirectory } from '@/lib/subgraph-directory';
+import { directoryApiQuery, directoryParams, emptyDirectoryState, fetchWholeDirectory } from '@/lib/subgraph-directory';
 import {
   CURATION_GUARANTEED_UNTIL,
   MIGRATION_START,
   REO_SIGNAL_FLOOR_GRT,
   SIGNAL_AGE_ROWS,
   STUDIO_SUPPORT_ENDS,
+  filterMigrationRows,
+  migrationParams,
+  parseMigrationFilters,
+  toggleNetwork,
+  type MigrationFilters,
   migrationRow,
   migrationStarted,
   migrationState,
-  parseNetworks,
-  readSignalAges,
+    readSignalAges,
   signalAgeLabel,
   sortBySignalAge,
 } from '@/lib/studio-migration';
@@ -41,8 +45,28 @@ export default function StudioMigrationPage() {
   );
 }
 
+/** Chips shown before the rest fold into a select. */
+const NETWORK_CHIPS = 8;
+
 function StudioMigration() {
-  const networks = parseNetworks(useSearchParams().get('network'));
+  const router = useRouter();
+  const filters = parseMigrationFilters(useSearchParams());
+  const { networks } = filters;
+  const [search, setSearch] = useState(filters.q);
+  const setFilters = (f: MigrationFilters) => {
+    const qs = migrationParams(f).toString();
+    router.replace(qs ? `/subgraphs/migration?${qs}` : '/subgraphs/migration', { scroll: false });
+  };
+
+  // Every network the directory knows, most deployments first. Its counts are over all deployments,
+  // not the unallocated ones, so they order the chips and are never shown on them.
+  const known = useQuery({
+    queryKey: ['subgraphDirectoryNetworks'],
+    queryFn: async () => (await fetchSubgraphDirectory(directoryApiQuery(emptyDirectoryState(), 1))).facets.networks.map((f) => f.id),
+    staleTime: FIVE_MINUTES * 12,
+  });
+  const chipNetworks = [...new Set([...networks, ...(known.data ?? []).slice(0, NETWORK_CHIPS)])];
+  const moreNetworks = (known.data ?? []).filter((n) => !chipNetworks.includes(n));
 
   const directory = useQuery({
     queryKey: ['studioMigration', networks],
@@ -74,11 +98,15 @@ function StudioMigration() {
 
   const rows = sortBySignalAge((directory.data ?? []).map((d) => migrationRow(d, signalledAt.get(d.ipfsHash) ?? null)));
   const unread = Math.max(0, (directory.data?.length ?? 0) - SIGNAL_AGE_ROWS);
-  const perNetwork = networks.map((n) => ({ network: n, count: rows.filter((r) => r.network === n).length }));
+  const shown = filterMigrationRows(rows, filters);
+  const countFor = (n: string) => rows.filter((r) => r.network === n).length;
   const started = migrationStarted();
 
   const directoryHref = (network: string) => `/subgraphs?${directoryParams(migrationState(network)).toString()}`;
   const thBase = 'px-4 py-3 text-[11px] font-medium text-[var(--text-muted)] select-none';
+  const buttonBase = 'px-3 py-1.5 text-xs font-medium rounded-[var(--radius-button)] border transition-colors';
+  const buttonOn = 'bg-[var(--accent)] text-white border-[var(--accent)]';
+  const buttonOff = 'bg-[var(--bg-surface)] text-[var(--text-muted)] border-[var(--border)] hover:border-[var(--accent)]';
 
   return (
     <div className="space-y-6">
@@ -94,17 +122,74 @@ function StudioMigration() {
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        {perNetwork.map((p) => (
-          <Link key={p.network} href={directoryHref(p.network)} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-button)] border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--accent)] transition-colors">
-            <Badge variant="accent">{p.network}</Badge>
-            <span className="font-mono text-[var(--text)]">{directory.data ? p.count.toLocaleString() : '…'}</span>
-            <span className="text-[var(--text-faint)]">unallocated</span>
-          </Link>
-        ))}
-        <span className="text-[var(--text-faint)]">
-          Other chains: <code className="font-mono">?network=arbitrum-one,mainnet</code>
-        </span>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs" role="group" aria-label="Networks">
+          {chipNetworks.map((n) => {
+            const on = networks.includes(n);
+            return (
+              <button
+                key={n}
+                aria-pressed={on}
+                onClick={() => setFilters({ ...filters, networks: toggleNetwork(networks, n) })}
+                className={cn(buttonBase, 'inline-flex items-center gap-2', on ? buttonOn : buttonOff)}
+              >
+                {n}
+                {on && <span className="font-mono opacity-80">{directory.data ? countFor(n).toLocaleString() : '…'}</span>}
+              </button>
+            );
+          })}
+          {moreNetworks.length > 0 && (
+            <select
+              aria-label="Add a network"
+              value=""
+              onChange={(e) => e.target.value && setFilters({ ...filters, networks: toggleNetwork(networks, e.target.value) })}
+              className="px-3 py-1.5 text-xs rounded-[var(--radius-button)] bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)]"
+            >
+              <option value="">More networks…</option>
+              {moreNetworks.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <button
+            aria-pressed={filters.floorOnly}
+            title={`Only deployments carrying at least ${REO_SIGNAL_FLOOR_GRT} GRT, the signal a subgraph needs to count towards REO`}
+            onClick={() => setFilters({ ...filters, floorOnly: !filters.floorOnly })}
+            className={cn(buttonBase, filters.floorOnly ? buttonOn : buttonOff)}
+          >
+            {REO_SIGNAL_FLOOR_GRT}+ GRT only
+          </button>
+          <input
+            type="search"
+            aria-label="Search by name or hash"
+            placeholder="Name or Qm hash"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setFilters({ ...filters, q: e.target.value.trim() });
+            }}
+            className="px-3 py-1.5 w-56 text-xs rounded-[var(--radius-button)] bg-[var(--bg-surface)] border border-[var(--border)] text-[var(--text)] placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)]"
+          />
+          {directory.data && (
+            <span className="text-[var(--text-faint)]">
+              {shown.length === rows.length
+                ? `${rows.length.toLocaleString()} unallocated`
+                : `${shown.length.toLocaleString()} of ${rows.length.toLocaleString()} unallocated`}
+              {networks.length === 1 && (
+                <>
+                  {' · '}
+                  <Link href={directoryHref(networks[0])} className="hover:text-[var(--accent-text)] hover:underline">
+                    open in the directory
+                  </Link>
+                </>
+              )}
+            </span>
+          )}
+        </div>
       </div>
 
       {directory.isLoading && <ChartSkeleton height="400px" />}
@@ -115,15 +200,17 @@ function StudioMigration() {
         </Card>
       )}
 
-      {directory.data && rows.length === 0 && (
+      {directory.data && shown.length === 0 && (
         <Card>
           <p className="px-4 py-8 text-sm text-[var(--text-faint)] text-center">
-            Every signalled deployment on {networks.join(' and ')} has at least one indexer.
+            {rows.length === 0
+              ? `Every signalled deployment on ${networks.join(' and ')} has at least one indexer.`
+              : 'Nothing unallocated matches these filters.'}
           </p>
         </Card>
       )}
 
-      {rows.length > 0 && (
+      {shown.length > 0 && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -139,7 +226,7 @@ function StudioMigration() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {rows.map((r) => (
+                {shown.map((r) => (
                   <tr key={r.id} className="hover:bg-[var(--bg-elevated)] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
