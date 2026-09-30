@@ -138,7 +138,13 @@ export function SimulatorPanel({
       <CardContent className="space-y-4">
         <p className="text-xs text-[var(--text-muted)]">
           Every figure here is an estimate. {SIMULATOR_TOOLTIP} It reads the 200 most-signalled deployments and this
-          indexer&apos;s own, and needs no agent.
+          indexer&apos;s own, and needs no agent.{' '}
+          <a
+            href="https://learn-thegraph.com/indexers/where-to-allocate/"
+            className="text-[var(--accent-text)] hover:underline"
+          >
+            How it decides
+          </a>
         </p>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
