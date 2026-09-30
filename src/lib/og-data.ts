@@ -104,6 +104,8 @@ export interface OgDeployment {
   stakedTokens?: string;
   queryFeesAmount?: string;
   createdAt?: number;
+  /** The block rewards were denied from; null while it earns. */
+  deniedAt?: number | null;
   /** Arrays whose lengths are the counts, which is what the pages read. */
   indexerAllocations?: unknown[];
   curatorSignals?: unknown[];

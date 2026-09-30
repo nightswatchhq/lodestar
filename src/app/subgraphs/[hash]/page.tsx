@@ -8,6 +8,7 @@ import {
   useIndexingStatus,
   useManifestAnalysis,
   useSubgraphCuration,
+  useSubgraphDeployment,
   useSubgraphHistory,
   useSubgraphVersions,
   useENSName,
@@ -22,6 +23,7 @@ import { SubgraphHistoryChart } from '@/components/charts/SubgraphHistoryChart';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { WatchStar } from '@/components/ui/WatchStar';
+import { RewardsDeniedBadge } from '@/components/subgraph/RewardsDeniedBadge';
 import { Badge } from '@/components/ui/Badge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
@@ -1084,6 +1086,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
   const { data: statusData } = useIndexingStatus(hash);
   const { data: manifestData } = useManifestAnalysis(hash);
   const { data: chainLagData } = useChainLag();
+  const deniedAt = useSubgraphDeployment(hash).data?.deniedAt ?? null;
 
   // Which chain this deployment indexes. The manifest is authoritative; fall
   // back to whatever the indexers report so the banner still works for
@@ -1133,6 +1136,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
                     {networkLabel}
                   </Badge>
                 )}
+                {deniedAt !== null && <RewardsDeniedBadge deniedAt={deniedAt} />}
               </div>
             </>
           ) : (
@@ -1141,6 +1145,7 @@ function DeploymentPageInner({ hash }: { hash: string }) {
                 {networkLabel ? `Deployment · ${networkLabel}` : 'Deployment'}
               </h1>
               <WatchStar kind="subgraph" id={hash} size="md" />
+              {deniedAt !== null && <RewardsDeniedBadge deniedAt={deniedAt} />}
             </div>
           )}
           <div className="flex items-center gap-2">

@@ -16,6 +16,7 @@ import { weiToGRT, formatGRT, cn } from '@/lib/utils';
 import { RATIO_TOOLTIP, signalStakeRatio } from '@/lib/allocation-ratio';
 import { CopyableId, truncatedQm } from '@/components/ui/CopyableId';
 import { WatchStar } from '@/components/ui/WatchStar';
+import { RewardsDeniedBadge } from '@/components/subgraph/RewardsDeniedBadge';
 import { fetchSubgraphDirectory, fetchSubgraphSearch, type DirectoryFacet, type DirectoryRow } from '@/lib/api';
 import { emptySearchMessage } from '@/lib/search-backlog';
 import {
@@ -558,6 +559,16 @@ function SubgraphDirectory() {
           >
             Signalled, nobody allocated
           </button>
+          {(data.denied ?? 0) > 0 || state.denied ? (
+            <button
+              title="Deployments on the RewardsManager denylist earn no indexing rewards"
+              aria-pressed={state.denied === 'hide'}
+              onClick={() => update({ ...state, denied: state.denied === 'hide' ? null : 'hide' })}
+              className={cn(buttonBase, state.denied === 'hide' ? buttonOn : buttonOff)}
+            >
+              Hide rewards-denied{data.denied ? ` (${data.denied.toLocaleString()})` : ''}
+            </button>
+          ) : null}
           <FacetSelect
             label="Filter by complexity"
             allLabel="All Complexities"
@@ -748,6 +759,7 @@ function SubgraphDirectory() {
                         />
                       )}
                       {row.isHighVolume && highVolumeBadge}
+                      <RewardsDeniedBadge deniedAt={row.deniedAt} />
                     </div>
                     {row.displayName ? (
                       <CopyableId
@@ -917,6 +929,7 @@ function SubgraphDirectory() {
                           />
                         </div>
                         {row.isHighVolume ? highVolumeBadge : null}
+                        <RewardsDeniedBadge deniedAt={row.deniedAt} />
                       </div>
                     </td>
                     {show('complexity') && (

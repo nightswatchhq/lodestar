@@ -30,6 +30,8 @@ export type DirectoryState = {
   complexity: string | null;
   category: string | null;
   createdWithinDays: number | null;
+  /** Deployments on the RewardsManager denylist: hidden, alone, or mixed in (null). */
+  denied: 'hide' | 'only' | null;
 };
 
 const SORT_KEYS: readonly DirectorySortKey[] = ['queryFees', 'signal', 'stake', 'created', 'ratio', 'indexers', 'curators'];
@@ -50,6 +52,7 @@ export function emptyDirectoryState(): DirectoryState {
     complexity: null,
     category: null,
     createdWithinDays: null,
+    denied: null,
   };
 }
 
@@ -78,6 +81,8 @@ export function parseDirectoryState(params: URLSearchParams): DirectoryState {
   state.category = label(params.get('category'));
   const days = bound(params.get('createdWithinDays'));
   state.createdWithinDays = days !== null && days >= 1 ? Math.floor(days) : null;
+  const denied = params.get('denied');
+  state.denied = denied === 'hide' || denied === 'only' ? denied : null;
 
   // Links saved before the Elite toggle became the high-volume preset still mean what they meant.
   if (params.get('elite') === '1' && state.ranges.fees.min === null) {
@@ -102,6 +107,7 @@ function filterParams(state: DirectoryState): URLSearchParams {
   if (state.complexity) p.set('complexity', state.complexity);
   if (state.category) p.set('category', state.category);
   if (state.createdWithinDays !== null) p.set('createdWithinDays', String(state.createdWithinDays));
+  if (state.denied) p.set('denied', state.denied);
   return p;
 }
 
@@ -126,7 +132,8 @@ export function hasFilters(state: DirectoryState): boolean {
     state.network !== null ||
     state.complexity !== null ||
     state.category !== null ||
-    state.createdWithinDays !== null
+    state.createdWithinDays !== null ||
+    state.denied !== null
   );
 }
 
@@ -231,7 +238,7 @@ export function directoryCsv(rows: DirectoryRow[]): string {
     [
       'ipfs_hash', 'deployment_id', 'name', 'network', 'complexity', 'categories', 'signal_grt',
       'stake_grt', 'signal_stake_ratio', 'query_fees_30d_grt', 'query_fees_all_time_grt', 'indexers',
-      'curators', 'created_at',
+      'curators', 'created_at', 'rewards_denied_since_block',
     ],
     rows.map((r) => [
       r.ipfsHash,
@@ -248,6 +255,7 @@ export function directoryCsv(rows: DirectoryRow[]): string {
       r.indexerCount,
       r.curatorCount,
       r.createdAt ? new Date(r.createdAt * 1000).toISOString() : null,
+      r.deniedAt ?? null,
     ]),
   );
 }

@@ -35,6 +35,7 @@ import {
   fetchParameterHistory,
   fetchAprProvenance,
   fetchSubgraphCuration,
+  fetchSubgraphDeployment,
   fetchSubgraphSchema,
   fetchCuratorLeaderboard,
   fetchIndexerDetail,
@@ -372,6 +373,17 @@ export function useSubgraphCuration(hash: string | null) {
   });
 }
 
+
+/** Shares the watchlist's key, so a deployment read there is not read again here. */
+export function useSubgraphDeployment(hash: string | null) {
+  return useQuery({
+    queryKey: ['subgraphDeployment', hash],
+    queryFn: () => fetchSubgraphDeployment(hash!),
+    staleTime: FIVE_MINUTES,
+    enabled: !!hash,
+    retry: 1,
+  });
+}
 
 export function useSubgraphHistory(hash: string | null) {
   return useQuery({

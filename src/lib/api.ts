@@ -257,6 +257,8 @@ export interface SubgraphDeployment {
   /** Flat, as kittiwake sends it. It is not nested under `versions[0].subgraph.metadata`. */
   displayName: string | null;
   categories: string[];
+  /** The block rewards were denied from, or null while it earns. */
+  deniedAt?: number | null;
 }
 
 /**
@@ -315,6 +317,8 @@ export interface DirectoryRow {
   /** Null when the manifest has not been read yet, or names no network. */
   network: string | null;
   complexity: 'Light' | 'Moderate' | 'Heavy' | 'Extreme' | null;
+  /** The block rewards were denied from, or null while it earns. Absent from an older kittiwake. */
+  deniedAt?: number | null;
 }
 
 export interface DirectoryFacet {
@@ -328,6 +332,8 @@ export interface DirectoryPage {
   total: number;
   /** Rows with no manifest read yet, which no network or complexity filter can match. */
   unanalysed: number;
+  /** How many in the whole set are denied rewards. */
+  denied?: number;
   facets: { networks: DirectoryFacet[]; complexities: DirectoryFacet[]; categories: DirectoryFacet[] };
 }
 

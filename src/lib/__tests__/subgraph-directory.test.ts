@@ -29,7 +29,7 @@ describe('the directory state in the URL', () => {
   it('round-trips every filter and leaves the defaults out', () => {
     const qs =
       'window=allTime&sort=ratio&dir=asc&signalMin=200&stakeMax=5000&ratioMin=5&feesMin=10&indexersMax=3' +
-      '&network=arbitrum-one&complexity=Heavy&category=DeFi&createdWithinDays=30&page=2';
+      '&network=arbitrum-one&complexity=Heavy&category=DeFi&createdWithinDays=30&denied=hide&page=2';
     const state = parse(qs);
     expect(new URLSearchParams(directoryParams(state)).toString()).toBe(new URLSearchParams(qs).toString());
     expect(directoryParams(emptyDirectoryState()).toString()).toBe('');
@@ -44,7 +44,7 @@ describe('the directory state in the URL', () => {
   });
 
   it('drops a bound it cannot read rather than sending it on', () => {
-    const state = parse('signalMin=lots&ratioMin=-1&network=all&createdWithinDays=0');
+    const state = parse('signalMin=lots&ratioMin=-1&network=all&createdWithinDays=0&denied=yes');
     expect(hasFilters(state)).toBe(false);
   });
 
@@ -106,7 +106,8 @@ describe('export', () => {
   it('writes full hashes and exact amounts, quoting names with commas', () => {
     const [header, line] = directoryCsv([row(0)]).split('\n');
     expect(header.split(',')[0]).toBe('ipfs_hash');
-    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z');
+    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z,');
+    expect(directoryCsv([{ ...row(0), deniedAt: 250_000_000 }]).split('\n')[1].endsWith(',250000000')).toBe(true);
   });
 });
 
