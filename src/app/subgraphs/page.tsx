@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Badge } from '@/components/ui/Badge';
+import { ComplexityBadge, COMPLEXITY_ESTIMATE_TIP } from '@/components/ui/ComplexityBadge';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableControls } from '@/components/ui/TableControls';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
@@ -45,18 +46,6 @@ import {
 } from '@/lib/subgraph-directory';
 
 // ---------- per-row cells ----------
-
-const CATEGORY_VARIANT: Record<NonNullable<DirectoryRow['complexity']>, 'success' | 'default' | 'warning' | 'error'> = {
-  Light: 'success',
-  Moderate: 'default',
-  Heavy: 'warning',
-  Extreme: 'error',
-};
-
-function ComplexityCell({ complexity }: { complexity: DirectoryRow['complexity'] }) {
-  if (!complexity) return <span className="text-[var(--text-faint)]">--</span>;
-  return <Badge variant={CATEGORY_VARIANT[complexity]}>{complexity}</Badge>;
-}
 
 function NetworkCell({ network }: { network: string | null }) {
   if (!network) return <span className="text-[var(--text-faint)]">--</span>;
@@ -246,7 +235,7 @@ function toRow(d: DirectoryRow, is30d: boolean): Row {
 
 /** What the column picker offers. Selection, rank and deployment always stay. */
 const SUBGRAPH_COLUMNS: readonly ColumnSpec[] = [
-  { id: 'complexity', label: 'Complexity' },
+  { id: 'complexity', label: 'Complexity (est.)' },
   { id: 'network', label: 'Network' },
   { id: 'categories', label: 'Categories', defaultVisible: false },
   { id: 'signal', label: 'Signal' },
@@ -572,8 +561,8 @@ function SubgraphDirectory() {
             Signalled, nobody allocated
           </button>
           <FacetSelect
-            label="Filter by complexity"
-            allLabel="All Complexities"
+            label="Filter by estimated complexity"
+            allLabel="All Complexities (est.)"
             value={state.complexity}
             facets={data.facets.complexities}
             onChange={(complexity) => update({ ...state, complexity })}
@@ -774,7 +763,7 @@ function SubgraphDirectory() {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <WatchStar kind="subgraph" id={row.ipfsHash} />
-                    <ComplexityCell complexity={row.complexity} />
+                    <ComplexityBadge complexity={row.complexity} />
                     <NetworkCell network={row.network} />
                     {row.indexerCount <= 1 && (
                       <span className="relative group/lowidx">
@@ -855,7 +844,7 @@ function SubgraphDirectory() {
                 </th>
                 <th className={cn(thBase, 'text-left w-12')}>#</th>
                 <th className={cn(thBase, 'text-left')}>Deployment ID</th>
-                {show('complexity') && <th className={cn(thBase, 'text-center')}>Complexity</th>}
+                {show('complexity') && <th className={cn(thBase, 'text-center')} title={COMPLEXITY_ESTIMATE_TIP}>Complexity (est.)</th>}
                 {show('network') && <th className={cn(thBase, 'text-center')}>Network</th>}
                 {show('categories') && <th className={cn(thBase, 'text-left')}>Categories</th>}
                 {show('signal') && (
@@ -941,7 +930,7 @@ function SubgraphDirectory() {
                     </td>
                     {show('complexity') && (
                       <td className={cn(pad, 'text-center', tdBorder)}>
-                        <ComplexityCell complexity={row.complexity} />
+                        <ComplexityBadge complexity={row.complexity} />
                       </td>
                     )}
                     {show('network') && (

@@ -939,7 +939,7 @@ function ManifestSection({ hash }: { hash: string }) {
   return (
     <>
       <StatGrid className="lg:grid-cols-4 xl:grid-cols-4">
-        <StatCard label="Overall Score" value={`${analysis.score}/100`} delta={{ value: analysis.category, positive: analysis.score < 50 }} />
+        <StatCard label="Estimated Complexity" value={`${analysis.score}/100`} delta={{ value: analysis.category, positive: analysis.score < 50 }} />
         <StatCard label="Handler Profile" value={`${totalEvents}E / ${totalCalls}C / ${totalBlocks}B`} subtitle={totalBlocks > 0 ? 'Block handlers present' : 'Events only'} />
         <StatCard label="Data Sources" value={`${analysis.dataSources.length} sources`} subtitle={analysis.templates.length > 0 ? `+ ${analysis.templates.length} templates` : 'No templates'} />
         <StatCard label="Block Range" value={formatNumber(startBlock)} subtitle={`Start block on ${analysis.network}`} />
@@ -948,6 +948,12 @@ function ManifestSection({ hash }: { hash: string }) {
       <Card>
         <CardHeader><CardTitle>Score Breakdown</CardTitle></CardHeader>
         <CardContent>
+          {/* lodestar#319: this is a reading of the manifest, not of indexers' actual sync speed. */}
+          <p className="mb-4 text-xs text-[var(--text-faint)]">
+            Estimated from the manifest alone. It does not measure how fast indexers actually sync this
+            deployment: event volume and <code>eth_call</code>s per event are not counted, so a subgraph can
+            score Light and still sync slowly.
+          </p>
           <div className="space-y-4">
             {analysis.breakdown.map((dim) => (
               <div key={dim.dimension}>
