@@ -42,5 +42,7 @@ describe('ComplexityBadge', () => {
   it('says when a sync never catches up, and counts hours under a day', () => {
     expect(syncTimeText({ ...v2, daysToSync: null })).toBe('never catches up at this speed');
     expect(syncTimeText({ ...v2, daysToSync: 0.25 })).toBe('about 6 hours');
+    // uniswap-v4-base-3, 2026-09-30: 24 of 26 indexers syncing at about the chain's own pace.
+    expect(syncTimeText({ ...v2, daysToSync: 8953.2 })).toBe('over a year');
   });
 });

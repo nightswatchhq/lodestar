@@ -22,6 +22,8 @@ export const COMPLEXITY_VARIANT: Record<ComplexityCategory, 'success' | 'default
 /** "about 48 days" or "never catches up", the one figure an allocator wants. */
 export function syncTimeText(s: SyncSpeed): string {
   if (s.daysToSync === null) return 'never catches up at this speed';
+  // Barely faster than the chain extrapolates to decades, which reads as a bug rather than a warning.
+  if (s.daysToSync > 365) return 'over a year';
   if (s.daysToSync < 1) return `about ${Math.max(1, Math.round(s.daysToSync * 24))} hours`;
   return `about ${Math.round(s.daysToSync)} days`;
 }
