@@ -27,6 +27,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { CopyButton } from '@/components/ui/CopyButton';
 import { WatchStar } from '@/components/ui/WatchStar';
 import { Badge } from '@/components/ui/Badge';
+import { ComplexityBadge, syncSpeedTip, syncTimeText } from '@/components/ui/ComplexityBadge';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { cn, formatNumber, formatGRT, weiToGRT, shortenAddress } from '@/lib/utils';
@@ -904,6 +905,8 @@ function VersionsSection({ hash }: { hash: string }) {
 
 function ManifestSection({ hash }: { hash: string }) {
   const { data: analysis, isLoading, error } = useManifestAnalysis(hash);
+  const { data: deployment } = useSubgraphDeployment(hash);
+  const measured = deployment?.difficultySource === 'measured' ? deployment.syncSpeed : null;
 
   if (isLoading) {
     return (
@@ -948,6 +951,12 @@ function ManifestSection({ hash }: { hash: string }) {
       <Card>
         <CardHeader><CardTitle>Score Breakdown</CardTitle></CardHeader>
         <CardContent>
+          {measured && (
+            <p className="mb-2 text-sm text-[var(--text)]">
+              Measured: {deployment?.difficulty}, {syncTimeText(measured)} to sync from the start block.{' '}
+              <span className="text-xs text-[var(--text-faint)]">{syncSpeedTip(measured)}</span>
+            </p>
+          )}
           {/* lodestar#319: this is a reading of the manifest, not of indexers' actual sync speed. */}
           <p className="mb-4 text-xs text-[var(--text-faint)]">
             Estimated from the manifest alone. It does not measure how fast indexers actually sync this
@@ -1164,6 +1173,14 @@ function DeploymentPageInner({ hash }: { hash: string }) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     {networkLabel}
                   </Badge>
+                )}
+                {deployment?.difficulty && (
+                  <ComplexityBadge
+                    complexity={deployment.difficultySource === 'manifest' ? (deployment.difficulty ?? null) : null}
+                    difficulty={deployment.difficulty}
+                    difficultySource={deployment.difficultySource}
+                    syncSpeed={deployment.syncSpeed}
+                  />
                 )}
               </div>
             </>

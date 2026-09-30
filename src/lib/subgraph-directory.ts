@@ -231,7 +231,7 @@ export function directoryCsv(rows: DirectoryRow[]): string {
     [
       'ipfs_hash', 'deployment_id', 'name', 'network', 'complexity', 'categories', 'signal_grt',
       'stake_grt', 'signal_stake_ratio', 'query_fees_30d_grt', 'query_fees_all_time_grt', 'indexers',
-      'curators', 'created_at',
+      'curators', 'created_at', 'difficulty', 'difficulty_source', 'measured_days_to_sync',
     ],
     rows.map((r) => [
       r.ipfsHash,
@@ -248,6 +248,9 @@ export function directoryCsv(rows: DirectoryRow[]): string {
       r.indexerCount,
       r.curatorCount,
       r.createdAt ? new Date(r.createdAt * 1000).toISOString() : null,
+      r.difficulty ?? null,
+      r.difficultySource ?? null,
+      r.syncSpeed?.daysToSync ?? null,
     ]),
   );
 }
