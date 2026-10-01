@@ -106,7 +106,10 @@ describe('export', () => {
   it('writes full hashes and exact amounts, quoting names with commas', () => {
     const [header, line] = directoryCsv([row(0)]).split('\n');
     expect(header.split(',')[0]).toBe('ipfs_hash');
-    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z');
+    expect(line).toBe('Qm0,0x0,"Graph, Network",arbitrum-one,Light,DeFi; NFT,2000,1000,2,1.5,0,3,1,2023-11-14T22:13:20.000Z,,,');
+    const measured = { ...row(0), difficulty: 'Extreme' as const, difficultySource: 'measured' as const,
+      syncSpeed: { blocksPerHour: 12_000, chainBlocksPerHour: 300, indexers: 7, measuredAt: 0, daysToSync: 48.1 } };
+    expect(directoryCsv([measured]).split('\n')[1].endsWith(',Extreme,measured,48.1')).toBe(true);
   });
 });
 

@@ -258,7 +258,28 @@ export async function fetchCuratorPortfolio(address: string): Promise<CuratorPor
 /**
  * Fetch subgraph deployments via GET endpoint
  */
-export interface SubgraphDeployment {
+/** How fast indexers were seen syncing a deployment, from kittiwake's status probes (#319). */
+export interface SyncSpeed {
+  blocksPerHour: number;
+  /** The chain's own rate over the same interval. */
+  chainBlocksPerHour: number;
+  indexers: number;
+  /** Unix seconds. */
+  measuredAt: number;
+  /** From the manifest's start block to the head, net of the chain; null when it never catches up. */
+  daysToSync: number | null;
+}
+
+type Difficulty = 'Light' | 'Moderate' | 'Heavy' | 'Extreme';
+
+/** Measured where kittiwake has a measurement, the manifest's estimate otherwise. */
+export interface DifficultyFields {
+  syncSpeed?: SyncSpeed | null;
+  difficulty?: Difficulty | null;
+  difficultySource?: 'measured' | 'manifest' | null;
+}
+
+export interface SubgraphDeployment extends DifficultyFields {
   id: string;
   ipfsHash: string;
   signalledTokens: string;
@@ -315,7 +336,7 @@ export async function fetchSubgraphDeployments(params: {
 }
 
 /** One row of `/api/subgraph-directory`. Wei as decimal strings, as everywhere else. */
-export interface DirectoryRow {
+export interface DirectoryRow extends DifficultyFields {
   id: string;
   ipfsHash: string;
   displayName: string | null;
@@ -330,7 +351,7 @@ export interface DirectoryRow {
   curatorCount: number;
   /** Null when the manifest has not been read yet, or names no network. */
   network: string | null;
-  complexity: 'Light' | 'Moderate' | 'Heavy' | 'Extreme' | null;
+  complexity: Difficulty | null;
 }
 
 export interface DirectoryFacet {
