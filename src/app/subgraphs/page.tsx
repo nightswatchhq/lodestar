@@ -6,7 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { ChartSkeleton } from '@/components/ui/ChartSkeleton';
 import { Badge } from '@/components/ui/Badge';
-import { ComplexityBadge, COMPLEXITY_ESTIMATE_TIP } from '@/components/ui/ComplexityBadge';
+import { ComplexityBadge, DIFFICULTY_TIP } from '@/components/ui/ComplexityBadge';
 import { Pagination } from '@/components/ui/Pagination';
 import { TableControls } from '@/components/ui/TableControls';
 import { useTablePrefs } from '@/hooks/useTablePrefs';
@@ -235,7 +235,7 @@ function toRow(d: DirectoryRow, is30d: boolean): Row {
 
 /** What the column picker offers. Selection, rank and deployment always stay. */
 const SUBGRAPH_COLUMNS: readonly ColumnSpec[] = [
-  { id: 'complexity', label: 'Complexity (est.)' },
+  { id: 'complexity', label: 'Difficulty' },
   { id: 'network', label: 'Network' },
   { id: 'categories', label: 'Categories', defaultVisible: false },
   { id: 'signal', label: 'Signal' },
@@ -561,8 +561,8 @@ function SubgraphDirectory() {
             Signalled, nobody allocated
           </button>
           <FacetSelect
-            label="Filter by estimated complexity"
-            allLabel="All Complexities (est.)"
+            label="Filter by difficulty"
+            allLabel="All Difficulties"
             value={state.complexity}
             facets={data.facets.complexities}
             onChange={(complexity) => update({ ...state, complexity })}
@@ -763,7 +763,7 @@ function SubgraphDirectory() {
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <WatchStar kind="subgraph" id={row.ipfsHash} />
-                    <ComplexityBadge complexity={row.complexity} />
+                    <ComplexityBadge complexity={row.complexity} difficulty={row.difficulty} difficultySource={row.difficultySource} syncSpeed={row.syncSpeed} />
                     <NetworkCell network={row.network} />
                     {row.indexerCount <= 1 && (
                       <span className="relative group/lowidx">
@@ -844,7 +844,7 @@ function SubgraphDirectory() {
                 </th>
                 <th className={cn(thBase, 'text-left w-12')}>#</th>
                 <th className={cn(thBase, 'text-left')}>Deployment ID</th>
-                {show('complexity') && <th className={cn(thBase, 'text-center')} title={COMPLEXITY_ESTIMATE_TIP}>Complexity (est.)</th>}
+                {show('complexity') && <th className={cn(thBase, 'text-center')} title={DIFFICULTY_TIP}>Difficulty</th>}
                 {show('network') && <th className={cn(thBase, 'text-center')}>Network</th>}
                 {show('categories') && <th className={cn(thBase, 'text-left')}>Categories</th>}
                 {show('signal') && (
@@ -930,7 +930,7 @@ function SubgraphDirectory() {
                     </td>
                     {show('complexity') && (
                       <td className={cn(pad, 'text-center', tdBorder)}>
-                        <ComplexityBadge complexity={row.complexity} />
+                        <ComplexityBadge complexity={row.complexity} difficulty={row.difficulty} difficultySource={row.difficultySource} syncSpeed={row.syncSpeed} />
                       </td>
                     )}
                     {show('network') && (
