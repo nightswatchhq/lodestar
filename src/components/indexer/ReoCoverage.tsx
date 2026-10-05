@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useIndexerQosDeployments } from '@/hooks/useNetworkStats';
+import { useIndexerQosDeployments, useIndexerQosQualifyingDays } from '@/hooks/useNetworkStats';
 import type { ActiveAllocation } from '@/lib/contracts/indexer-detail';
 import {
   REO_COVERAGE_CHANGE,
@@ -9,6 +9,7 @@ import {
   REO_SUBGRAPHS_FROM,
   coverage,
   coverageChanged,
+  dailyStrip,
 } from '@/lib/reo-coverage';
 import { cn, weiToGRT } from '@/lib/utils';
 
@@ -52,6 +53,7 @@ export function ReoCoverage({ indexer, allocations }: { indexer: string; allocat
         <span className="text-[var(--text-faint)]">Needs, on each active day, {changed ? 'since' : 'from'} {when}</span>
         <span className={cn('font-mono', short ? 'text-[var(--red-text)]' : 'text-[var(--text-muted)]')}>{REO_SUBGRAPHS_FROM}</span>
       </div>
+      <DailyStrip indexer={indexer} />
       <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
         A qualifying subgraph carries at least {REO_SIGNAL_FLOOR_GRT} GRT of signal; the rule was 1 a day before {when}. Allocating
         is not enough: the gateway has to route the query and it has to come back 200, under 5 s, within 50,000 blocks. The
@@ -69,6 +71,53 @@ export function ReoCoverage({ indexer, allocations }: { indexer: string; allocat
         Rule from the Foundation&apos;s 22 September 2026 announcement. The oracle repository&apos;s ELIGIBILITY_CRITERIA.md carries
         the five-subgraph change but not the {REO_SIGNAL_FLOOR_GRT} GRT floor; if the oracle disagrees with either, this count is
         wrong the same way.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The last 28 days, one cell per UTC day, against the five the oracle wants. Each count is a ceiling
+ * on the oracle's, so a red cell is short for the oracle too and a full one is not proof.
+ */
+function DailyStrip({ indexer }: { indexer: string }) {
+  const query = useIndexerQosQualifyingDays(indexer);
+  if (query.status !== 'success') return null;
+  const answer = query.data;
+  const cells = dailyStrip(answer);
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[11px] text-[var(--text-faint)]">Each of the last {answer.window_days} days</div>
+      <div className="grid grid-cols-[repeat(14,minmax(0,1fr))] gap-0.5">
+        {cells.map((c) => (
+          <div
+            key={c.date}
+            title={
+              c.count === null
+                ? `${c.date}: no figure`
+                : `${c.date}${c.partial ? ' (so far)' : ''}: ${c.count} of ${REO_SUBGRAPHS_FROM}`
+            }
+            className={cn(
+              'h-5 rounded-sm text-[10px] font-mono leading-5 text-center',
+              c.count === null
+                ? 'bg-[var(--bg-elevated)] text-[var(--text-faint)]'
+                : c.short
+                  ? 'bg-[var(--red-dim)] text-[var(--red-text)]'
+                  : 'bg-[var(--green-dim)] text-[var(--text)]',
+              c.partial && 'opacity-60',
+            )}
+          >
+            {c.count ?? '-'}
+          </div>
+        ))}
+      </div>
+      <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+        Deployments that answered at least one query with HTTP 200 that day
+        {answer.signal_floor_applied
+          ? `, carrying ${answer.signal_floor_grt} GRT of signal at the day's end`
+          : `. Signal could not be read (${answer.signal_floor_reason}), so the ${answer.signal_floor_grt} GRT floor is not applied`}
+        . The QoS feed has no per-query latency or freshness, so the 5 s and 50,000-block bars are not applied either:
+        each day is a ceiling on the oracle&apos;s count. A red day is short for the oracle; a full one is not proof.
       </p>
     </div>
   );

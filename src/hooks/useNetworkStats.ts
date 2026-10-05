@@ -31,6 +31,7 @@ import {
   fetchIndexerQos,
   fetchIndexerQosScore,
   fetchIndexerQosDeployments,
+  fetchIndexerQosQualifyingDays,
   fetchDelegationFlows,
   fetchDeveloperActivity,
   fetchTokenMetrics,
@@ -619,6 +620,16 @@ export function useIndexerQosDeployments(indexer: string | null) {
   return useQuery({
     queryKey: ['indexerQosDeployments', indexer],
     queryFn: () => fetchIndexerQosDeployments(indexer!),
+    staleTime: 30 * 60 * 1000,
+    enabled: !!indexer,
+    retry: 1,
+  });
+}
+
+export function useIndexerQosQualifyingDays(indexer: string | null) {
+  return useQuery({
+    queryKey: ['indexerQosQualifyingDays', indexer],
+    queryFn: () => fetchIndexerQosQualifyingDays(indexer!),
     staleTime: 30 * 60 * 1000,
     enabled: !!indexer,
     retry: 1,

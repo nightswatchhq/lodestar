@@ -3,12 +3,13 @@
  *
  * From 6 October 2026 an active day needs a qualifying query on each of five subgraphs carrying at
  * least 500 GRT of signal, up from one. The count that decides it is per day, and kittiwake keeps
- * per-day, per-deployment rows (`QosAllocationDay`) but serves only a 30-day roll-up per deployment,
- * so what can be shown here is the window figure: deployments served at all in the window, of which
- * those over the floor. No day can exceed it, which is what makes it worth showing.
+ * per-day, per-deployment rows. Two figures are shown: the window figure, deployments served at all
+ * in the 30-day roll-up of which those over the floor, and a per-day count from
+ * `/qos-qualifying-days`, which is still a ceiling because the rows carry no per-query latency or
+ * freshness.
  */
 
-import type { QosDeploymentRow } from '@/lib/contracts/indexer-qos';
+import type { QosDeploymentRow, QualifyingDaysResponse } from '@/lib/contracts/indexer-qos';
 
 export const REO_COVERAGE_CHANGE = '2026-10-06';
 export const REO_SUBGRAPHS_BEFORE = 1;
@@ -53,4 +54,32 @@ export function coverage(deployments: QosDeploymentRow[], signalGrt: Map<string,
     else if (signal >= REO_SIGNAL_FLOOR_GRT) qualifying++;
   }
   return { served, qualifying, unknown };
+}
+
+export interface StripDay {
+  date: string;
+  /** Null for a day kittiwake did not send: not computed, or today when the nest did not answer. */
+  count: number | null;
+  partial: boolean;
+  short: boolean | null;
+}
+
+const DAY_MS = 86_400_000;
+
+/** One cell per UTC day of the oracle's window, oldest first, ending today. */
+export function dailyStrip(answer: QualifyingDaysResponse, nowMs = Date.now()): StripDay[] {
+  const byDate = new Map(answer.days.map((d) => [d.date, d]));
+  const today = Math.floor(nowMs / DAY_MS);
+  const cells: StripDay[] = [];
+  for (let n = answer.window_days - 1; n >= 0; n--) {
+    const date = new Date((today - n) * DAY_MS).toISOString().slice(0, 10);
+    const d = byDate.get(date);
+    cells.push({
+      date,
+      count: d ? d.count : null,
+      partial: d?.partial ?? false,
+      short: d ? d.count < REO_SUBGRAPHS_FROM : null,
+    });
+  }
+  return cells;
 }
