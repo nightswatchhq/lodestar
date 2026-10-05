@@ -12,6 +12,15 @@ const STATUS_VARIANT: Record<EpochStatus, 'success' | 'accent' | 'warning' | 'de
   Finalized: 'default',
 };
 
+// EpochManager counts L1 blocks, so its own range is the exact one; the L2 range is what an older
+// backend sends, and is labelled so the two are never read as the same chain.
+function blockRange(e: Epoch): string {
+  if (e.startL1Block != null && e.endL1Block != null) {
+    return `L1 ${formatNumber(e.startL1Block)} – ${formatNumber(e.endL1Block)}`;
+  }
+  return `L2 ${formatNumber(e.startBlock)} – ${formatNumber(e.endBlock)}`;
+}
+
 /**
  * Per-epoch table with derived status (Active/Settling/Distributing/Finalized)
  * and query-fee / reward totals. Status is derived from the epoch number vs the
@@ -43,7 +52,7 @@ export function EpochTable({ epochs, currentEpoch }: { epochs: Epoch[]; currentE
                 <td className="px-4 py-3 text-right font-mono text-sm text-[var(--text)]">{formatGRT(weiToGRT(e.totalQueryFees))} GRT</td>
                 <td className="px-4 py-3 text-right font-mono text-sm text-[var(--green)]">{formatGRT(weiToGRT(e.totalRewards))} GRT</td>
                 <td className="px-4 py-3 text-right font-mono text-[11px] text-[var(--text-faint)] hidden sm:table-cell">
-                  {formatNumber(e.startBlock)} – {formatNumber(e.endBlock)}
+                  {blockRange(e)}
                 </td>
               </tr>
             );
