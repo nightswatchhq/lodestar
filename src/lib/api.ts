@@ -41,7 +41,7 @@ import type {
 import type { IndexerRevenue, IndexerPnl } from '@/lib/contracts/indexer-pnl';
 import type { IndexerTrendsResponse } from '@/lib/contracts/indexer-trends';
 import type { IndexerDelegatorsPage } from '@/lib/contracts/indexer-delegators';
-import type { IndexerQosResponse, QosDeploymentsResponse, QosScoreResponse } from '@/lib/contracts/indexer-qos';
+import type { IndexerQosResponse, QosDeploymentsResponse, QosScoreResponse, QualifyingDaysResponse } from '@/lib/contracts/indexer-qos';
 import type { DisassemblyReport } from '@/lib/disassembly/types';
 import type { DisassemblyDiff } from '@/lib/disassembly/diff';
 import type { RecommendResponse } from '@/lib/contracts/delegate-recommend';
@@ -623,6 +623,17 @@ export async function fetchIndexerQosDeployments(address: string): Promise<QosDe
   return parseResponse('/api/indexer/qos-deployments', await response.json(), {
     objects: ['data'],
     rows: { 'data.deployments': ['deployment_id', 'drag', 'measured'] },
+    pick: 'data',
+  });
+}
+
+/** Per UTC day of the oracle's window, deployments answered with a 200 and those over the signal floor. */
+export async function fetchIndexerQosQualifyingDays(address: string): Promise<QualifyingDaysResponse> {
+  const response = await fetchShedAware(apiUrl(`/api/indexer/${encodeURIComponent(address)}/qos-qualifying-days`));
+  if (!response.ok) throw new Error(`QoS qualifying days failed: ${response.status}`);
+  return parseResponse('/api/indexer/qos-qualifying-days', await response.json(), {
+    objects: ['data'],
+    rows: { 'data.days': ['date', 'partial', 'count'] },
     pick: 'data',
   });
 }

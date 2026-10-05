@@ -112,3 +112,36 @@ export interface QosDeploymentsResponse {
   } | null;
   deployments: QosDeploymentRow[];
 }
+
+export interface QualifyingDeployment {
+  deployment_id: string;
+  num_200: number;
+  /** Signal at the end of that UTC day, or null when it could not be read. */
+  signal_grt: number | null;
+  over_floor: boolean | null;
+}
+
+export interface QualifyingDay {
+  date: string;
+  /** Today: its buckets are still arriving. */
+  partial: boolean;
+  /** Deployments with an HTTP 200 that day, over the floor when `signal_floor_applied`. */
+  count: number;
+  count_without_floor: number;
+  deployments: QualifyingDeployment[];
+}
+
+/**
+ * What `/api/indexer/[address]/qos-qualifying-days` answers. kittiwake's QoS rows have no per-query
+ * latency or freshness, so every count bounds the oracle's from above; the response says so.
+ */
+export interface QualifyingDaysResponse {
+  window_days: number;
+  qualifying_test_applied: boolean;
+  bound: 'upper';
+  qualifying_test_reason: string;
+  signal_floor_grt: number;
+  signal_floor_applied: boolean;
+  signal_floor_reason: string | null;
+  days: QualifyingDay[];
+}
