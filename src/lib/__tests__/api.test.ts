@@ -28,6 +28,7 @@ import {
   fetchIndexerQos,
   fetchIndexerQosScore,
   fetchIndexerQosDeployments,
+  fetchIndexerQosQualifyingDays,
   fetchIndexerPnl,
   fetchParameterHistory,
   fetchSubgraphCuration,
@@ -445,6 +446,19 @@ describe('api: .data-envelope endpoints (happy + error)', () => {
 
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 502));
     await expect(fetchIndexerQosScore('0xabc')).rejects.toThrow('QoS score failed: 502');
+  });
+
+  it('fetchIndexerQosQualifyingDays unwraps .data and refuses a day without its count', async () => {
+    const body = { window_days: 28, signal_floor_applied: false, days: [{ date: '2026-10-05', partial: true, count: 3, count_without_floor: 3, deployments: [] }] };
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: body }));
+    expect(await fetchIndexerQosQualifyingDays('0xabc')).toEqual(body);
+    expect(mockFetch.mock.calls[0][0]).toBe('/api/indexer/0xabc/qos-qualifying-days');
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { ...body, days: [{ date: 'd', partial: false }] } }));
+    await expect(fetchIndexerQosQualifyingDays('0xabc')).rejects.toThrow(/count/);
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 404));
+    await expect(fetchIndexerQosQualifyingDays('0xabc')).rejects.toThrow('QoS qualifying days failed: 404');
   });
 
   it('fetchIndexerStakeHistory unwraps .data from the path endpoint', async () => {
