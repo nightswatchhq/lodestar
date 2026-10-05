@@ -46,6 +46,8 @@ export const EPOCH_HISTORY_QUERY = gql`
       id
       startBlock
       endBlock
+      startL1Block
+      endL1Block
       signalledTokens
       stakeDeposited
       totalQueryFees
@@ -438,6 +440,9 @@ export interface Epoch {
   id: string;
   startBlock: number;
   endBlock: number;
+  /** EpochManager's exact L1 range; absent or null from a backend that predates it. */
+  startL1Block?: number | null;
+  endL1Block?: number | null;
   signalledTokens: string;
   stakeDeposited: string;
   totalQueryFees: string;

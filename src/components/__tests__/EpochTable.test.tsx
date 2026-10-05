@@ -32,6 +32,16 @@ describe('EpochTable', () => {
     expect(screen.getByText('1273')).toBeInTheDocument();
   });
 
+  it('shows the exact EpochManager L1 range when the backend sends it', () => {
+    render(<EpochTable epochs={[{ ...epoch('1401'), startL1Block: 26112737, endL1Block: 26119936 }]} currentEpoch={1402} />);
+    expect(screen.getByText('L1 26,112,737 – 26,119,936')).toBeInTheDocument();
+  });
+
+  it('falls back to the labelled L2 range from a backend without the L1 one', () => {
+    render(<EpochTable epochs={[epoch('1401'), { ...epoch('1400'), startL1Block: null, endL1Block: null }]} currentEpoch={1402} />);
+    expect(screen.getAllByText('L2 100 – 200')).toHaveLength(2);
+  });
+
   it('shows an empty state when there are no epochs', () => {
     render(<EpochTable epochs={[]} currentEpoch={1274} />);
     expect(screen.getByText(/No epoch data/i)).toBeInTheDocument();
