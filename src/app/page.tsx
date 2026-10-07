@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useNetworkStats, useGRTPrice, useTVL, useEpochInfo, useEpochHistory, useSubgraphDeployments30d } from '@/hooks/useNetworkStats';
 import { unavailableReason, useQueryState } from '@/hooks/useQueryState';
 import { EpochTable } from '@/components/EpochTable';
 import { annualIssuancePercent } from '@/lib/network-math';
 import { CIRCULATING_SUPPLY_APPROX } from '@/lib/grt-flow-data';
+import { fetchGrtFlow } from '@/lib/api';
+import type { GrtFlowData } from '@/lib/contracts/grt-flow';
 import { weiToGRT, formatGRT, formatUSD, formatNumber, formatPPM } from '@/lib/utils';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { SourceUnavailable } from '@/components/ui/SourceUnavailable';
@@ -31,6 +34,14 @@ export default function ProtocolOverview() {
   const { data: priceData, isLoading: priceLoading } = useGRTPrice();
   const { data: tvlData, isLoading: tvlLoading } = useTVL();
   const subgraphs30dState = useQueryState(useSubgraphDeployments30d());
+  // Same key and cadence as /grt-flow, so the two pages share one request.
+  const { data: flow, isLoading: flowLoading } = useQuery<GrtFlowData>({
+    queryKey: ['grtFlow'],
+    queryFn: fetchGrtFlow,
+    staleTime: 30 * 60 * 1000,
+  });
+  const burns = flow?.burns;
+  const burned = burns?.totalBurned ?? burns?.arbitrum?.burned;
   const subgraphs30d = subgraphs30dState.kind === 'ready' ? subgraphs30dState.data : undefined;
   const subgraphsLoading = subgraphs30dState.kind === 'loading';
 
@@ -134,6 +145,13 @@ export default function ProtocolOverview() {
           subtitle="L1 + L2 − bridge escrow"
           loading={networkLoading}
           unavailable={networkUnavailable}
+        />
+        <StatCard
+          label="GRT Burned"
+          value={burned == null ? '—' : `${formatGRT(burned)} GRT`}
+          subtitle={burns?.totalBurned != null ? 'Ethereum + Arbitrum' : 'Arbitrum, bridge excluded'}
+          loading={flowLoading}
+          tooltip="GRT destroyed by the protocol: query-fee protocol tax, curation tax, delegation tax and slashing. Withdrawals to Ethereum through the bridge are not burns, though the network subgraph counts them as such. Breakdown per chain on GRT Flow."
         />
         <StatCard
           label="Annual Issuance (est.)"

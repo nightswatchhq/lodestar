@@ -13,6 +13,30 @@ export interface SupplyBreakdown {
   globalSupply: number;
 }
 
+/** Arbitrum, in GRT. `burned` and `issued` have the bridge taken out (graph-network-subgraph#337). */
+export interface GrtBurnsArbitrum {
+  burned: number;
+  issued: number;
+  grossBurned: number;
+  bridgeBurned: number;
+  grossMinted: number;
+  bridgeMinted: number;
+}
+
+/** Ethereum mainnet, in GRT. No bridge correction: the mainnet side of the bridge escrows. */
+export interface GrtBurnsMainnet {
+  burned: number;
+  minted: number;
+}
+
+/** From grt-supply-nest, one nest per chain. Each part is null when its nest is not answering. */
+export interface GrtBurns {
+  arbitrum: GrtBurnsArbitrum | null;
+  mainnet: GrtBurnsMainnet | null;
+  /** Both chains. Null unless both answered, so a one-chain figure never reads as the whole. */
+  totalBurned: number | null;
+}
+
 export interface GrtFlowData {
   blockNumber: number | null;
   supply: number;
@@ -22,6 +46,8 @@ export interface GrtFlowData {
   supplyBreakdown: SupplyBreakdown | null;
   minted: number;
   burned: number;
+  /** Absent from a kittiwake older than this field; the page shows "—" rather than failing. */
+  burns?: GrtBurns;
   indexingRewards: number;
   queryFees: number;
   staked: number;
