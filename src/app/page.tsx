@@ -149,7 +149,13 @@ export default function ProtocolOverview() {
         <StatCard
           label="GRT Burned"
           value={burned == null ? '—' : `${formatGRT(burned)} GRT`}
-          subtitle={burns?.totalBurned != null ? 'Ethereum + Arbitrum' : 'Arbitrum, bridge excluded'}
+          subtitle={
+            burns?.mainnet && burns.arbitrum
+              ? `L1 ${formatGRT(burns.mainnet.burned)} · L2 ${formatGRT(burns.arbitrum.burned)}`
+              : burns?.arbitrum
+                ? 'Arbitrum, bridge excluded'
+                : undefined
+          }
           loading={flowLoading}
           tooltip="GRT destroyed by the protocol: query-fee protocol tax, curation tax, delegation tax and slashing. Withdrawals to Ethereum through the bridge are not burns, though the network subgraph counts them as such. Breakdown per chain on GRT Flow."
         />
