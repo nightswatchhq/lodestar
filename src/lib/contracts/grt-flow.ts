@@ -46,7 +46,8 @@ export interface GrtFlowData {
   supplyBreakdown: SupplyBreakdown | null;
   minted: number;
   burned: number;
-  burns: GrtBurns;
+  /** Absent from a kittiwake older than this field; the page shows "—" rather than failing. */
+  burns?: GrtBurns;
   indexingRewards: number;
   queryFees: number;
   staked: number;

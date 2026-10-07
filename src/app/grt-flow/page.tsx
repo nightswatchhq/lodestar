@@ -145,7 +145,7 @@ export default function GrtFlowPage() {
             <div className="space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)] font-medium">Distribution &amp; sinks</p>
               <FlowNode tone="neutral" label="Indexing rewards → indexers + delegators" value={fmt(d?.indexingRewards)} sub={d ? `delegation cap ${d.params.delegationRatio}× self-stake` : undefined} />
-              <FlowNode tone="sink" label="Burned" value={fmt(d?.burns.totalBurned ?? undefined)} sub={d ? `Ethereum + Arbitrum · ${d.params.protocolFeePct.toFixed(1)}% / ${d.params.curationTaxPct.toFixed(1)}% / ${d.params.delegationTaxPct.toFixed(1)}% query-fee / curation / delegation tax + slashing` : undefined} />
+              <FlowNode tone="sink" label="Burned" value={fmt(d?.burns?.totalBurned ?? undefined)} sub={d ? `Ethereum + Arbitrum · ${d.params.protocolFeePct.toFixed(1)}% / ${d.params.curationTaxPct.toFixed(1)}% / ${d.params.delegationTaxPct.toFixed(1)}% query-fee / curation / delegation tax + slashing` : undefined} />
             </div>
           </div>
         </CardContent>
@@ -162,28 +162,28 @@ export default function GrtFlowPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
               <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Total</p>
-              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns.totalBurned ?? undefined)}</p>
+              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.totalBurned ?? undefined)}</p>
               <p className="text-[10px] text-[var(--text-faint)] mt-1">Ethereum + Arbitrum</p>
             </div>
             <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
               <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Ethereum mainnet</p>
-              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns.mainnet?.burned)}</p>
+              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.mainnet?.burned)}</p>
               <p className="text-[10px] text-[var(--text-faint)] mt-1">
                 Burned on the Ethereum GraphToken, where the protocol ran before it moved to Arbitrum.
               </p>
             </div>
             <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
               <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Arbitrum One</p>
-              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns.arbitrum?.burned)}</p>
+              <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.arbitrum?.burned)}</p>
               <p className="text-[10px] text-[var(--text-faint)] mt-1">
                 Burned on the L2GraphToken, not counting GRT withdrawn to Ethereum through the bridge.
               </p>
             </div>
           </div>
-          {d?.burns.arbitrum && (
+          {d?.burns?.arbitrum && (
             <p className="text-[11px] text-[var(--text-muted)] mt-4 leading-relaxed max-w-3xl">
-              The network subgraph reports {formatGRT(d.burns.arbitrum.grossBurned)} GRT burned on Arbitrum. Of
-              that, {formatGRT(d.burns.arbitrum.bridgeBurned)} is GRT withdrawn to Ethereum: the bridge burns it
+              The network subgraph reports {formatGRT(d.burns?.arbitrum.grossBurned)} GRT burned on Arbitrum. Of
+              that, {formatGRT(d.burns?.arbitrum.bridgeBurned)} is GRT withdrawn to Ethereum: the bridge burns it
               on Arbitrum and releases the same amount from escrow on mainnet, so none of it was destroyed (
               <a className="underline" href="https://github.com/graphprotocol/graph-network-subgraph/issues/337" target="_blank" rel="noreferrer">graph-network-subgraph#337</a>).
             </p>
@@ -226,19 +226,19 @@ export default function GrtFlowPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
                 <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Cumulative Minted</p>
-                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns.arbitrum?.grossMinted ?? d?.minted)}</p>
-                {d?.burns.arbitrum && (
+                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.arbitrum?.grossMinted ?? d?.minted)}</p>
+                {d?.burns?.arbitrum && (
                   <p className="text-[10px] text-[var(--text-faint)] mt-1">
-                    {formatGRT(d.burns.arbitrum.bridgeMinted)} bridge deposits · {formatGRT(d.burns.arbitrum.issued)} issued
+                    {formatGRT(d.burns?.arbitrum.bridgeMinted)} bridge deposits · {formatGRT(d.burns?.arbitrum.issued)} issued
                   </p>
                 )}
               </div>
               <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
                 <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Cumulative Burned</p>
-                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns.arbitrum?.grossBurned ?? d?.burned)}</p>
-                {d?.burns.arbitrum && (
+                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.arbitrum?.grossBurned ?? d?.burned)}</p>
+                {d?.burns?.arbitrum && (
                   <p className="text-[10px] text-[var(--text-faint)] mt-1">
-                    {formatGRT(d.burns.arbitrum.bridgeBurned)} bridge withdrawals · {formatGRT(d.burns.arbitrum.burned)} burned
+                    {formatGRT(d.burns?.arbitrum.bridgeBurned)} bridge withdrawals · {formatGRT(d.burns?.arbitrum.burned)} burned
                   </p>
                 )}
               </div>
