@@ -145,7 +145,7 @@ export default function GrtFlowPage() {
             <div className="space-y-3">
               <p className="text-[10px] uppercase tracking-wide text-[var(--text-faint)] font-medium">Distribution &amp; sinks</p>
               <FlowNode tone="neutral" label="Indexing rewards → indexers + delegators" value={fmt(d?.indexingRewards)} sub={d ? `delegation cap ${d.params.delegationRatio}× self-stake` : undefined} />
-              <FlowNode tone="sink" label="Burned" value={d ? `${d.params.protocolFeePct.toFixed(1)}% / ${d.params.curationTaxPct.toFixed(1)}% / ${d.params.delegationTaxPct.toFixed(1)}%` : '—'} sub="query-fee / curation / delegation tax + slashing" />
+              <FlowNode tone="sink" label="Burned on Arbitrum" value={fmt(d?.burns?.burned)} sub={d ? `${d.params.protocolFeePct.toFixed(1)}% / ${d.params.curationTaxPct.toFixed(1)}% / ${d.params.delegationTaxPct.toFixed(1)}% query-fee / curation / delegation tax + slashing, bridge excluded` : undefined} />
             </div>
           </div>
         </CardContent>
@@ -186,11 +186,21 @@ export default function GrtFlowPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
                 <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Cumulative Minted</p>
-                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.minted)}</p>
+                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.grossMinted ?? d?.minted)}</p>
+                {d?.burns && (
+                  <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                    {formatGRT(d.burns.bridgeMinted)} bridge deposits · {formatGRT(d.burns.issued)} issued
+                  </p>
+                )}
               </div>
               <div className="rounded-lg bg-[var(--bg-elevated)] px-3 py-3">
                 <p className="text-[10px] text-[var(--text-faint)] mb-0.5">Cumulative Burned</p>
-                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burned)}</p>
+                <p className="text-xl font-semibold font-mono text-[var(--text)]">{fmt(d?.burns?.grossBurned ?? d?.burned)}</p>
+                {d?.burns && (
+                  <p className="text-[10px] text-[var(--text-faint)] mt-1">
+                    {formatGRT(d.burns.bridgeBurned)} bridge withdrawals · {formatGRT(d.burns.burned)} burned
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[var(--amber-dim)] border border-[var(--amber)] mt-4">
@@ -199,8 +209,8 @@ export default function GrtFlowPage() {
               </svg>
               <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
                 On Arbitrum, gross mint/burn is dominated by <strong className="text-[var(--text)]">bridge flows</strong>,
-                every L2 deposit mints and every withdrawal burns. These are not a clean issuance/burn measure;
-                use cumulative indexing rewards and the per-block rate for issuance.
+                every L2 deposit mints and every withdrawal burns. The network subgraph reports these gross
+                figures as totalGRTMinted / totalGRTBurned; the split beneath each takes the bridge back out.
               </p>
             </div>
           </CardContent>

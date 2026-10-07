@@ -13,6 +13,16 @@ export interface SupplyBreakdown {
   globalSupply: number;
 }
 
+/** GRT figures; `burned` and `issued` have the bridge taken out (graph-network-subgraph#337). */
+export interface GrtBurns {
+  burned: number;
+  issued: number;
+  grossBurned: number;
+  bridgeBurned: number;
+  grossMinted: number;
+  bridgeMinted: number;
+}
+
 export interface GrtFlowData {
   blockNumber: number | null;
   supply: number;
@@ -22,6 +32,8 @@ export interface GrtFlowData {
   supplyBreakdown: SupplyBreakdown | null;
   minted: number;
   burned: number;
+  /** Arbitrum only, from grt-supply-nest. Null when that nest is not answering: absent, not zero. */
+  burns: GrtBurns | null;
   indexingRewards: number;
   queryFees: number;
   staked: number;
