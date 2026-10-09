@@ -13,7 +13,7 @@
  * A note on what the score does NOT do: it marks down a greedy cut, it does not disqualify one.
  * A 100% reward cut zeroes delegatorCut (10) and delegatorAPY (8) and caps cutStability (6) at 5,
  * which costs a flawless indexer 24 points, so 100 (A) becomes 76 (B). The hard exclusion at ≥ 90%
- * lives in the one-click delegation filter, not here. See nightswatchhq/kittiwake#14.
+ * lives in the one-click delegation filter, not here. See nuthatch-org/kittiwake#14.
  */
 
 import { scoreServedGap } from './served-gap';
@@ -71,7 +71,7 @@ export const SCORE_LABELS: Record<keyof ScoreBreakdown, string> = {
  * them. The Score tooltip previously named seven dimensions and omitted Delegator Cut, the one a
  * delegator most needs, because it was a hand-written string nothing compared against this table.
  * Generating it means a weight added, removed or re-tuned changes the published copy in the same
- * commit. See nightswatchhq/kittiwake#14.
+ * commit. See nuthatch-org/kittiwake#14.
  */
 export const SCORE_DIMENSION_COUNT = Object.keys(SCORE_WEIGHTS).length;
 

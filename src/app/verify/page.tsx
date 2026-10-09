@@ -157,7 +157,7 @@ export default function VerifyPage() {
         <p className="text-sm text-[var(--text-muted)] max-w-2xl">
           Check a{' '}
           <a
-            href="https://github.com/nightswatchhq/tattler"
+            href="https://github.com/nuthatch-org/tattler"
             target="_blank"
             rel="noreferrer"
             className="text-[var(--accent)] hover:underline"

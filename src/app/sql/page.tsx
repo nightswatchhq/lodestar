@@ -142,7 +142,7 @@ export default function SqlPage() {
         <p className="text-sm text-[var(--text-muted)] max-w-2xl">
           Query the indexed chain data behind this dashboard directly. These are{' '}
           <a
-            href="https://github.com/nightswatchhq/nuthatch"
+            href="https://github.com/nuthatch-org/nuthatch"
             target="_blank"
             rel="noreferrer"
             className="text-[var(--accent)] hover:underline"
@@ -581,7 +581,7 @@ function TakeAReceipt({ name, args }: { name: string; args: Record<string, strin
       <p className="text-[10px] text-[var(--text-faint)] mt-1 leading-relaxed">
         Needs{' '}
         <a
-          href="https://github.com/nightswatchhq/tattler"
+          href="https://github.com/nuthatch-org/tattler"
           target="_blank"
           rel="noreferrer"
           className="text-[var(--accent)] hover:underline"

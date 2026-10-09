@@ -55,7 +55,7 @@ describe('SCORE_WEIGHTS', () => {
   // The published copy has to name every dimension, not a subset. The Score tooltip used to name
   // seven of eleven and leave out Delegator Cut, so an indexer taking everything was graded in a
   // column whose own explanation never mentioned cuts. Deriving the string is the fix; this is
-  // the check that it stayed derived. See nightswatchhq/kittiwake#14.
+  // the check that it stayed derived. See nuthatch-org/kittiwake#14.
   it('are all named in the summary the UI publishes, with their real percentages', () => {
     expect(SCORE_DIMENSION_COUNT).toBe(Object.keys(SCORE_WEIGHTS).length);
     for (const [key, weight] of Object.entries(SCORE_WEIGHTS)) {

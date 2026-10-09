@@ -7,7 +7,7 @@
  *
  * **It is the API inventory the kittiwake port needs.** Each hook is one method, one path, one
  * request shape and one response shape, written down. That is exactly what the parity harness
- * compares, and the absence of it is what nightswatchhq/kittiwake#23 cost: two lists that had to
+ * compares, and the absence of it is what nuthatch-org/kittiwake#23 cost: two lists that had to
  * agree with nothing enforcing it, and three routes reaching production answering 200 with a
  * payload the frontend could not read.
  *

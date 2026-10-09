@@ -17,7 +17,7 @@
 //
 // ## Table names are from the nest's schema, not from guesswork
 //
-// `schema.json` in nightswatchhq/dips-nest is the source. Worth stating because the convention has
+// `schema.json` in nuthatch-org/dips-nest is the source. Worth stating because the convention has
 // a trap in it: `RCACollected` becomes `recurring_collector__r_c_a_collected`, not
 // `..._rca_collected`, and a reasonable guess is wrong.
 

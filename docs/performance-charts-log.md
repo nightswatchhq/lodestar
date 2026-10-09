@@ -12,7 +12,7 @@ or deployed before then.
 
 ## 2026-09-13
 
-**Why this exists.** stake-machine asked in the Night's Watch Discord whether the performance charts
+**Why this exists.** stake-machine asked in the Nuthatch Discord whether the performance charts
 had been removed from the indexer page. They had, on 2026-09-05 under nuthatch#1160: `cb61cea`
 removed Query Performance and the QoS Quality panel, `cd47802` removed Daily Trends. Both read
 subgraphs through the gateway with `GRAPH_API_KEY`. We said they will be back.

@@ -84,7 +84,7 @@ Not here. Lodestar is where the surface and the tests already are, so it is the 
 prove the design — but the durable home is the **nuthatch data service gateway**, beside the TAP
 paywall that already answers `402 TAP-Receipt header required`. There it becomes a second accepted
 payment method for *any* nuthatch operator rather than a feature of one dashboard, which is the
-model The Night's Watch works to: build the thing, let other people run it.
+model Nuthatch works to: build the thing, let other people run it.
 
 ## Open decisions
 

@@ -18,7 +18,7 @@
  * we observe actually changed over wall-clock time. That is what this module
  * tracks. It is deliberately pure — the cron owns the IO and the cache.
  *
- * See nightswatchhq/graph-support#15.
+ * See nuthatch-org/graph-support#15.
  */
 
 // ---------------------------------------------------------------------------

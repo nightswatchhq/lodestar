@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     'How much of the Lodestar API is served by kittiwake, the Rust backend, and how much is still Next.',
 };
 
-const ISSUE = 'https://github.com/nightswatchhq/kittiwake/issues';
+const ISSUE = 'https://github.com/nuthatch-org/kittiwake/issues';
 
 /** What each block of work is waiting on, and the issue that tracks it. */
 const WORKSTREAM_NOTES: Partial<Record<Workstream, { issue: number; what: string }>> = {

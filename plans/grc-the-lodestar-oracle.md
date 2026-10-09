@@ -1,7 +1,7 @@
 # GRC-XXX: The Lodestar Oracle
 
 **Status:** draft for comment
-**Author:** petko (Lodestar / The Night's Watch)
+**Author:** petko (Lodestar / Nuthatch)
 **Supersedes in practice:** the V1 Gateway QoS Oracle pipeline for consumers who need it to work
 **Builds on:** [GRC-002: QoS Oracle V2](https://forum.thegraph.com/t/grc-002-qos-oracle-v2/5756)
 
@@ -119,7 +119,7 @@ measured, only estimated.
 
 ### Stage 3: indexing — the nuthatch nest
 
-A [nuthatch](https://github.com/nightswatchhq/nuthatch) nest over the publisher contract. This works
+A [nuthatch](https://github.com/nuthatch-org/nuthatch) nest over the publisher contract. This works
 **today, with no new capability**, precisely because the publisher emits events rather than calldata.
 
 For the record, since it is the reason for the design choice above: nuthatch cannot index the V1
@@ -225,7 +225,7 @@ mirror of the canonical history.
 
 **Built and unpaid:** probe dispatch. Currently routed through E&N's gateway, which biases success
 rate upward and starves correctness of corroboration. Direct dispatch needs only the TAP receipt
-attached, and the signing machinery exists in [gib](https://github.com/nightswatchhq/gib).
+attached, and the signing machinery exists in [gib](https://github.com/nuthatch-org/gib).
 
 **Not built:** the publisher contract, the nest, and one funded escrow.
 

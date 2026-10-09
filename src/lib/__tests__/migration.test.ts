@@ -2,7 +2,7 @@
  * The check that stops the migration panel becoming a story about itself.
  *
  * A progress figure nobody verifies drifts in exactly one direction. The defect behind
- * nightswatchhq/kittiwake#23 was two lists that had to agree with nothing enforcing it, so three
+ * nuthatch-org/kittiwake#23 was two lists that had to agree with nothing enforcing it, so three
  * routes moved to production uncompared. These tests walk the filesystem and refuse to let the
  * inventory disagree with what is actually on disk, in either direction.
  */

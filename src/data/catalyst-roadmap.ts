@@ -45,7 +45,7 @@ export const CATALYST_SOURCE_POST =
  * more here than presentation.
  */
 export const CATALYST_TRACKER_URL =
-  'https://github.com/nightswatchhq/lodestar/blob/main/docs/catalyst-community-roadmap.md';
+  'https://github.com/nuthatch-org/lodestar/blob/main/docs/catalyst-community-roadmap.md';
 
 export interface CatalystProject {
   name: string;
@@ -64,7 +64,7 @@ export interface CatalystItem {
    */
   communityCeiling: number;
   /**
-   * The highest score reachable by The Night's Watch specifically, given that we build these
+   * The highest score reachable by Nuthatch specifically, given that we build these
    * services and do not operate them, and that audits and legal entities are things we recommend
    * rather than buy. The gap between this and the community ceiling is the part that needs somebody
    * else, which is the most useful thing on this card.
@@ -90,8 +90,8 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     rationale:
       'The biggest move of 28 Aug, from 25%. nutcracker implements it: contract, client crypto, provider store, local MCP shim. The design names a contradiction in the brief nobody had — end-to-end encryption and semantic recall do not compose, and the usual casualty is the encryption, via plaintext embeddings stored beside the ciphertext. It picks a keyed blind index instead and publishes measured recall rather than adjectives. It now runs: a provider binary and an MCP server you point an agent at, driven end to end in a real session where memories were sealed locally, stored, found by blinded bucket tokens and ranked after decryption. Two places where the obvious build would have been actively harmful are documented and tested against. Marked DOWN from 74% on 29 Aug after checking the retrieval half: the published recall figures were measured against uniformly random vectors, and transformer embeddings crowd into a narrow cone instead. On that geometry the false-candidate rate — which is the leakage — is 26% rather than 3%, and at severe anisotropy the index degenerates into matching everything. Mean-centring fixes it and is not yet implemented. Then measured on 30 Aug against nomic-embed-text: unrelated sentences sit at cosine 0.43, and at the default parameters the index retrieves 46% of related pairs while surfacing 22% of unrelated ones. Recall and disclosure move together and no setting buys both. Back up to 72% because the agent binary now runs a real local embedder instead of the bag-of-bytes placeholder, and refuses the three ways swapping one silently corrupts an index: a remote embedder, a changed model, and a fallback after failure.',
     projects: [
-      { name: 'nutcracker', url: 'https://github.com/nightswatchhq/nutcracker' },
-      { name: 'compass', url: 'https://github.com/nightswatchhq/compass' },
+      { name: 'nutcracker', url: 'https://github.com/nuthatch-org/nutcracker' },
+      { name: 'compass', url: 'https://github.com/nuthatch-org/compass' },
       { name: 'AI/MCP directory', url: '/ai' },
     ],
   },
@@ -103,7 +103,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     ourCeiling: 75,
     rationale:
       'gib solves the genuinely hard technical part: a working TAP v2 / Horizon gateway used to be a multi-week ordeal and is now a compose file with a smoke test. Added since: `gib onboard`, which withholds the block an indexer must paste until your own side would actually work — the whitelist handshake is slow because every failure in it is discovered by the indexer, hours later, as receipts that bounce. The remaining third is money actually flowing and a second operator choosing to run it, and we have decided not to be that operator. Added 30 Aug: the invitation now leads somewhere. becoming-an-operator.md carries the four traps that cost us afternoons — a thawing period capped near 2,418,000 seconds so 30 days is refused by a nameless error, Horizon addresses in circulation that are implementations rather than proxies and return zero instead of reverting, the authorizeSigner step, and the provision requirement — plus a fork harness so an operator can prove they get paid before spending gas.',
-    projects: [{ name: 'gib', url: 'https://github.com/nightswatchhq/gib' }],
+    projects: [{ name: 'gib', url: 'https://github.com/nuthatch-org/gib' }],
   },
   {
     slug: 'multi-product-studio',
@@ -128,7 +128,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     rationale:
       'The frontend half is largely done via the Dock. The news of 28 Aug is the protocol half: every DIPS contract is live on Arbitrum One and was fully wired on 25 August — issuance allocator, agreement manager, recurring collector, eligibility oracle — with the indexing-agreement allocation still set to zero. GIP-0088 is a governance parameter change away, not a deployment away. dips-nest indexes it and the dashboard shows it, so the moment that number moves is observable rather than announced. And the participating half turned out never to have been blocked: DIPS settles through RecurringCollector, not the query-fee path, so no gateway is involved. weaver builds and signs the agreements, and the whole accept() path is now exercised against the deployed RecurringCollector on a Sepolia fork: the happy path plus six ways it fails. That found a trap worth knowing about, because it costs a day: a payer must authorize their own key before any agreement they sign will verify, since the contract does not special-case signer == payer, and the revert blames the signature. And collect() is done too, on 30 Aug: the whole path runs against deployed Sepolia contracts, ending with the service provider actually being paid. The blocker was misstated — funded escrow is required for a broadcast, not for a fork, where GRT is dealt and the provision and deposit are ordinary calls. That leaves CAT-1 at its ceiling: what remains is a governance parameter and running pipelines we have decided not to run.',
     projects: [
-      { name: 'dips-nest', url: 'https://github.com/nightswatchhq/dips-nest' },
+      { name: 'dips-nest', url: 'https://github.com/nuthatch-org/dips-nest' },
       { name: 'The Dock', url: '/dock' },
     ],
   },
@@ -140,7 +140,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     ourCeiling: 65,
     rationale:
       'Live contract on Arbitrum One, settlement daemon, runbooks and a rehearsed end-to-end path: that is most of the engineering, and none of it moved on 28 Aug. The missing 42% is heavy — external audit, multisig ownership, a hosted gateway and oracle, and a provider actually onboarding. Code is the smaller half of shipping a data service people trust with funds. Corrected 30 Aug against the deployed bytecode: two of the three Low audit findings are already fixed. pendingOwner() answers so it is Ownable2Step, and initialize on the implementation reverts so there is nothing to front-run. Only L-01 stands, and it stopped being theoretical the same day: an empty _authorizeUpgrade lets an upgrade silently rewire the contract\'s immutables, which is exactly what WSaaS\'s deploy script did with a stray implementation and the legacy TAPCollector.',
-    projects: [{ name: 'SDSCE', url: 'https://github.com/nightswatchhq/SDSCE' }],
+    projects: [{ name: 'SDSCE', url: 'https://github.com/nuthatch-org/SDSCE' }],
   },
   {
     slug: 'rpc-service',
@@ -150,7 +150,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     ourCeiling: 60,
     rationale:
       'Marked DOWN from 60%, and it is the honest direction. Three real improvements landed on 28 Aug: the April audit was re-scoped against the current contract and its one surviving High was disproved by a proof-of-concept rather than by argument, a live filter-routing bug was fixed, and a liveness probe now exists. All of it is outweighed by discovering that Dispatch had not answered a request in 39 days. 60% described a codebase; 50% describes a codebase whose operation is at zero. The contract is live, the code is maintained, and it is open to any operator. Added 30 Aug: an audit scope somebody else can fund — the surface measured, the settled parts fenced off so nobody pays to rediscover our homework, what to audit in the order we would pay for it, and what is explicitly out of scope. A tight brief is the difference between an affordable engagement and an open-ended one, and it is a thing a group with no audit budget can still produce. Corrected 30 Aug: two addresses in this repo were dead. RPCDataService pointed at a stray implementation the proxy has never used, and that was the default in the proxy source, both example gateway configs and the address the subgraph indexed; GraphPayments pointed at an address holding no code. Both quiet failures: a receipt signed against the wrong data service verifies locally and fails at redemption, and a subgraph on a dead address syncs perfectly and returns nothing. A chain-checking guard script now catches it.',
-    projects: [{ name: 'Dispatch (GRC-005)', url: 'https://github.com/nightswatchhq/dispatch' }],
+    projects: [{ name: 'Dispatch (GRC-005)', url: 'https://github.com/nuthatch-org/dispatch' }],
   },
   {
     slug: 'chain-integrations',
@@ -162,7 +162,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     rationale:
       'Was 5% because nobody had built it. chain-integration-ds now has the contract, the metering design, an integrator runbook and a deploy script. The design changed on contact with the protocol: supporting a chain is a commitment held over time, not a request, so it settles through RecurringCollector rather than per-query receipts — the Recurring Collection Agreement already has fields for an integration fee and an ongoing retainer. It does not go higher because nothing is deployed, and because the value-capture policy, which is most of what this item is, remains Council\'s. Fixed on 30 Aug: the contract could not be paid at all. It called the RecurringCollector to collect but never to accept, and accept is callable only by the data service an agreement names, so an agreement written for it could be accepted by nobody. Sixteen tests were silent because they ran against a mock that modelled no rule. Proven against the deployed collector on a Sepolia fork, then closed. The rehearsal that proved the fix then found a second fatal defect: collect() encoded four fields against a six-field struct, so every real collection would have reverted, and the mock was green because it stored the calldata without decoding it. Both fixed; the contract is now paid end to end against deployed contracts.',
     projects: [
-      { name: 'chain-integration-ds', url: 'https://github.com/nightswatchhq/chain-integration-ds' },
+      { name: 'chain-integration-ds', url: 'https://github.com/nuthatch-org/chain-integration-ds' },
     ],
   },
   {
@@ -175,7 +175,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
     rationale:
       'Still mostly business development: SOC 2 and SLAs need a legal entity, which is not an engineering problem, and no repo pre-builds relationships with auditors. But the "deterministic ground-truth pipeline" this item asks for turned out not to be greenfield. nuthatch has been producing content-addressed sealed segments with a provenance stamp — the block an answer was true as of, how far the nest had sealed, the registry hash that decoded it — on a live box for six weeks. What was missing was a way to hand an answer to someone who does not trust you, and tattler is that: signed receipts you can verify offline, and replay against a different nest. Proven across two independently backfilled nests that both index TokensDelegated, which produced the identical hash. The finding underneath it is that an answer must pin its block, because nuthatch serves sealed history plus a moving tip and an unpinned answer cannot be reproduced by anyone, including whoever took it. And since 30 Aug the advisory half exists: institutional-readiness.md says what a body that has an entity should actually do, backed by measured SLOs from our own infrastructure rather than a framework — the SOC 2 observation window is calendar-bound so the clock starts in Q1 even if the code lands in Q4, and a signature makes tampering detectable while only replay makes lying detectable. Receipts now cover declared queries too, asked by name and typed arguments, and a named receipt replays by name: the other endpoint answers using its own definition rather than being asked to agree with your SQL, which is the only way a disagreement about the question itself can surface. And since 30 Aug a receipt can be disclosed from rather than only verified: every receipt commits to a Merkle root over the same sorted row hashes the result hash already folds together, so one row can be proved to have been in an answer without the answer being handed over. One delegation out of 34 is 1,991 bytes against the receipt\'s 10,271. The limit is stated on the page rather than buried: the leaves are not salted, so a neighbouring row can be guessed at by hashing it, which is no help against an address or a uint256 and trivial against a low-cardinality column.',
     projects: [
-      { name: 'tattler', url: 'https://github.com/nightswatchhq/tattler' },
+      { name: 'tattler', url: 'https://github.com/nuthatch-org/tattler' },
       { name: 'Verify a receipt', url: '/verify' },
     ],
   },
@@ -184,7 +184,7 @@ export const CATALYST_ITEMS: CatalystItem[] = [
 export interface CatalystSummary {
   /** Unweighted mean of every item score. */
   overall: number;
-  /** Mean of what The Night's Watch alone could reach. */
+  /** Mean of what Nuthatch alone could reach. */
   ourCeiling: number;
   /** Mean of what the community could reach with other people running things. */
   communityCeiling: number;

@@ -399,7 +399,7 @@ export default function DataServicesPage() {
           label="Built, awaiting an operator"
           value={String(stats.awaitingOperator)}
           subtitle="Deployed contracts, nobody serving"
-          tooltip="Services that are finished and unclaimed. The contracts are deployed and the code is maintained; nobody is running them, because The Night's Watch builds these services and does not operate them. This card said 'Lodestar services live' until 30 August, which described an arrangement that had already been retired by decision."
+          tooltip="Services that are finished and unclaimed. The contracts are deployed and the code is maintained; nobody is running them, because Nuthatch builds these services and does not operate them. This card said 'Lodestar services live' until 30 August, which described an arrangement that had already been retired by decision."
         />
       </StatGrid>
 
@@ -408,7 +408,7 @@ export default function DataServicesPage() {
       <Card className="my-4 border-[var(--accent)]">
         <h2 className="text-sm font-semibold text-[var(--text)] mb-1">Indexers: several of these are yours for the taking</h2>
         <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-          The Night&apos;s Watch builds data services and does not operate them. A box, a domain, a
+          Nuthatch builds data services and does not operate them. A box, a domain, a
           bill and an on-call rota, indefinitely, per service, is a different job from writing the
           thing — so several of the services below are finished, deployed on Arbitrum One, with the
           payment path rehearsed against real Horizon contracts, and nobody serving.
@@ -417,7 +417,7 @@ export default function DataServicesPage() {
           That is not a gap we are hiding. It is the offer. If you index and fancy testing one, the
           contracts are live, the runbooks are written, and{' '}
           <a
-            href="https://github.com/nightswatchhq/gib"
+            href="https://github.com/nuthatch-org/gib"
             target="_blank"
             rel="noreferrer"
             className="text-[var(--accent)] hover:underline"
@@ -426,7 +426,7 @@ export default function DataServicesPage() {
           </a>{' '}
           exists so your first hour is not wasted. Start with{' '}
           <a
-            href="https://github.com/nightswatchhq/lodestar/blob/main/docs/becoming-an-operator.md"
+            href="https://github.com/nuthatch-org/lodestar/blob/main/docs/becoming-an-operator.md"
             target="_blank"
             rel="noreferrer"
             className="text-[var(--accent)] hover:underline"

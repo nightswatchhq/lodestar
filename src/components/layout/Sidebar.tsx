@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { NightsWatchCTA } from '@/components/NightsWatchCTA';
+import { NuthatchCTA } from '@/components/NuthatchCTA';
 
 interface NavItem {
   label: string;
@@ -407,8 +407,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* The Night's Watch — community CTA (dismissable per session) */}
-      <NightsWatchCTA />
+      {/* Nuthatch — community CTA (dismissable per session) */}
+      <NuthatchCTA />
 
     </aside>
   );

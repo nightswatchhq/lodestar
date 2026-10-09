@@ -1,7 +1,7 @@
 # Project Catalyst: Community Roadmap
 
 > Last updated: 2026-08-28
-> Owner: Pete / The Night's Watch
+> Owner: Pete / Nuthatch
 > Scope: the eight Project Catalyst roadmap items, tracked as one programme rather than eight essays.
 >
 > **Status legend:** ✅ Done · 🟡 In progress · ⬜ Not started · 🔒 Foundation-gated · ❓ Unverified
@@ -30,7 +30,7 @@ detail still lives in each repo.
   keeping them in sync is itself a task.
 
 **There are no effort estimates or budgets in this document, deliberately.** The point of the
-exercise is that The Night's Watch moves all eight of these items on zero funding, in the open,
+exercise is that Nuthatch moves all eight of these items on zero funding, in the open,
 under permissive licences. Costing the work in person-weeks invites the question of who is paying
 for it, and the answer is nobody. It gets done because it gets done.
 
@@ -49,7 +49,7 @@ audits: it needs money and a legal entity, which is why it sits at an 80% ceilin
 
 ## Operating model: we develop, we do not operate
 
-**Decided 2026-08-28.** The Night's Watch builds these services. It does not run them.
+**Decided 2026-08-28.** Nuthatch builds these services. It does not run them.
 
 Running a data service means a box, a domain, a bill and an on-call rota, indefinitely, per
 service. That is a different business from writing the software, and it is the one we are not in.
@@ -121,7 +121,7 @@ recording the cut, which is the ordinary way a document starts lying: not by sta
 by keeping a sentence that was true when it was written.
 
 **CAT-7: 6% → 35%.** The engineering that was at zero this morning is largely done —
-[chain-integration-ds](https://github.com/nightswatchhq/chain-integration-ds) has the contract,
+[chain-integration-ds](https://github.com/nuthatch-org/chain-integration-ds) has the contract,
 16 tests, the design note, the integrator runbook and a deploy script. It does not move further
 because **nothing is deployed and nothing has ever collected**, and because this item's own risk
 note says it "is more a business-model/governance problem than an engineering one": the
@@ -134,7 +134,7 @@ around from outside.
 ### CAT-5 50% → 55%: an audit brief somebody else can fund
 
 The re-cut ceiling named the deliverable — *"the re-scoped audit brief, not the audit"* — so it has
-been written. [`dispatch/docs/audit-scope.md`](https://github.com/nightswatchhq/dispatch/blob/main/docs/audit-scope.md).
+been written. [`dispatch/docs/audit-scope.md`](https://github.com/nuthatch-org/dispatch/blob/main/docs/audit-scope.md).
 
 The point of a scope document is that it makes an audit **cheap to buy and hard to waste**, which is
 the most useful thing available to a group with no budget for one. It carries the surface measured
@@ -196,7 +196,7 @@ its collector. Two auditors called this Low; one of ours had done it.
 
 **Fixed once, properly, where it could be tested.** `chain-integration-ds` is the only one of the
 six with a Foundry harness, so the guard went there:
-[`8542148`](https://github.com/nightswatchhq/chain-integration-ds). `_authorizeUpgrade` asks the
+[`8542148`](https://github.com/nuthatch-org/chain-integration-ds). `_authorizeUpgrade` asks the
 candidate for its `RECURRING_COLLECTOR()` and refuses a mismatch. The property that makes immutables
 dangerous is what makes them checkable, because being in bytecode means the candidate can be asked
 directly before adoption. Five tests: the same collector passes, a different one reverts and leaves
@@ -848,10 +848,10 @@ wrong and are corrected here.** Fix them before any of this is quoted externally
 
 ### Corrections
 
-1. **`nightswatchhq` is entirely public.** The report's caveat that the org "exposes few or no
+1. **`nuthatch-org` is entirely public.** The report's caveat that the org "exposes few or no
    public repos" is false: all 83 repos are PUBLIC, including `gib`, `dispatch`, `compass`,
    `seahorn`, `SDSCE`, `gateway`, `liminal`, `polaris`, `graphite` and every nest. Nothing in this
-   programme needs to be taken on trust. Verified: `gh repo list nightswatchhq --limit 100`.
+   programme needs to be taken on trust. Verified: `gh repo list nuthatch-org --limit 100`.
 
 2. **Seahorn is deployed, not pre-deployment.** The report says `SolanaDataService.sol` is
    "written, not yet deployed, so no on-chain address exists yet". It is live on Arbitrum One:
@@ -961,7 +961,7 @@ is per-service rot, not an infrastructure failure. **SDSCE** and **WSaaS** also 
 "Live · Production" but advertise no endpoint at all, so nobody can check them; SDSCE's own README
 says it is "not usable end-to-end until at least one provider self-onboards", which contradicts
 the catalogue. Write-up:
-[`dispatch/docs/outage-2026-08-28.md`](https://github.com/nightswatchhq/dispatch/blob/main/docs/outage-2026-08-28.md).
+[`dispatch/docs/outage-2026-08-28.md`](https://github.com/nuthatch-org/dispatch/blob/main/docs/outage-2026-08-28.md).
 
 **2026-08-28 amendment: the risk is worse than one provider.** Dispatch had two registered
 providers and zero serving ones for 39 days without anyone noticing, because everything we monitor
@@ -1173,7 +1173,7 @@ can be validated while the subject has not happened yet.
   - [x] Deploy `dips-nest` to Helsinki behind `/dips/sql` and wire `NUTHATCH_DIPS`.
         `nuthatch-dips.service` on `127.0.0.1:8104`, Caddy `handle_path /dips/*`, backfills in 5s
         with `--window 50000 --seal-direct --concurrency 4`. Repo:
-        [nightswatchhq/dips-nest](https://github.com/nightswatchhq/dips-nest).
+        [nuthatch-org/dips-nest](https://github.com/nuthatch-org/dips-nest).
   - [x] Allocation-split panel: current targets and rates, and the moment DefaultAllocation moves
         off zero. Live on the homepage. `DefaultAllocation`'s zero is labelled *"no allocation
         event; zero by absence"* rather than rendered as a measured figure, because it has never
@@ -1196,7 +1196,7 @@ can be validated while the subject has not happened yet.
         cancelled matching the 4 on chain, and 892.3282 GRT collected, agreeing exactly with an
         independent raw sum of the collection logs.
   - [ ] Deploy `dips-nest-sepolia` to Helsinki. Config authored in
-        [nightswatchhq/dips-nest#1](https://github.com/nightswatchhq/dips-nest/pull/1). It buys the
+        [nuthatch-org/dips-nest#1](https://github.com/nuthatch-org/dips-nest/pull/1). It buys the
         `/sql` path itself: exact table and column names, the `_dec` companions and the provenance
         envelope, none of which the RPC validation above exercises.
   - [x] Alert on the split changing. It is the starting gun for the rest of this workstream.
@@ -1223,7 +1223,7 @@ can be validated while the subject has not happened yet.
         directly. A cron comparing the two, alerting on divergence, is the only thing that can
         catch a missed event — and the invariant is exact: the allocator rates must sum to
         `getIssuancePerBlock()`. That check is what found the totalling bug fixed on 2026-09-02.
-- [x] **Agreement tooling: [nightswatchhq/weaver](https://github.com/nightswatchhq/weaver).**
+- [x] **Agreement tooling: [nuthatch-org/weaver](https://github.com/nuthatch-org/weaver).**
       13 Rust tests and 10 Foundry fork tests. Builds, hashes, signs and checks Recurring
       Collection Agreements — the actual
       GIP-0087 path, replacing the "Dipper client in the gateway" task below, which was written
@@ -1308,7 +1308,7 @@ lose issuance rewards.
 gib is the near-complete artifact. The gap is turning a smoke-tested topology into a gateway that
 has actually settled a paid query on-chain.
 
-**What is already true, verified.** gib v0.2, MIT, built on the `nightswatchhq/gateway` fork plus
+**What is already true, verified.** gib v0.2, MIT, built on the `nuthatch-org/gateway` fork plus
 graph-tally aggregator and escrow-manager, Redpanda, optional Prometheus/Grafana. ~570 MB full
 stack on a 2 GB box. `gib smoke` runs green from a clean stranger deploy against the published GHCR
 image. Ships payment-safe by default (`PAYMENT_REQUIRED=false`, `ESCROW_DRY_RUN=true`).
@@ -1387,7 +1387,7 @@ reusable write/store primitive.
 ### Tasks
 
 - [x] **`MemoryDataService.sol`.** Done 2026-08-28:
-      [nightswatchhq/nutcracker](https://github.com/nightswatchhq/nutcracker). 15 tests.
+      [nuthatch-org/nutcracker](https://github.com/nuthatch-org/nutcracker). 15 tests.
       **The plan said "registry keyed on memory-namespace rather than subgraph deployment". Do not
       do that.** A public registry of namespaces leaks who keeps memory, with which provider, how
       much, and since when — permanently, against an address. The registry is of **providers,
@@ -1399,7 +1399,7 @@ reusable write/store primitive.
         provider's forget-to-write ratio is a public number — the only observable a user has that
         deletion happens at all.
 - [x] **The design, which is where this workstream actually is.**
-      [`docs/design.md`](https://github.com/nightswatchhq/nutcracker/blob/main/docs/design.md).
+      [`docs/design.md`](https://github.com/nuthatch-org/nutcracker/blob/main/docs/design.md).
       **The brief contains a contradiction nobody has named:** end-to-end encryption and semantic
       recall do not compose. `memory.search` means comparing a query against stored memories; E2E
       means the provider cannot read them. Every product claiming both gives one up, and the usual
@@ -1594,7 +1594,7 @@ advertised endpoint answers**: `rpc.cargopete.com` fails its TLS handshake, and 
 provider's two Railway endpoints return "Application not found". The gateway host has no dispatch
 process, container, unit or directory on it at all; its reverse-proxy entry was dropped from the
 Caddyfile on **2026-07-20**, so this has been down for 39 days. Full write-up:
-[`dispatch/docs/outage-2026-08-28.md`](https://github.com/nightswatchhq/dispatch/blob/main/docs/outage-2026-08-28.md).
+[`dispatch/docs/outage-2026-08-28.md`](https://github.com/nuthatch-org/dispatch/blob/main/docs/outage-2026-08-28.md).
 
 Score held at 62% pending a decision, not lowered: the contract, the registrations and the code are
 all intact and the settlement path was proven historically. But **62% describes a service that is
@@ -1618,7 +1618,7 @@ issuance. No trusted state roots. UUPS, `OwnableUpgradeable`, pause guardian, `w
 ### Tasks
 
 - [x] **Audit re-scope.** ✅ Done 2026-08-28. Full disposition at
-      [`dispatch/docs/audit-disposition.md`](https://github.com/nightswatchhq/dispatch/blob/main/docs/audit-disposition.md).
+      [`dispatch/docs/audit-disposition.md`](https://github.com/nuthatch-org/dispatch/blob/main/docs/audit-disposition.md).
       **No finding from the April assessment describes a live vulnerability in the current
       contract.**
   - [x] Re-ran all seven findings against the current 365-line contract.
@@ -1751,7 +1751,7 @@ per-panel fallback to the gateway.
         alone is not enough: the node's guards are "self-protection, not a security boundary" — they
         bound one query's cost and say nothing about which questions the surface answers at all.
   - [x] Five declared queries across `staking` and `dips`, **every one pinned to a block**, so every
-        answer is reproducible and can carry a [receipt](https://github.com/nightswatchhq/tattler).
+        answer is reproducible and can carry a [receipt](https://github.com/nuthatch-org/tattler).
         A name is the unit two parties can agree on; an ad-hoc SELECT from six months ago is not.
   - [x] **Only `int` and `address` parameters**, because both have a total validating parse into a
         form with no escaping hazard. `text` is deliberately absent, and the reasoning is nuthatch's
@@ -1795,7 +1795,7 @@ Foundation adopts it rather than rebuilds it**, funded against the GIP-0089 Inno
 ### Tasks
 
 - [x] **Metering spec + contract.** Done 2026-08-28:
-      [nightswatchhq/chain-integration-ds](https://github.com/nightswatchhq/chain-integration-ds).
+      [nuthatch-org/chain-integration-ds](https://github.com/nuthatch-org/chain-integration-ds).
       **The design changed on contact with the protocol.** Not the compass template and not
       GraphTallyCollector: supporting a chain is a commitment held over time, not a request, so it
       settles through **`RecurringCollector`** (`0xff0dc731…`, live on Arbitrum One, built for
@@ -1824,7 +1824,7 @@ Foundation adopts it rather than rebuilds it**, funded against the GIP-0089 Inno
       cheap, because `IntegrationFeesCollected` carries the CAIP-2 id so the panel is a query over
       one event rather than a join against a registry.
 - [x] **Reference integrator flow.** Done:
-      [`docs/integrator-runbook.md`](https://github.com/nightswatchhq/chain-integration-ds/blob/main/docs/integrator-runbook.md).
+      [`docs/integrator-runbook.md`](https://github.com/nuthatch-org/chain-integration-ds/blob/main/docs/integrator-runbook.md).
       End to end for both parties, with the failure table. Plus `Deploy.s.sol` (atomic initialise;
       an uninitialised proxy is front-runnable) carrying the canonical `RecurringCollector`
       addresses for both networks.
@@ -1887,7 +1887,7 @@ SOC 2 Type II or ISO 27001.
       lineage-tagged, hash-anchored substrate this item describes, and it has been running on
       Helsinki for six weeks. What was missing was a way to hand an answer to someone who does not
       trust you.
-  - [x] **[nightswatchhq/tattler](https://github.com/nightswatchhq/tattler)**, 20 tests. Signed,
+  - [x] **[nuthatch-org/tattler](https://github.com/nuthatch-org/tattler)**, 20 tests. Signed,
         replayable receipts: `attest` signs an answer, `verify` checks offline that nothing was
         edited, `replay` re-runs the question against another nest and compares.
   - [x] **Proven across two independently built nests.** `staking` and `legacy-flows` on the
@@ -2057,7 +2057,7 @@ The card's *rationales* are still editorial and argued in prose. The numbers are
   trigger had fired five months earlier, unnoticed) and unblocks the observable half of CAT-1.
 - **2026-08-28**: created. Ground-truth pass against `gib`, `dispatch`, `SDSCE`, `compass`,
   `seahorn` and Arbitrum One. Corrected three claims from the source research report: the
-  `nightswatchhq` org is fully public, Seahorn is deployed on mainnet, and the Dispatch address in
+  `nuthatch-org` org is fully public, Seahorn is deployed on mainnet, and the Dispatch address in
   circulation is a superseded implementation rather than the live proxy. Established that the
   2026-04-15 Dispatch audit targets a since-deleted contract and that two of its three High findings
   no longer apply.

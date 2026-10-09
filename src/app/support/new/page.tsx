@@ -6,7 +6,7 @@ import NewIssueForm from './NewIssueForm';
 export const metadata: Metadata = {
   title: 'File a support issue | Lodestar',
   description:
-    'File an issue against nightswatchhq/graph-support: community triage for The Graph, where you get a root cause, a workaround, or the name of whoever can actually fix it.',
+    'File an issue against nuthatch-org/graph-support: community triage for The Graph, where you get a root cause, a workaround, or the name of whoever can actually fix it.',
 };
 
 /**
@@ -35,14 +35,14 @@ export default async function NewIssuePage({
         <p className="mt-3 max-w-2xl text-[var(--text-muted)]">
           It goes to{' '}
           <a
-            href="https://github.com/nightswatchhq/graph-support"
+            href="https://github.com/nuthatch-org/graph-support"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[var(--accent-text)] hover:underline"
           >
-            nightswatchhq/graph-support
+            nuthatch-org/graph-support
           </a>
-          , community triage run by The Night&rsquo;s Watch. You get a root cause, a workaround, or
+          , community triage run by Nuthatch. You get a root cause, a workaround, or
           the name of the party who can actually fix it, and the thread stays public so the next
           person finds it. You can file it here without a GitHub account, or open it on GitHub under
           your own name, which is the better of the two if you have one.

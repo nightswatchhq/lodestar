@@ -6,12 +6,12 @@ import SupportArchive from './SupportArchive';
 export const metadata: Metadata = {
   title: 'Support | Lodestar',
   description:
-    'Worked answers for The Graph: root causes, workarounds, and who can actually fix it. Read live from the nightswatchhq/graph-support archive.',
+    'Worked answers for The Graph: root causes, workarounds, and who can actually fix it. Read live from the nuthatch-org/graph-support archive.',
 };
 
-const REPO_URL = 'https://github.com/nightswatchhq/graph-support';
+const REPO_URL = 'https://github.com/nuthatch-org/graph-support';
 const DISCORD_URL = 'https://discord.gg/CQewvyJ69Y';
-const LODESTAR_ISSUES_URL = 'https://github.com/nightswatchhq/lodestar/issues';
+const LODESTAR_ISSUES_URL = 'https://github.com/nuthatch-org/lodestar/issues';
 
 export default function SupportPage() {
   return (
@@ -36,9 +36,9 @@ export default function SupportPage() {
             rel="noopener noreferrer"
             className="text-[var(--accent-text)] hover:underline"
           >
-            nightswatchhq/graph-support
+            nuthatch-org/graph-support
           </a>
-          , which is run by The Night&rsquo;s Watch and is not Edge &amp; Node or the Foundation.
+          , which is run by Nuthatch and is not Edge &amp; Node or the Foundation.
         </p>
       </div>
 
@@ -57,7 +57,7 @@ export default function SupportPage() {
             rel="noopener noreferrer"
             className="text-[var(--accent-text)] hover:underline"
           >
-            the Night&rsquo;s Watch Discord
+            the Nuthatch Discord
           </a>{' '}
           to talk it through while someone is looking. For a bug in Lodestar itself rather than in
           the protocol, use{' '}

@@ -1,7 +1,7 @@
 /**
  * The graph-support archive, as this dashboard reads it.
  *
- * nightswatchhq/graph-support closes issues with a root cause and a worked case attached, and
+ * nuthatch-org/graph-support closes issues with a root cause and a worked case attached, and
  * until now the only way to find one was to already think of searching GitHub. The grouping here
  * is the repo's own label taxonomy (its `TRIAGE.md`): `area/*` for what broke, `owner/*` for who
  * can actually fix it, and a disposition label set on close.
@@ -143,7 +143,7 @@ const OWNER_ORDER: readonly { key: string; label: string; blurb: string }[] = [
   },
   {
     key: 'owner/watch',
-    label: "The Night's Watch",
+    label: "Nuthatch",
     blurb: 'Ours. If one of these is stuck, saying so in the thread is the fastest way to move it.',
   },
   {

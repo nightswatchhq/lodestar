@@ -45,7 +45,7 @@ describe('the link into GitHub', () => {
   it('names the template file, which is what sets the labels', () => {
     const url = new URL(newIssueUrl(ISSUE_TEMPLATES[0]));
     expect(url.origin + url.pathname).toBe(
-      'https://github.com/nightswatchhq/graph-support/issues/new',
+      'https://github.com/nuthatch-org/graph-support/issues/new',
     );
     expect(url.searchParams.get('template')).toBe('01-query-error.yml');
   });
@@ -70,7 +70,7 @@ describe('the link into GitHub', () => {
 
   it('offers GitHub’s own chooser as the way out', () => {
     expect(CHOOSER_URL).toBe(
-      'https://github.com/nightswatchhq/graph-support/issues/new/choose',
+      'https://github.com/nuthatch-org/graph-support/issues/new/choose',
     );
   });
 });

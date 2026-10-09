@@ -24,7 +24,7 @@ import {
 function issue(overrides: Partial<SupportIssue> & Pick<SupportIssue, 'number'>): SupportIssue {
   return {
     title: `issue ${overrides.number}`,
-    url: `https://github.com/nightswatchhq/graph-support/issues/${overrides.number}`,
+    url: `https://github.com/nuthatch-org/graph-support/issues/${overrides.number}`,
     state: 'open',
     labels: [],
     comments: 0,

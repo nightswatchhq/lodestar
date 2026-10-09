@@ -2,7 +2,7 @@
  * How much of the API has moved to kittiwake, and how much is still Next.
  *
  * This file is the single list. `src/proxy.ts` imports `MIGRATED` from here rather than keeping
- * its own copy, because the defect behind nightswatchhq/kittiwake#23 was exactly two lists that
+ * its own copy, because the defect behind nuthatch-org/kittiwake#23 was exactly two lists that
  * had to agree and nothing enforcing it: three routes sat in the proxy's list and in no harness,
  * so they moved to production unchecked and answered 200 with a payload the frontend could not
  * read. One list cannot disagree with itself.
@@ -317,7 +317,7 @@ export const BACKEND_ONLY: readonly string[] = [
  * that assumption against `MIGRATED` rather than trusting it.
  */
 const UNMIGRATED: readonly RouteRecord[] = [
-  // ── The Dock: nightswatchhq/kittiwake#16 ──────────────────────────────────
+  // ── The Dock: nuthatch-org/kittiwake#16 ──────────────────────────────────
                   
   // ── The disassembler, onto wasmtime with fuel and epoch limits: kittiwake#18
     

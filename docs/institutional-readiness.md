@@ -1,6 +1,6 @@
 # What a body with an entity should actually do
 
-**A recommendation, not a plan.** The Night's Watch has no legal entity, will not acquire one, and
+**A recommendation, not a plan.** Nuthatch has no legal entity, will not acquire one, and
 cannot hold a SOC 2 certification or sign an SLA. So this is the other thing available to us: to
 have gone far enough down the road to say precisely what somebody who *can* should do, and where the
 work is harder than it looks.
@@ -98,7 +98,7 @@ against something that was not produced by the people I am checking". Three piec
 - **Content-addressed, lineage-tagged chain data.** A nuthatch nest produces sealed segments with a
   provenance stamp: the block an answer was true as of, how far the nest had sealed, and the
   registry hash that decoded it. Six weeks running on ordinary hardware.
-- **Signed, replayable receipts** ([tattler](https://github.com/nightswatchhq/tattler)). An answer
+- **Signed, replayable receipts** ([tattler](https://github.com/nuthatch-org/tattler)). An answer
   can be signed, verified offline by anyone, and **replayed** against a different operator's nest.
   Verified across two independently backfilled nests producing an identical hash.
 - **A browser verifier** ([`/verify`](https://www.lodestar-dashboard.com/verify)) that runs the same

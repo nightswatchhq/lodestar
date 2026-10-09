@@ -7,7 +7,7 @@ import { useDismissible } from '@/hooks/useDismissible';
 const STORAGE_KEY = 'lodestar:nights-watch-cta-dismissed';
 const INVITE_URL = 'https://discord.gg/484vgDETEZ';
 
-export function NightsWatchCTA() {
+export function NuthatchCTA() {
   const { dismissed, dismiss } = useDismissible(STORAGE_KEY);
 
   if (dismissed) return null;
@@ -36,17 +36,17 @@ export function NightsWatchCTA() {
           className="block group transition-transform active:scale-[0.98]"
         >
           <div className="flex items-center gap-2 pr-5">
-            <span className="text-[15px] leading-none" aria-hidden="true">⚔️</span>
-            <span className="text-[13px] font-semibold text-[var(--text)]">The Night&apos;s Watch</span>
+
+            <span className="text-[13px] font-semibold text-[var(--text)]">Nuthatch</span>
           </div>
           <p className="mt-1 text-[11px] text-[var(--text-muted)] leading-snug">
-            The Night&apos;s Watch is an open community of people who believe in The Graph&apos;s original vision of an open, permissionless and thriving network for all ecosystem participants.
+            Nuthatch is an open community of people who believe in The Graph&apos;s original vision of an open, permissionless and thriving network for all ecosystem participants.
           </p>
           <span
             className="mt-2 inline-flex items-center justify-center w-full px-3 py-1.5 text-[12px] font-medium rounded-[var(--radius-button)] transition-[filter] group-hover:brightness-110"
             style={{ background: 'var(--accent)', color: '#fff' }}
           >
-            Join the Watch →
+            Join the Discord →
           </span>
         </a>
       </div>
