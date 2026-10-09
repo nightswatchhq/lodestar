@@ -54,10 +54,10 @@ export function Footer() {
               rel="noopener noreferrer"
               className="text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"
             >
-              {'⚔️'} The Night&apos;s Watch
+              Nuthatch
             </a>
             <a
-              href="https://github.com/nightswatchhq/lodestar"
+              href="https://github.com/nuthatch-org/lodestar"
               target="_blank"
               rel="noopener noreferrer"
               className="text-[var(--text-muted)] hover:text-[var(--accent-text)] transition-colors"

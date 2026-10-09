@@ -210,7 +210,7 @@ the denominator. See `nuthatch#1083`.
       features that only existed to relay someone else's query through the gateway were removed
       rather than kept on an exception, and the key is deleted from Vercel.
 - [ ] Expose `seal-direct` backfill progress through `/metrics` and the TUI. Tracked in
-      [nuthatch#807](https://github.com/nightswatchhq/nuthatch/issues/807).
+      [nuthatch#807](https://github.com/nuthatch-org/nuthatch/issues/807).
 
 The final checkbox is intentionally last. Deleting the Graph dependency before the individual data
 families are indexed would not be a migration. It would be an outage with excellent intentions.

@@ -2,7 +2,7 @@
 
 **Status:** Draft · **Author:** Pete · **Created:** 2026-09-08
 **Relation:** precedes the `the Dock` block in `docs/MIGRATION.md` (0/9 routes). Touches no server route.
-**Tracking:** nightswatchhq/lodestar#129
+**Tracking:** nuthatch-org/lodestar#129
 
 ## TL;DR
 

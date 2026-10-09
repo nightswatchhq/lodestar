@@ -102,7 +102,7 @@ stake → provision (toward the SubstreamsDataService proxy) → register()
 
 `register()` reverts with `ProvisionManagerProvisionNotFound` until your provision exists; that's expected, not a bug. Once registered, you're collectible.
 
-Every command, flag, and `cast` invocation is in the [deployment & onboarding runbook](https://github.com/nightswatchhq/SDSCE/blob/main/docs/arb-one-deployment-runbook.md). The [README quickstart](https://github.com/nightswatchhq/SDSCE#quickstart-self-onboarding-on-arbitrum-one) is the tight version.
+Every command, flag, and `cast` invocation is in the [deployment & onboarding runbook](https://github.com/nuthatch-org/SDSCE/blob/main/docs/arb-one-deployment-runbook.md). The [README quickstart](https://github.com/nuthatch-org/SDSCE#quickstart-self-onboarding-on-arbitrum-one) is the tight version.
 
 ## How consumers stream
 
@@ -119,8 +119,8 @@ The honest framing: SDSCE is a *whitelisted soft launch*, not the permissionless
 
 But the rail is live, and it burns. If you run Substreams infrastructure and want to sell access for TAP receipts on Arbitrum One, you can join today.
 
-- **Repo:** [github.com/nightswatchhq/SDSCE](https://github.com/nightswatchhq/SDSCE)
-- **README & quickstart:** [github.com/nightswatchhq/SDSCE#readme](https://github.com/nightswatchhq/SDSCE#readme)
-- **Deployment runbook:** [docs/arb-one-deployment-runbook.md](https://github.com/nightswatchhq/SDSCE/blob/main/docs/arb-one-deployment-runbook.md)
+- **Repo:** [github.com/nuthatch-org/SDSCE](https://github.com/nuthatch-org/SDSCE)
+- **README & quickstart:** [github.com/nuthatch-org/SDSCE#readme](https://github.com/nuthatch-org/SDSCE#readme)
+- **Deployment runbook:** [docs/arb-one-deployment-runbook.md](https://github.com/nuthatch-org/SDSCE/blob/main/docs/arb-one-deployment-runbook.md)
 
 Come break it. Tell us what you find.

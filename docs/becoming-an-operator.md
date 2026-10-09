@@ -4,7 +4,7 @@ Several data services in the catalogue are finished, deployed on Arbitrum One, a
 is what actually stands between you and serving one, written from having done it rather than from
 the contracts.
 
-**Nothing is asked in return.** The Night's Watch builds these and does not operate them. If you run
+**Nothing is asked in return.** Nuthatch builds these and does not operate them. If you run
 one, it is yours.
 
 ---
@@ -129,7 +129,7 @@ You do not need funds to find out whether any of this works. On a fork you can m
 collection end to end.
 
 `horizon-skills` ships a base class for exactly this
-([`HorizonForkTest.sol`](https://github.com/nightswatchhq/horizon-skills)), carrying all four traps
+([`HorizonForkTest.sol`](https://github.com/nuthatch-org/horizon-skills)), carrying all four traps
 above so you meet them in a test rather than in a transaction:
 
 ```solidity

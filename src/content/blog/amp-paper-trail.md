@@ -28,7 +28,7 @@ I should declare an interest immediately, because it becomes relevant around the
 | **Feb 2026** | Community architecture write-ups appear. Amp adds Solana support. |
 | **Early–mid 2026** | Repositioning around enterprise compliance: GENIUS Act, SOC 2, the `ampersend` agent-payments product. The repo goes private. Distribution moves to the `ampup.sh` installer and a token-gated releases API. |
 | **5 May 2026** | `ghcr.io/edgeandnode/amp:latest` tagged **v0.0.36**. Still the newest publicly obtainable binary. |
-| **6–7 Jun 2026** | `nightswatchhq/amp` archived and deprecated. `lodestar-team/camp-node` v0.2.0 released. |
+| **6–7 Jun 2026** | `nuthatch-org/amp` archived and deprecated. `lodestar-team/camp-node` v0.2.0 released. |
 
 Edge & Node's own SmartCon video is unambiguous about the framing: "At SmartCon 2025, Rodrigo Coelho, CEO of Edge & Node… unveiled Amp, the world's first blockchain-native database." The launch blog puts the scale context at 1.27 trillion queries served to more than 75,000 projects.
 
@@ -58,8 +58,8 @@ The `setup-amp` README is the most quietly informative document in that list, be
 
 **Third-party, all BUSL-1.1:**
 
-- `nightswatchhq/camp-node` and `lodestar-team/camp-node`, the live fork.
-- `nightswatchhq/amp`, deprecated, archived 6 June 2026, pointing at camp-node.
+- `nuthatch-org/camp-node` and `lodestar-team/camp-node`, the live fork.
+- `nuthatch-org/amp`, deprecated, archived 6 June 2026, pointing at camp-node.
 - `aUsABuisnessman/amp`, the fork-network root.
 - `engine.camp`, a free keyless REST/SQL API running `ampd` against Arbitrum One.
 
@@ -67,11 +67,11 @@ The `setup-amp` README is the most quietly informative document in that list, be
 
 This is the part where people either take my word for it or do not, so here are the identifiers, which are checkable without my involvement.
 
-The fork network root of `nightswatchhq/amp` is `aUsABuisnessman/amp`, GitHub `network_root_id` **1101719220**. `nightswatchhq/amp` itself is repo id **1250506772**, carried 1,313 commits, and was archived on 6 June 2026 marked "DEPRECATED - moved to a clean standalone repo."
+The fork network root of `nuthatch-org/amp` is `aUsABuisnessman/amp`, GitHub `network_root_id` **1101719220**. `nuthatch-org/amp` itself is repo id **1250506772**, carried 1,313 commits, and was archived on 6 June 2026 marked "DEPRECATED - moved to a clean standalone repo."
 
-That clean repo is `camp-node`, repo id **1261433744**. That single id is shared by both `lodestar-team/camp-node` and `nightswatchhq/camp-node`, which is the useful bit: **an identical repository id means the repo was transferred or renamed between the two orgs, not independently re-created.** One repository, two names, no clean-room story.
+That clean repo is `camp-node`, repo id **1261433744**. That single id is shared by both `lodestar-team/camp-node` and `nuthatch-org/camp-node`, which is the useful bit: **an identical repository id means the repo was transferred or renamed between the two orgs, not independently re-created.** One repository, two names, no clean-room story.
 
-The two copies are at different points. `nightswatchhq/camp-node` is the current one at 29 commits, carrying the Postgres-wire server, the keyless `pinax` source, Cloudflare R2 support, `bench/`, `ROADMAP.md` and `benchmarking-against-amp.md`. `lodestar-team/camp-node` sits at 3 commits with releases v0.1.0 and v0.2.0. The tree is roughly 80% Rust, 20% TypeScript.
+The two copies are at different points. `nuthatch-org/camp-node` is the current one at 29 commits, carrying the Postgres-wire server, the keyless `pinax` source, Cloudflare R2 support, `bench/`, `ROADMAP.md` and `benchmarking-against-amp.md`. `lodestar-team/camp-node` sits at 3 commits with releases v0.1.0 and v0.2.0. The tree is roughly 80% Rust, 20% TypeScript.
 
 The conclusion that matters: **camp-node is a genuine fork of real Amp source taken at `a1937bf`, not a reimplementation.** It keeps the upstream binary names `ampd`, `ampctl` and `ampsync` for compatibility, versions independently, and is explicitly "not affiliated with, sponsored by, or endorsed by Edge & Node Ventures or The Graph."
 

@@ -2,7 +2,7 @@
  * The shape of a GitHub issue form, as `/api/issue-forms` hands it over.
  *
  * The YAML parse, the validation and the markdown render moved to kittiwake on 2026-09-11
- * (nightswatchhq/kittiwake#113), along with the filing itself: the templates were already mirrored
+ * (nuthatch-org/kittiwake#113), along with the filing itself: the templates were already mirrored
  * there, and parsing them in two places is two sets of decisions about a schema that is GitHub's.
  * What stays here is the vocabulary the compose page renders a field with.
  *

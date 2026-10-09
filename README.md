@@ -105,7 +105,7 @@ Each indexer receives a composite score (0–100) across eleven dimensions, comb
 - **Zero extra API calls** — scores are computed from data the enrichment pipeline already fetches
 - **Delegation-neutral self-stake** — attracting delegation is a sign of trust, not something to penalise
 - **Delegator-first, but a deduction rather than a disqualification** — a 100% reward cut zeroes Delegator Cut (10%) and Delegator APY (8%), and caps Cut Stability (6%) at 5. That costs a flawless indexer 24 points, taking it from 100 (A) to **76 (B)**. It is a visible markdown, not a failing grade. If you want cuts excluded outright rather than marked down, that is the ≥ 90% hard filter in [One-Click Delegation](#one-click-delegation), which the score deliberately does not duplicate
-- **Feedback welcome** — if the weights or thresholds feel off, [open an issue](https://github.com/nightswatchhq/lodestar/issues)
+- **Feedback welcome** — if the weights or thresholds feel off, [open an issue](https://github.com/nuthatch-org/lodestar/issues)
 
 ## One-Click Delegation
 
@@ -143,11 +143,11 @@ With default preferences this is effectively "highest overall risk score among R
 
 The approval step is skipped on subsequent delegations if the existing GRT allowance covers the amount. First-time delegators need two transactions; all others need one.
 
-Code: [`src/app/delegate/`](src/app/delegate/) · API: `/api/delegate/recommend` in kittiwake's [`crates/read/src/recommend.rs`](https://github.com/nightswatchhq/kittiwake/blob/main/crates/read/src/recommend.rs)
+Code: [`src/app/delegate/`](src/app/delegate/) · API: `/api/delegate/recommend` in kittiwake's [`crates/read/src/recommend.rs`](https://github.com/nuthatch-org/kittiwake/blob/main/crates/read/src/recommend.rs)
 
 ## Backend
 
-Lodestar is a frontend. Every API call goes to **kittiwake** ([nightswatchhq/kittiwake](https://github.com/nightswatchhq/kittiwake)),
+Lodestar is a frontend. Every API call goes to **kittiwake** ([nuthatch-org/kittiwake](https://github.com/nuthatch-org/kittiwake)),
 a single Rust process in front of the nuthatch nests, which also owns the database schema at
 `db/schema.sql` and runs every scheduled job. The history of the move is in
 [docs/MIGRATION.md](docs/MIGRATION.md) and on [`/migration`](https://www.lodestar-dashboard.com/migration).
@@ -312,7 +312,7 @@ src/
 
 ## Contributing
 
-Issues and feedback welcome at [github.com/nightswatchhq/lodestar/issues](https://github.com/nightswatchhq/lodestar/issues).
+Issues and feedback welcome at [github.com/nuthatch-org/lodestar/issues](https://github.com/nuthatch-org/lodestar/issues).
 
 ## License
 

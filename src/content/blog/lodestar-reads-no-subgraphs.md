@@ -77,7 +77,7 @@ This is the part that does not fit the migration framing, and it is the more hon
 
 The gateway QoS oracle ingest is gone, along with everything derived from it: the per-indexer QoS route, the QoS-by-deployment route, the backfill and recompute scripts, and the tables, dropped in `migrations/020_drop_qos_oracle.sql`. In July we listed QoS as the notable thing still on The Graph. It did not move to a nest, because it cannot. Our own nest catalogue lists **Gateway QoS telemetry as blocked**, with the reason stated plainly: the gateway publishes it off chain, and no contract emits it. There is nothing on Arbitrum to index.
 
-So QoS is now measured rather than fetched. [Foghorn](https://github.com/nightswatchhq/foghorn), our self-hosted network-quality judge, serves `/qos` and `/foghorn` from its own probes. That is a different claim from the old one and we would rather say so than quietly swap the backend and keep the label.
+So QoS is now measured rather than fetched. [Foghorn](https://github.com/nuthatch-org/foghorn), our self-hosted network-quality judge, serves `/qos` and `/foghorn` from its own probes. That is a different claim from the old one and we would rather say so than quietly swap the backend and keep the label.
 
 Deleted with it: the indexer-trends panel, the conversions and protocols surfaces, the networks registry, the subgraph playground, the metered gateway proxy and its keys, the bounty query proxy, the Studio query proxy, the subgraph-health alert cron and the gateway probe. Every one of them existed only to relay somebody else's query through the gateway. The earlier position had been that the API key would stay configured for exactly these; the decision went the other way, and features that were only a relay were removed rather than kept alive on an exception.
 
@@ -128,4 +128,4 @@ It does not prove that everything on a dashboard can be indexed, and we would be
 
 The other thing worth saying: none of this was a flag day. It was seven weeks of one route at a time, each gated on parity at a fixed block, each with a rollback that restored a release rather than a hidden second data path. The last five landed in a single day only because the preceding forty-odd had been done properly.
 
-nuthatch is [github.com/nightswatchhq/nuthatch](https://github.com/nightswatchhq/nuthatch) (AGPL-3.0), and the nest catalogue is [github.com/nightswatchhq/nests](https://github.com/nightswatchhq/nests). Both nests serving Lodestar's Graph data are in there, and running one is `nuthatch init --from <repo-url>`.
+nuthatch is [github.com/nuthatch-org/nuthatch](https://github.com/nuthatch-org/nuthatch) (AGPL-3.0), and the nest catalogue is [github.com/nuthatch-org/nests](https://github.com/nuthatch-org/nests). Both nests serving Lodestar's Graph data are in there, and running one is `nuthatch init --from <repo-url>`.

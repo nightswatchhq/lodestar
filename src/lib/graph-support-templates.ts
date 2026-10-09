@@ -1,5 +1,5 @@
 /**
- * The six issue templates in nightswatchhq/graph-support, as a chooser.
+ * The six issue templates in nuthatch-org/graph-support, as a chooser.
  *
  * This list is the fallback, not the source. `/api/file-issue` reads the forms themselves from
  * kittiwake's mirror of the repository and the compose page renders those, so what a reporter
@@ -13,7 +13,7 @@
  * would rather open the thread under their own name, which is still the better way to do it.
  */
 
-const REPO = 'https://github.com/nightswatchhq/graph-support';
+const REPO = 'https://github.com/nuthatch-org/graph-support';
 
 export interface IssueTemplate {
   /** The filename, which is what GitHub's `template` parameter takes. */

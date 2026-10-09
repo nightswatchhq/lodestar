@@ -204,7 +204,7 @@ proxy does; delete one and the other has no purpose. That is the tenth environme
 *CORS, which nobody listed.* A browser on `www.lodestar-dashboard.com` calling
 `api.lodestar-dashboard.com` is cross-origin and kittiwake has never sent a CORS header - correctly,
 because every browser request currently arrives through the edge on the dashboard's own origin.
-nightswatchhq/kittiwake#130 adds the layer, off unless `[cors] allowed_origins` is configured, so it
+nuthatch-org/kittiwake#130 adds the layer, off unless `[cors] allowed_origins` is configured, so it
 can ship before anything uses it.
 
 The order is: deploy CORS, prove with a curl carrying an `Origin` header that the response actually

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'lodestar:star-dismissed';
-const REPO_URL = 'https://github.com/nightswatchhq/lodestar';
+const REPO_URL = 'https://github.com/nuthatch-org/lodestar';
 const DELAY_MS = 8000;
 
 export function StarPrompt() {

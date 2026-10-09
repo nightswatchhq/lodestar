@@ -79,7 +79,7 @@ export interface DataService {
   grc?: string;
   /** Org / author that built it. */
   builtBy: string;
-  /** Built by Lodestar (nightswatchhq / cargopete). */
+  /** Built by Lodestar (nuthatch-org / cargopete). */
   homeTeam: boolean;
   /** One-line summary for the card. */
   tagline: string;
@@ -109,7 +109,7 @@ export interface DataService {
   /**
    * Built, tested, and waiting for somebody to run it.
    *
-   * The Night's Watch builds these services and does not operate them: a box, a domain, a bill and
+   * Nuthatch builds these services and does not operate them: a box, a domain, a bill and
    * an on-call rota, indefinitely, per service, is a different job from writing the thing. So a
    * service can be finished and still have nobody serving, and the catalogue has to be able to say
    * that without either claiming production or implying the code is unready.
@@ -266,7 +266,7 @@ npm i @lodestar-dispatch/consumer-sdk`,
     slug: 'seahorn',
     name: 'Seahorn',
     grc: 'GRC-008',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'A Solana structured-data service: the "missing third lane" alongside Subgraphs and Substreams.',
     description:
@@ -288,7 +288,7 @@ npm i @lodestar-dispatch/consumer-sdk`,
     chain: { payment: 'arbitrum-one', paymentLabel: 'Arbitrum One', dataLabel: 'Solana mainnet data', isMainnet: true },
     stack: ['Rust', 'Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/seahorn' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/seahorn' },
       { label: 'GRC-008', url: 'https://forum.thegraph.com/t/grc-008-seahorn-a-solana-structured-data-service-on-horizon/6950' },
     ],
     contracts: [
@@ -368,7 +368,7 @@ curl -s 'https://seahorn.89.167.109.4.sslip.io/buys?limit=3&order=slot.desc' \\
   {
     slug: 'sdsce',
     name: 'Substreams Data Service: Community Edition (SDSCE)',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'A community edition of the Substreams Data Service, live on Arbitrum One with a fixed 1% burn.',
     description:
@@ -384,9 +384,9 @@ curl -s 'https://seahorn.89.167.109.4.sslip.io/buys?limit=3&order=slot.desc' \\
     chain: { payment: 'arbitrum-one', paymentLabel: 'Arbitrum One', dataLabel: 'Substreams (firecore)', isMainnet: true },
     stack: ['Go', 'Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/SDSCE' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/SDSCE' },
       { label: 'Announcement', url: 'https://www.lodestar-dashboard.com/blog/substreams-data-service-community-edition' },
-      { label: 'Deployment runbook', url: 'https://github.com/nightswatchhq/SDSCE/blob/main/docs/arb-one-deployment-runbook.md' },
+      { label: 'Deployment runbook', url: 'https://github.com/nuthatch-org/SDSCE/blob/main/docs/arb-one-deployment-runbook.md' },
     ],
     contracts: [
       {
@@ -440,7 +440,7 @@ substreams run common@v0.1.0 map_clocks -e localhost:9002 --plaintext -s 0 -t +2
   {
     slug: 'fhsce',
     name: 'File Hosting Service: Community Edition (FHSCE)',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'A community edition of the File Hosting Service: chunked, IPFS-verified file sharing, brought onto Horizon with TAP v2.',
     description:
@@ -455,8 +455,8 @@ substreams run common@v0.1.0 map_clocks -e localhost:9002 --plaintext -s 0 -t +2
     chain: { payment: 'arbitrum-one', paymentLabel: 'Arbitrum One (target)', dataLabel: 'Firehose flatfiles (.dbin)', isMainnet: false },
     stack: ['Rust', 'Solidity'],
     links: [
-      { label: 'Repo (FHSCE)', url: 'https://github.com/nightswatchhq/FHSCE' },
-      { label: 'horizon-core', url: 'https://github.com/nightswatchhq/horizon-core' },
+      { label: 'Repo (FHSCE)', url: 'https://github.com/nuthatch-org/FHSCE' },
+      { label: 'horizon-core', url: 'https://github.com/nuthatch-org/horizon-core' },
       { label: 'Upstream (graphops)', url: 'https://github.com/graphops/file-hosting-service' },
     ],
     minProvision: '0 GRT (soft launch)',
@@ -473,12 +473,12 @@ substreams run common@v0.1.0 map_clocks -e localhost:9002 --plaintext -s 0 -t +2
     ],
     fees: 'Fixed 1% data-service cut, burned (0% retained), matching SDSCE under Community Edition policy.',
     notable:
-      'First consumer of horizon-core (nightswatchhq\'s reusable Horizon payment plumbing: TAP v2 validation, RAV aggregation, on-chain collection, persistence, generic TAP-gated proxy). Experimental and community-led; not affiliated with the Graph Foundation, Edge & Node, or GraphOps. Unaudited. Distinct from the upstream graphops File Hosting Service.',
+      'First consumer of horizon-core (nuthatch-org\'s reusable Horizon payment plumbing: TAP v2 validation, RAV aggregation, on-chain collection, persistence, generic TAP-gated proxy). Experimental and community-led; not affiliated with the Graph Foundation, Edge & Node, or GraphOps. Unaudited. Distinct from the upstream graphops File Hosting Service.',
   },
   {
     slug: 'nuthatch-data-service',
     name: 'Nuthatch Data Service',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'Reproducible Nuthatch indexed datasets, identified and sold by NID rather than a vague promise of SQL.',
     description:
@@ -498,9 +498,9 @@ substreams run common@v0.1.0 map_clocks -e localhost:9002 --plaintext -s 0 -t +2
     },
     stack: ['Rust', 'Solidity', 'DuckDB', 'Postgres'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/nuthatch-ds' },
-      { label: 'First nest: horizon-nest', url: 'https://github.com/nightswatchhq/horizon-nest' },
-      { label: 'Nuthatch', url: 'https://github.com/nightswatchhq/nuthatch' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/nuthatch-ds' },
+      { label: 'First nest: horizon-nest', url: 'https://github.com/nuthatch-org/horizon-nest' },
+      { label: 'Nuthatch', url: 'https://github.com/nuthatch-org/nuthatch' },
     ],
     contracts: [
       {
@@ -590,7 +590,7 @@ cargo run --example stream_blocks -- \\
   {
     slug: 'wsaas',
     name: 'WSaaS (WebSocket)',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'A WebSocket data service: pre-parsed transfers, swaps and exchange events over one connection, billed per message.',
     description:
@@ -606,7 +606,7 @@ cargo run --example stream_blocks -- \\
     chain: { payment: 'arbitrum-one', paymentLabel: 'Arbitrum One', dataLabel: 'Multi-chain pre-parsed events', isMainnet: true },
     stack: ['Rust', 'Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/wsaas' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/wsaas' },
       { label: 'Pinax WebSockets', url: 'https://pinax.network/products/websockets' },
     ],
     contracts: [
@@ -644,7 +644,7 @@ wscat -c "wss://ws.89.167.109.4.sslip.io/ws/solana/swaps?receipt=$RECEIPT_JSON"
     slug: 'compass',
     name: 'Compass',
     grc: 'GRC-007',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'A decentralized Subgraph-MCP gateway, turning every subgraph into a pay-per-call MCP tool for AI agents.',
     description:
@@ -658,7 +658,7 @@ wscat -c "wss://ws.89.167.109.4.sslip.io/ws/solana/swaps?receipt=$RECEIPT_JSON"
     chain: { payment: 'arbitrum-sepolia', paymentLabel: 'Arbitrum Sepolia', dataLabel: 'USDC rail on Base', isMainnet: false },
     stack: ['Solidity', 'JavaScript', 'TypeScript', 'Rust'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/compass' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/compass' },
       { label: 'GRC-007', url: 'https://forum.thegraph.com/t/grc-007-compass-a-decentralised-subgraph-mcp-gateway-on-horizon/6949' },
     ],
     becomeProvider: [
@@ -678,7 +678,7 @@ wscat -c "wss://ws.89.167.109.4.sslip.io/ws/solana/swaps?receipt=$RECEIPT_JSON"
   {
     slug: 'camp-data-service',
     name: 'camp-data-service',
-    builtBy: 'nightswatchhq',
+    builtBy: 'nuthatch-org',
     homeTeam: true,
     tagline: 'Monetizes a self-hosted camp instance: pay per request in GRT for decoded Arbitrum One data.',
     description:
@@ -700,8 +700,8 @@ wscat -c "wss://ws.89.167.109.4.sslip.io/ws/solana/swaps?receipt=$RECEIPT_JSON"
     },
     stack: ['Rust', 'Solidity', 'TypeScript'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/camp-data-service' },
-      { label: 'camp REST API', url: 'https://github.com/nightswatchhq/camp' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/camp-data-service' },
+      { label: 'camp REST API', url: 'https://github.com/nuthatch-org/camp' },
     ],
     contracts: [
       { label: 'CampDataService (proxy)', address: '0x8ED612666ad1853AdB050f4c4c54082decA605b8', network: 'arbitrum-one' },
@@ -745,7 +745,7 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
   {
     slug: 'hermit',
     name: 'Hermit DS',
-    builtBy: 'lodestone (nightswatchhq)',
+    builtBy: 'lodestone (nuthatch-org)',
     homeTeam: true,
     tagline: 'The inverse analytics service: it indexes wallets that have gone quiet and fires wake alerts when dormant ones stir.',
     description:
@@ -760,8 +760,8 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
     chain: { payment: 'arbitrum-sepolia', paymentLabel: 'Arbitrum Sepolia (target)', dataLabel: 'Dormancy signal (concept)', isMainnet: false },
     stack: ['Rust', 'Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/hermit-ds' },
-      { label: 'Built with lodestone', url: 'https://github.com/nightswatchhq/lodestone' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/hermit-ds' },
+      { label: 'Built with lodestone', url: 'https://github.com/nuthatch-org/lodestone' },
       { label: 'How it was built', url: 'https://www.lodestar-dashboard.com/blog/build-data-services-with-lodestone' },
     ],
     minProvision: '555 GRT',
@@ -781,7 +781,7 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
   {
     slug: 'vince-data-service',
     name: 'Vince Data Service',
-    builtBy: 'nightswatchhq · cargopete',
+    builtBy: 'nuthatch-org · cargopete',
     homeTeam: true,
     tagline: 'A whimsical-but-functional service "for locating individuals named Vince, worldwide".',
     description:
@@ -795,7 +795,7 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
     chain: { payment: 'local-anvil', paymentLabel: 'Local Anvil', isMainnet: false },
     stack: ['Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/vince-data-service' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/vince-data-service' },
       { label: 'Lodestar guide', url: 'https://www.lodestar-dashboard.com/blog/how-to-build-a-horizon-data-service' },
     ],
     becomeProvider: [
@@ -812,7 +812,7 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
   {
     slug: 'hello-data-service',
     name: 'Hello Data Service',
-    builtBy: 'nightswatchhq · cargopete',
+    builtBy: 'nuthatch-org · cargopete',
     homeTeam: true,
     tagline: 'A minimal (~120-line) working Horizon data service reference, the simplest of the set.',
     description:
@@ -826,7 +826,7 @@ curl -s 'https://camp.89.167.109.4.sslip.io/v1/transfers?token=0xaf88…&limit=1
     chain: { payment: 'local-anvil', paymentLabel: 'Local Anvil', isMainnet: false },
     stack: ['Solidity'],
     links: [
-      { label: 'Repo', url: 'https://github.com/nightswatchhq/hello-data-service' },
+      { label: 'Repo', url: 'https://github.com/nuthatch-org/hello-data-service' },
       { label: 'Lodestar guide', url: 'https://www.lodestar-dashboard.com/blog/how-to-build-a-horizon-data-service' },
     ],
     becomeProvider: [

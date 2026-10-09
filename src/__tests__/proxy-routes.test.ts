@@ -57,7 +57,7 @@ describe('the migrated route list', () => {
    * These three shipped in the list and answered 200 with a payload the frontend could not read -
    * `/api/subgraph-history` returned `{allocations, signals}` where the page reads `{history}`.
    * They were never in the parity harness. Until the ports are finished they stay on Next, and this
-   * test is what stops them drifting back in unnoticed. See nightswatchhq/kittiwake#23.
+   * test is what stops them drifting back in unnoticed. See nuthatch-org/kittiwake#23.
    */
   /**
    * One of the eight remains out. Its port needs the live serving probe and the multi-round

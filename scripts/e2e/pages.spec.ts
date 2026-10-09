@@ -138,7 +138,7 @@ test('the delegation activity filter does not throw on indexers with no name', a
  * `/api/poi?deployment=` normalised its argument by lowercasing, and base58 is case-sensitive, so
  * every `Qm…` CID became rubbish. The page returned 200 and rendered its shell, the request failed
  * in the console, and nothing else noticed: the #114 shape again, in a route no test opened.
- * nightswatchhq/kittiwake#124.
+ * nuthatch-org/kittiwake#124.
  */
 test('a POI deployment page renders epochs rather than a failed read', async ({ page, request }) => {
   const failed: string[] = [];

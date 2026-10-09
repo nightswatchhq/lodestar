@@ -1,7 +1,7 @@
 ---
 title: "We Read the Foundation's New Roadmap. Anyway, Here's Our GitHub"
 date: "2026-08-28"
-author: "nightswatchhq"
+author: "nuthatch-org"
 tags: ["the-graph", "roadmap", "catalyst", "community", "data-services"]
 category: "Ecosystem"
 excerpt: "A completely humble review of Project Catalyst, in which we discover that the community accidentally pre-built most of it."
@@ -23,25 +23,25 @@ Bold. Ambitious. Also: the [Dock](/dock) has been quietly doing Studio's job for
 
 ## "Onboard new gateway operators"
 
-You will be delighted to learn that the onboarding kit already exists. It's called [gib](https://github.com/nightswatchhq/gib) - **Gateway-in-a-Box** - a self-hostable, TAP-native, Horizon-ready Graph gateway in a Docker Compose file. It runs on a 2GB VPS. It has a one-command smoke test that proves your whole payment path end-to-end before you ask a single indexer for anything.
+You will be delighted to learn that the onboarding kit already exists. It's called [gib](https://github.com/nuthatch-org/gib) - **Gateway-in-a-Box** - a self-hostable, TAP-native, Horizon-ready Graph gateway in a Docker Compose file. It runs on a 2GB VPS. It has a one-command smoke test that proves your whole payment path end-to-end before you ask a single indexer for anything.
 
 Is it battle-hardened? Our README states, with the confidence of a man walking into the sea: *no payment has ever flowed, not on any network, not once.* But every receipt verifies, every RAV recovers to the right signer, and the only thing between a fresh gib deployment and production is the indexer whitelist wall - which, conveniently, is a social coordination problem, and social coordination is famously the Foundation's whole thing. We'll bring the box; you bring the handshakes.
 
 ## "Memory for AI"
 
-Okay, this one's genuinely not ours - storing agent memory on the network is a neat idea and we're curious. But when those agents want to *reach* the network, may we interest you in [compass](https://github.com/nightswatchhq/compass)? It's a Subgraph-MCP gateway as a Horizon data service: every subgraph becomes a pay-per-call MCP tool, settled in GRT via TAP v2 or USDC via x402. Any agent that speaks MCP - Claude, Cursor, whatever your nephew is building - queries subgraphs for under a cent, no API key, no central operator.
+Okay, this one's genuinely not ours - storing agent memory on the network is a neat idea and we're curious. But when those agents want to *reach* the network, may we interest you in [compass](https://github.com/nuthatch-org/compass)? It's a Subgraph-MCP gateway as a Horizon data service: every subgraph becomes a pay-per-call MCP tool, settled in GRT via TAP v2 or USDC via x402. Any agent that speaks MCP - Claude, Cursor, whatever your nephew is building - queries subgraphs for under a cent, no API key, no central operator.
 
 Your memory service will need an agent-facing front door. We appear to have built a door. GRC-007 forum post incoming.
 
 ## "Finish the Substreams data service"
 
-"We were very close to shipping it before the core dev grants ended," said the Foundation. Funny story: so were we, except we kept going. [SDSCE](https://github.com/nightswatchhq/SDSCE) - the Substreams Data Service *Community Edition* - has a live contract on Arbitrum One, an automated settlement daemon, deployment runbooks, and a rehearsed end-to-end provision → register → collect path with a 1% burn.
+"We were very close to shipping it before the core dev grants ended," said the Foundation. Funny story: so were we, except we kept going. [SDSCE](https://github.com/nuthatch-org/SDSCE) - the Substreams Data Service *Community Edition* - has a live contract on Arbitrum One, an automated settlement daemon, deployment runbooks, and a rehearsed end-to-end provision → register → collect path with a 1% burn.
 
 The "Community Edition" name is doing load-bearing work here: it's experimental, externally unaudited, owner-controlled by an EOA, and explicitly leaves room for the official version. Which is our extremely subtle way of saying - Pedro, StreamingFast, the fork is right there, the runbooks are written, and we would much rather hand you our Arbitrum One scars than watch you collect a matching set.
 
 ## "The RPC service - yes, we're finally coming up with a plan"
 
-The community's plan is called [Dispatch](https://github.com/nightswatchhq/dispatch) (GRC-005), and it's far enough along that Lodestar's indexer scoring already gives you credit for provisioning to it. We are not saying the plan should just be "Dispatch." We're just saying that if you typed "Graph RPC data service" into a search bar, the plan would find *you*.
+The community's plan is called [Dispatch](https://github.com/nuthatch-org/dispatch) (GRC-005), and it's far enough along that Lodestar's indexer scoring already gives you credit for provisioning to it. We are not saying the plan should just be "Dispatch." We're just saying that if you typed "Graph RPC data service" into a search bar, the plan would find *you*.
 
 ## "A multi-product Studio experience"
 

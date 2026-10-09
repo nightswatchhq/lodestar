@@ -2,7 +2,7 @@
 
 **Status:** Draft, 2026-09-13
 **Author:** Pete
-**Follows:** nightswatchhq/nuthatch#1160 (the removal), `plans/grc-the-lodestar-oracle.md`
+**Follows:** nuthatch-org/nuthatch#1160 (the removal), `plans/grc-the-lodestar-oracle.md`
 **Touches:** `graph-allocations-nest`, `qos-reo-nest`, nuthatch (one slice), kittiwake, this repo
 
 ## TL;DR

@@ -3,7 +3,7 @@
 /**
  * `rav_grt` and `indexing_rewards_grt` are what the indexer received: query fees after the protocol, the
  * curators and the delegators, and rewards after the delegators. The `*_gross_grt` fields are what was
- * collected, which is what the first two meant before nightswatchhq/kittiwake#142.
+ * collected, which is what the first two meant before nuthatch-org/kittiwake#142.
  */
 export interface RevenueDay {
   date: string;

@@ -4,7 +4,7 @@
  * Types and one constant, deliberately with no implementation beside them. They used to live in
  * `indexing-status.ts` alongside the probe itself, so a page needing a number imported a module
  * that reached for a TAP signing key, an SSRF guard and a live HTTP probe. The route that ran all
- * of that moved to kittiwake on 2026-09-11 (nightswatchhq/kittiwake#116, #117); this is what the
+ * of that moved to kittiwake on 2026-09-11 (nuthatch-org/kittiwake#116, #117); this is what the
  * frontend still needs in order to render the answer it is handed.
  */
 

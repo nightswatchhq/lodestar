@@ -2,7 +2,7 @@
  * The desktop sidebar and the mobile bottom nav have to agree, and nothing made them.
  *
  * They are two hand-maintained lists of the same routes in two files, which is the shape of the
- * defect behind nightswatchhq/kittiwake#23 and the reason `migration.ts` is one list rather than
+ * defect behind nuthatch-org/kittiwake#23 and the reason `migration.ts` is one list rather than
  * two. It bit here on 2026-09-09: `/support` shipped into the sidebar and the footer, and mobile
  * users could not reach it at all, because adding a page means editing two files and only one of
  * them is in front of you. Checking then found `/sql`, `/verify` and `/qos` had been missing from

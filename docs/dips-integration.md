@@ -41,7 +41,7 @@ directions: self-only zeroes InnovationAllocation, allocator-only zeroes the Rew
 **The `Allocation` struct has three fields, not two.** `(totalAllocationRate, allocatorMintingRate,
 selfMintingRate)`. A two-field ABI decodes without error and returns values shifted by one position,
 which is a wrong answer that looks exactly like a right one. Decode against the ABI in
-`nightswatchhq/dips-nest/abis/`, never against a reading of the docs.
+`nuthatch-org/dips-nest/abis/`, never against a reading of the docs.
 
 **The sum is an exact invariant.** Per-target totals equal `getIssuancePerBlock()`. Not
 approximately, exactly. That is the cheapest correctness check available on this surface and it is
@@ -124,7 +124,7 @@ version of exactly the failure the panel exists to prevent.
 
 Not integrated, and it should stay that way. The Dipper is the Foundation's gateway-internal
 component under GIP-0081's off-chain MVP. DIPS settles through `RecurringCollector` under GIP-0087,
-which is a different path, and `nightswatchhq/weaver` already covers it: it builds, signs and checks
+which is a different path, and `nuthatch-org/weaver` already covers it: it builds, signs and checks
 Recurring Collection Agreements with the EIP-712 hashing verified against the deployed contract
 rather than against a reading of the spec.
 
@@ -253,7 +253,7 @@ noticed because an unlabelled address at a plausible rate looks like noise.
       exercised, which is how "it would have been caught" stayed a theory while
       InnovationAllocation went unremarked.
 - [ ] **Deploy `dips-nest-sepolia` to Helsinki.** The one item that needs the box. Config authored
-      in [nightswatchhq/dips-nest#1](https://github.com/nightswatchhq/dips-nest/pull/1), with
+      in [nuthatch-org/dips-nest#1](https://github.com/nuthatch-org/dips-nest/pull/1), with
       `start_block` values read over RPC rather than taken from a deployment record. It buys the
       `/sql` path itself: exact table and column names, the `_dec` companions and the provenance
       envelope, none of which an RPC log read exercises.
@@ -274,5 +274,5 @@ contract set, and folding it into this bullet only made this bullet permanently 
 
 - `docs/catalyst-community-roadmap.md`, CAT-1, for how this fits the wider workstream.
 - `docs/nuthatch-migration.md` for the nest-down policy these routes inherit.
-- [nightswatchhq/dips-nest](https://github.com/nightswatchhq/dips-nest) for the schema and views.
-- [nightswatchhq/weaver](https://github.com/nightswatchhq/weaver) for the agreement tooling.
+- [nuthatch-org/dips-nest](https://github.com/nuthatch-org/dips-nest) for the schema and views.
+- [nuthatch-org/weaver](https://github.com/nuthatch-org/weaver) for the agreement tooling.
